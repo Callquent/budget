@@ -1,0 +1,221 @@
+{# templates/monthly_budget/month.html.twig #}
+{% extends 'base.html.twig' %}
+{% block title %}Budget — {{ period_label }}{% endblock %}
+
+{% block body %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <a href="{{ path('monthly_budget_year', {year: year}) }}" class="text-muted text-decoration-none small">
+            <i class="bi bi-chevron-left"></i> Budget {{ year }}
+        </a>
+        <h1 class="h3 mb-0 mt-1">{{ period_label|capitalize }}</h1>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ path('monthly_budget_new') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Ajouter
+        </a>
+        <form method="post" action="{{ path('monthly_budget_duplicate', {year: year, month: month}) }}"
+              onsubmit="return confirm('Copier ces lignes vers le mois suivant ?')">
+            <input type="hidden" name="_token" value="{{ csrf_token('dup-'~year~'-'~month) }}">
+            <button class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-copy me-1"></i>Dupliquer →
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if budgets is empty %}
+    <div class="alert alert-info">
+        Aucune ligne budgétaire pour ce mois.
+        <a href="{{ path('monthly_budget_new') }}" class="alert-link">En ajouter une</a>.
+    </div>
+{% else %}
+
+{# Comptes + mouvements du mois #}
+<div class="row g-3 mb-4">
+    {% for account in accounts %}
+        {% set aid = account.id %}
+        {% set credit = tx_by_account[aid].credit ?? 0 %}
+        {% set debit  = tx_by_account[aid].debit  ?? 0 %}
+        {% set net    = credit - debit %}
+        <div class="col-md-4 col-sm-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                             style="width:40px;height:40px;background:{{ account.type == 'credit' ? '#d1fae5' : '#fee2e2' }}">
+                            <i class="bi {{ account.type == 'credit' ? 'bi-piggy-bank text-success' : 'bi-wallet2 text-danger' }} fs-5"></i>
+                        </div>
+                        <div>
+                            <div class="fw-semibold">{{ account.name }}</div>
+                            <div class="small text-muted">Solde : <strong>{{ account.balance|number_format(2, ',', ' ') }} {{ account.currency }}</strong></div>
+                        </div>
+                    </div>
+                    {% if credit > 0 or debit > 0 %}
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-success"><i class="bi bi-arrow-down-circle me-1"></i>Entrées</span>
+                            <span class="fw-medium text-success">+{{ credit|number_format(2, ',', ' ') }} €</span>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-2">
+                            <span class="text-danger"><i class="bi bi-arrow-up-circle me-1"></i>Sorties</span>
+                            <span class="fw-medium text-danger">-{{ debit|number_format(2, ',', ' ') }} €</span>
+                        </div>
+                        <div class="border-top pt-2 d-flex justify-content-between small fw-semibold">
+                            <span>Net du mois</span>
+                            <span class="{{ net >= 0 ? 'text-success' : 'text-danger' }}">
+                                {{ net >= 0 ? '+' : '' }}{{ net|number_format(2, ',', ' ') }} €
+                            </span>
+                        </div>
+                    {% else %}
+                        <div class="text-muted small text-center py-1">Aucun mouvement ce mois</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+{# ── Abonnements actifs ce mois ─────────────────────────────────────────── #}
+{% if subscriptions is defined and subscriptions is not empty %}
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">
+            <i class="bi bi-arrow-repeat me-2 text-primary"></i>Abonnements actifs ce mois
+        </span>
+        <span class="badge bg-primary">{{ subscriptions|length }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Compte</th>
+                    <th>Catégorie</th>
+                    <th>Fréquence</th>
+                    <th class="text-end">Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set freq_labels = {monthly:'Mensuel', yearly:'Annuel', quarterly:'Trimestriel', occasional:'Occasionnel'} %}
+                {% for sub in subscriptions %}
+                <tr>
+                    <td class="fw-medium">{{ sub.name }}</td>
+                    <td>{{ sub.account.name }}</td>
+                    <td><span class="badge badge-expense">{{ sub.category.name }}</span></td>
+                    <td><span class="badge badge-{{ sub.frequency }}">{{ freq_labels[sub.frequency] ?? sub.frequency }}</span></td>
+                    <td class="text-end fw-semibold text-danger">-{{ sub.amount|number_format(2, ',', ' ') }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light fw-semibold">
+                <tr>
+                    <td colspan="4">Total abonnements</td>
+                    <td class="text-end text-danger">
+                        -{{ subscriptions|reduce((carry, sub) => carry + sub.amount, 0)|number_format(2, ',', ' ') }} €
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{# ── Tableau budget prévu / réalisé ─────────────────────────────────────── #}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Catégorie</th>
+                        <th>Fréquence</th>
+                        <th class="text-end">Prévu</th>
+                        <th class="text-end">Réalisé</th>
+                        <th class="text-end">Écart</th>
+                        <th style="width:120px">Avancement</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {# Totaux séparés recettes / dépenses pour un solde net correct #}
+                    {% set total_planned_income  = 0 %}
+                    {% set total_actual_income   = 0 %}
+                    {% set total_planned_expense = 0 %}
+                    {% set total_actual_expense  = 0 %}
+
+                    {% for budget in budgets %}
+                        {% set variance = budget.plannedAmount - budget.actualAmount %}
+                        {% set pct = budget.plannedAmount > 0 ? (budget.actualAmount / budget.plannedAmount * 100)|round : 0 %}
+
+                        {% if budget.category.transactionType == 'income' %}
+                            {% set total_planned_income = total_planned_income + budget.plannedAmount %}
+                            {% set total_actual_income  = total_actual_income  + budget.actualAmount %}
+                        {% else %}
+                            {% set total_planned_expense = total_planned_expense + budget.plannedAmount %}
+                            {% set total_actual_expense  = total_actual_expense  + budget.actualAmount %}
+                        {% endif %}
+
+                        <tr>
+                            <td>
+                                <span class="fw-medium">{{ budget.category.name }}</span>
+                                <span class="badge ms-1
+                                    {% if budget.category.transactionType == 'income' %}badge-income
+                                    {% elseif budget.category.transactionType == 'expense' %}badge-expense
+                                    {% else %}badge-transfer{% endif %}">
+                                    {{ budget.category.transactionType == 'income' ? 'recette' : (budget.category.transactionType == 'expense' ? 'dépense' : 'virement') }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ budget.category.frequency }}">
+                                    {{ {monthly:'mensuelle', yearly:'annuelle', quarterly:'trimestrielle', occasional:'occasionnel'}[budget.category.frequency] ?? budget.category.frequency }}
+                                </span>
+                            </td>
+                            <td class="text-end text-muted">{{ budget.plannedAmount|number_format(2, ',', ' ') }} €</td>
+                            <td class="text-end">{{ budget.actualAmount|number_format(2, ',', ' ') }} €</td>
+                            <td class="text-end {{ variance >= 0 ? 'text-success' : 'text-danger' }}">
+                                {{ variance >= 0 ? '+' : '' }}{{ variance|number_format(2, ',', ' ') }} €
+                            </td>
+                            <td>
+                                {% if budget.plannedAmount > 0 %}
+                                    <div class="progress">
+                                        <div class="progress-bar {{ pct > 100 ? 'bg-danger' : (pct > 80 ? 'bg-warning' : 'bg-success') }}"
+                                             style="width: {{ pct > 100 ? 100 : pct }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ pct }} %</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ path('monthly_budget_edit', {id: budget.id}) }}" class="btn btn-outline-primary btn-action me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post" action="{{ path('monthly_budget_delete', {id: budget.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('Supprimer cette ligne ?')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete-budget-' ~ budget.id) }}">
+                                    <button class="btn btn-outline-danger btn-action"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light fw-semibold">
+                    {% set total_planned_net = total_planned_income - total_planned_expense %}
+                    {% set total_actual_net  = total_actual_income  - total_actual_expense %}
+                    {% set tv = total_planned_net - total_actual_net %}
+                    <tr>
+                        <td colspan="2">Solde net (recettes − dépenses)</td>
+                        <td class="text-end {{ total_planned_net >= 0 ? 'text-success' : 'text-danger' }}">
+                            {{ total_planned_net >= 0 ? '+' : '' }}{{ total_planned_net|number_format(2, ',', ' ') }} €
+                        </td>
+                        <td class="text-end {{ total_actual_net >= 0 ? 'text-success' : 'text-danger' }}">
+                            {{ total_actual_net >= 0 ? '+' : '' }}{{ total_actual_net|number_format(2, ',', ' ') }} €
+                        </td>
+                        <td class="text-end {{ tv >= 0 ? 'text-success' : 'text-danger' }}">
+                            {{ tv >= 0 ? '+' : '' }}{{ tv|number_format(2, ',', ' ') }} €
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

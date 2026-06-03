@@ -1,0 +1,139 @@
+# =======================
+# GÉNÉRAL (pour tous les projets)
+# =======================
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.log
+*.sql
+*.sqlite
+*.db
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+node_modules/
+vendor/
+composer.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+build/
+dist/
+cache/
+*.cache
+*.diff
+*.patch
+*.bak
+*.orig
+*.rej
+
+# =======================
+# NEXT.JS (dans le dossier /next)
+# =======================
+/next/.next/
+/next/out/
+/next/build/
+/next/.pnp/
+/next/.pnp.js
+/next/node_modules/
+/next/.env*
+/next/.env.local
+/next/.env.development
+/next/.env.test
+/next/.env.production
+/next/.cache/
+/next/.parcel-cache/
+/next/.npm
+/next/.yarn/
+/next/.yarn/cache
+/next/.yarn/unplugged
+/next/.yarn/build-state.gz
+/next/.yarn/install-state.gz
+/next/.yarn/.pnp.unplugged
+/next/.yarn/berry
+/next/.yarn/links
+/next/.yarn/sdks
+/next/.yarn/versions
+/next/.yarn/workspaces
+/next/.yarn/.pnp.js
+/next/.yarnrc.yml
+/next/yarn-error.log
+/next/.next/cache/
+
+# =======================
+# SYMFONY (dans le dossier /symfony)
+# =======================
+/symfony/var/
+/symfony/vendor/
+/symfony/node_modules/
+/symfony/public/build/
+/symfony/public/bundles/
+/symfony/var/cache/
+/symfony/var/logs/
+/symfony/var/sessions/
+/symfony/var/export/
+/symfony/.env
+/symfony/.env.local
+/symfony/.env.*.local
+/symfony/composer.lock
+/symfony/ide/
+/symfony/.phpunit.cache/
+/symfony/.phpstorm.meta.php
+/symfony/.symfony/
+/symfony/.symfony5/
+/symfony/bin/.phpunit/
+/symfony/coverage/
+/symfony/phpunit.xml
+/symfony/phpunit.xml.dist
+/symfony/.php_cs.cache
+/symfony/.php-cs-fixer.cache
+/symfony/.phpunit.result.cache
+/symfony/.vibe/
+/symfony/.vibe.cache
+
+# =======================
+# DOCKER
+# =======================
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+*.docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# =======================
+# IDE / EDITORS
+# =======================
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+*.phpstorm.meta.php
+.php_cs.cache
+.phpunit.cache
+.phpunit.result.cache
+
+# =======================
+# OS SPECIFIC
+# =======================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
