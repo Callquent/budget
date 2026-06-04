@@ -1,6 +1,6 @@
 {# templates/monthly_budget/month.html.twig #}
 {% extends 'base.html.twig' %}
-{% block title %}Budget — {{ period_label }}{% endblock %}
+{% block title %}Budget prévisionnel — {{ period_label }}{% endblock %}
 
 {% block body %}
 <div class="d-flex align-items-center justify-content-between mb-4">
@@ -8,11 +8,11 @@
         <a href="{{ path('monthly_budget_year', {year: year}) }}" class="text-muted text-decoration-none small">
             <i class="bi bi-chevron-left"></i> Budget {{ year }}
         </a>
-        <h1 class="h3 mb-0 mt-1">{{ period_label|capitalize }}</h1>
+        <h1 class="h3 mb-0 mt-1">Budget prévisionnel — {{ period_label|capitalize }}</h1>
     </div>
     <div class="d-flex gap-2">
         <a href="{{ path('monthly_budget_new') }}" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i>Ajouter
+            <i class="bi bi-plus-lg me-1"></i>Budget
         </a>
         <form method="post" action="{{ path('monthly_budget_duplicate', {year: year, month: month}) }}"
               onsubmit="return confirm('Copier ces lignes vers le mois suivant ?')">
@@ -37,7 +37,9 @@
         {% set aid = account.id %}
         {% set credit = tx_by_account[aid].credit ?? 0 %}
         {% set debit  = tx_by_account[aid].debit  ?? 0 %}
+        {% set subs   = tx_by_account[aid].subs   ?? 0 %}
         {% set net    = credit - debit %}
+        {% set solde_fin_mois = account.balance + net %}
         <div class="col-md-4 col-sm-6">
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-body">
@@ -48,7 +50,7 @@
                         </div>
                         <div>
                             <div class="fw-semibold">{{ account.name }}</div>
-                            <div class="small text-muted">Solde : <strong>{{ account.balance|number_format(2, ',', ' ') }} {{ account.currency }}</strong></div>
+                            <div class="small text-muted">Solde actuel : <strong>{{ account.balance|number_format(2, ',', ' ') }} {{ account.currency }}</strong></div>
                         </div>
                     </div>
                     {% if credit > 0 or debit > 0 %}
@@ -56,11 +58,17 @@
                             <span class="text-success"><i class="bi bi-arrow-down-circle me-1"></i>Entrées</span>
                             <span class="fw-medium text-success">+{{ credit|number_format(2, ',', ' ') }} €</span>
                         </div>
-                        <div class="d-flex justify-content-between small mb-2">
+                        <div class="d-flex justify-content-between small mb-1">
                             <span class="text-danger"><i class="bi bi-arrow-up-circle me-1"></i>Sorties</span>
-                            <span class="fw-medium text-danger">-{{ debit|number_format(2, ',', ' ') }} €</span>
+                            <span class="fw-medium text-danger">-{{ (debit - subs)|number_format(2, ',', ' ') }} €</span>
                         </div>
-                        <div class="border-top pt-2 d-flex justify-content-between small fw-semibold">
+                        {% if subs > 0 %}
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-warning"><i class="bi bi-arrow-repeat me-1"></i>Abonnements</span>
+                            <span class="fw-medium text-warning">-{{ subs|number_format(2, ',', ' ') }} €</span>
+                        </div>
+                        {% endif %}
+                        <div class="border-top pt-2 mt-1 d-flex justify-content-between small fw-semibold">
                             <span>Net du mois</span>
                             <span class="{{ net >= 0 ? 'text-success' : 'text-danger' }}">
                                 {{ net >= 0 ? '+' : '' }}{{ net|number_format(2, ',', ' ') }} €
@@ -120,18 +128,23 @@
 </div>
 {% endif %}
 
-{# ── Tableau budget prévu / réalisé ─────────────────────────────────────── #}
+{# ── Tableau budget prévisionnel ─────────────────────────────────────────── #}
     <div class="card">
+        <div class="card-header bg-white fw-semibold">
+            <i class="bi bi-clipboard-check me-2 text-primary"></i>Budget prévisionnel
+        </div>
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>
                     <tr>
                         <th>Catégorie</th>
                         <th>Fréquence</th>
+                        <th>Compte</th>
                         <th class="text-end">Prévu</th>
-                        <th class="text-end">Réalisé</th>
                         <th class="text-end">Écart</th>
-                        <th style="width:120px">Avancement</th>
+                        <th class="text-end">Réalisé</th>
+                        <th style="width:110px">Avancement</th>
+                        <th>Statut</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -154,7 +167,7 @@
                             {% set total_actual_expense  = total_actual_expense  + budget.actualAmount %}
                         {% endif %}
 
-                        <tr>
+                        <tr class="{{ budget.isApproved() ? 'table-success bg-opacity-50' : '' }}">
                             <td>
                                 <span class="fw-medium">{{ budget.category.name }}</span>
                                 <span class="badge ms-1
@@ -169,11 +182,18 @@
                                     {{ {monthly:'mensuelle', yearly:'annuelle', quarterly:'trimestrielle', occasional:'occasionnel'}[budget.category.frequency] ?? budget.category.frequency }}
                                 </span>
                             </td>
+                            <td class="small text-muted">
+                                {% if budget.account %}
+                                    {{ budget.account.name }}
+                                {% else %}
+                                    <span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Non défini</span>
+                                {% endif %}
+                            </td>
                             <td class="text-end text-muted">{{ budget.plannedAmount|number_format(2, ',', ' ') }} €</td>
-                            <td class="text-end">{{ budget.actualAmount|number_format(2, ',', ' ') }} €</td>
                             <td class="text-end {{ variance >= 0 ? 'text-success' : 'text-danger' }}">
                                 {{ variance >= 0 ? '+' : '' }}{{ variance|number_format(2, ',', ' ') }} €
                             </td>
+                            <td class="text-end">{{ budget.actualAmount|number_format(2, ',', ' ') }} €</td>
                             <td>
                                 {% if budget.plannedAmount > 0 %}
                                     <div class="progress">
@@ -183,15 +203,61 @@
                                     <small class="text-muted">{{ pct }} %</small>
                                 {% endif %}
                             </td>
-                            <td class="text-end">
-                                <a href="{{ path('monthly_budget_edit', {id: budget.id}) }}" class="btn btn-outline-primary btn-action me-1">
+                            <td>
+                                {% if budget.isApproved() %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle me-1"></i>Approuvé
+                                    </span>
+                                    {% if budget.approvedAt %}
+                                        <div class="text-muted" style="font-size:.7rem">
+                                            {{ budget.approvedAt|date('d/m/Y') }}
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-25 text-secondary">En attente</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end" style="white-space:nowrap">
+                                {# Bouton Approuver #}
+                                {% if not budget.isApproved() %}
+                                    <form method="post"
+                                          action="{{ path('monthly_budget_approve', {id: budget.id}) }}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Approuver « {{ budget.category.name }} » et créer la transaction de {{ budget.actualAmount }} € ?')">
+                                        <input type="hidden" name="_token"
+                                               value="{{ csrf_token('approve-budget-' ~ budget.id) }}">
+                                        <button class="btn btn-success btn-action me-1" title="Approuver → créer transaction">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    {# Annuler approbation #}
+                                    <form method="post"
+                                          action="{{ path('monthly_budget_unapprove', {id: budget.id}) }}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Annuler l\'approbation et supprimer la transaction ?')">
+                                        <input type="hidden" name="_token"
+                                               value="{{ csrf_token('unapprove-budget-' ~ budget.id) }}">
+                                        <button class="btn btn-outline-warning btn-action me-1" title="Annuler l'approbation">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <a href="{{ path('monthly_budget_edit', {id: budget.id}) }}"
+                                   class="btn btn-outline-primary btn-action me-1">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <form method="post" action="{{ path('monthly_budget_delete', {id: budget.id}) }}" class="d-inline"
+                                {% if not budget.isApproved() %}
+                                <form method="post" action="{{ path('monthly_budget_delete', {id: budget.id}) }}"
+                                      class="d-inline"
                                       onsubmit="return confirm('Supprimer cette ligne ?')">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete-budget-' ~ budget.id) }}">
-                                    <button class="btn btn-outline-danger btn-action"><i class="bi bi-trash"></i></button>
+                                    <input type="hidden" name="_token"
+                                           value="{{ csrf_token('delete-budget-' ~ budget.id) }}">
+                                    <button class="btn btn-outline-danger btn-action">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </form>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}
@@ -201,15 +267,15 @@
                     {% set total_actual_net  = total_actual_income  - total_actual_expense %}
                     {% set tv = total_planned_net - total_actual_net %}
                     <tr>
-                        <td colspan="2">Solde net (recettes − dépenses)</td>
+                        <td colspan="3">Solde net (recettes − dépenses)</td>
                         <td class="text-end {{ total_planned_net >= 0 ? 'text-success' : 'text-danger' }}">
                             {{ total_planned_net >= 0 ? '+' : '' }}{{ total_planned_net|number_format(2, ',', ' ') }} €
                         </td>
+                        <td class="text-end {{ tv <= 0 ? 'text-success' : 'text-danger' }}">
+                            {{ tv >= 0 ? '+' : '' }}{{ tv|number_format(2, ',', ' ') }} €
+                        </td>
                         <td class="text-end {{ total_actual_net >= 0 ? 'text-success' : 'text-danger' }}">
                             {{ total_actual_net >= 0 ? '+' : '' }}{{ total_actual_net|number_format(2, ',', ' ') }} €
-                        </td>
-                        <td class="text-end {{ tv >= 0 ? 'text-success' : 'text-danger' }}">
-                            {{ tv >= 0 ? '+' : '' }}{{ tv|number_format(2, ',', ' ') }} €
                         </td>
                         <td colspan="2"></td>
                     </tr>

@@ -43,13 +43,24 @@ class MonthlyBudget
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2, options: ['default' => '0.00'])]
     private string $plannedAmount = '0.00';
 
-    /**
-     * Montant réellement dépensé/encaissé.
-     * Peut être mis à jour automatiquement via une requête agrégée
-     * sur la table Transaction.
-     */
+    /** Montant réellement dépensé/encaissé. */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2, options: ['default' => '0.00'])]
     private string $actualAmount = '0.00';
+
+    /**
+     * Date d'approbation : renseignée quand la ligne est validée
+     * et convertie en transaction réelle.
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $approvedAt = null;
+
+    /**
+     * Transaction générée lors de l'approbation.
+     * Nullable : null = pas encore approuvé.
+     */
+    #[ORM\ManyToOne(targetEntity: Transaction::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Transaction $approvedTransaction = null;
 
     public function getId(): ?int
     {
@@ -120,6 +131,31 @@ class MonthlyBudget
     public function getVariance(): float
     {
         return (float) $this->plannedAmount - (float) $this->actualAmount;
+    }
+
+    public function getApprovedAt(): ?\DateTimeImmutable
+    {
+        return $this->approvedAt;
+    }
+    public function setApprovedAt(?\DateTimeImmutable $dt): static
+    {
+        $this->approvedAt = $dt;
+        return $this;
+    }
+
+    public function getApprovedTransaction(): ?Transaction
+    {
+        return $this->approvedTransaction;
+    }
+    public function setApprovedTransaction(?Transaction $tx): static
+    {
+        $this->approvedTransaction = $tx;
+        return $this;
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->approvedAt !== null;
     }
 
     /** Clé lisible pour l'affichage : "mars 2025" */

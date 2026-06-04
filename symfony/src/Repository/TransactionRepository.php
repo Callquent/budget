@@ -74,6 +74,28 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Mouvements agrégés par compte et par mois pour une année entière.
+     * Retourne : [ ['account_id'=>1, 'month'=>6, 'credit'=>1600, 'debit'=>200], … ]
+     * Utilisé pour calculer les soldes cumulés mois par mois dans le récap annuel.
+     */
+    public function findMonthlyByAccountForYear(int $year): array
+    {
+        return $this->createQueryBuilder('t')
+            ->select(
+                'IDENTITY(t.account) AS account_id',
+                't.month',
+                "SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END) AS credit",
+                "SUM(CASE WHEN t.type = 'debit'  THEN t.amount ELSE 0 END) AS debit"
+            )
+            ->where('t.year = :year')
+            ->setParameter('year', $year)
+            ->groupBy('t.account', 't.month')
+            ->orderBy('t.month', 'ASC')
+            ->getQuery()
+            ->getScalarResult();
+    }
+
+    /**
      * Transactions d'un compte sur une plage de mois.
      * Exemple : du mois 3/2025 au mois 5/2026
      */

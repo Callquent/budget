@@ -1,0 +1,128 @@
+{# templates/transaction/form.html.twig #}
+{% extends 'base.html.twig' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ path('transaction_index') }}" class="text-muted text-decoration-none me-3">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            <h1 class="h4 mb-0">{{ title }}</h1>
+        </div>
+
+        <div class="card p-4">
+            {{ form_start(form, {attr: {id: 'tx-form', novalidate: 'novalidate'}}) }}
+
+            {# Date en premier — la plus importante #}
+            {{ form_row(form.transactionDate) }}
+
+            <div class="row g-3">
+                <div class="col-7">{{ form_row(form.account) }}</div>
+                <div class="col-5">
+                    {{ form_row(form.type) }}
+                </div>
+            </div>
+
+            {# Catégorie avec suggestion auto du sens #}
+            <div id="category-wrapper">
+                {{ form_row(form.category) }}
+            </div>
+
+            {{ form_row(form.amount) }}
+            {{ form_row(form.label) }}
+            {{ form_row(form.notes) }}
+
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i>Enregistrer
+                </button>
+                <a href="{{ path('transaction_index') }}" class="btn btn-outline-secondary">Annuler</a>
+            </div>
+
+            {{ form_end(form) }}
+        </div>
+
+        {# Raccourcis rapides #}
+        {% if not transaction %}
+        <div class="card mt-3 p-3">
+            <div class="small text-muted fw-semibold mb-2">RACCOURCIS</div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="prefill('credit', 'Salaire')">
+                    <i class="bi bi-briefcase me-1"></i>Salaire
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="prefill('debit', 'Courses')">
+                    <i class="bi bi-cart me-1"></i>Courses
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="prefill('debit', 'Électricité')">
+                    <i class="bi bi-lightning me-1"></i>Électricité
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="prefill('transfer', 'Virement Livret A')">
+                    <i class="bi bi-arrow-left-right me-1"></i>Virement
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Quand la catégorie change, suggère automatiquement le bon sens (crédit/débit)
+document.addEventListener('DOMContentLoaded', function () {
+    const categorySelect = document.querySelector('[name$="[category]"]');
+    const typeSelect     = document.querySelector('[name$="[type]"]');
+    const labelInput     = document.querySelector('[name$="[label]"]');
+
+    // Map catégorie label → type suggéré (basé sur le groupe optgroup)
+    if (categorySelect && typeSelect) {
+        categorySelect.addEventListener('change', function () {
+            const selected = this.options[this.selectedIndex];
+            if (!selected) return;
+            const group = selected.closest('optgroup')?.label ?? '';
+            if (group.includes('Recettes')) {
+                typeSelect.value = 'credit';
+            } else if (group.includes('Dépenses')) {
+                typeSelect.value = 'debit';
+            } else if (group.includes('Virements')) {
+                typeSelect.value = 'transfer';
+            }
+            // Auto-remplir le libellé si vide
+            if (labelInput && !labelInput.value.trim()) {
+                const month = new Date().toLocaleString('fr-FR', {month: 'long'});
+                const year  = new Date().getFullYear();
+                labelInput.value = selected.text.trim() + ' ' + month + ' ' + year;
+            }
+        });
+    }
+});
+
+// Raccourcis rapides
+function prefill(type, categoryName) {
+    const typeSelect  = document.querySelector('[name$="[type]"]');
+    const labelInput  = document.querySelector('[name$="[label]"]');
+    const catSelect   = document.querySelector('[name$="[category]"]');
+
+    if (typeSelect) typeSelect.value = type;
+
+    // Chercher la catégorie par son texte
+    if (catSelect && categoryName) {
+        for (const opt of catSelect.options) {
+            if (opt.text.trim().toLowerCase().startsWith(categoryName.toLowerCase())) {
+                catSelect.value = opt.value;
+                catSelect.dispatchEvent(new Event('change'));
+                break;
+            }
+        }
+    }
+
+    if (labelInput && !labelInput.value.trim()) {
+        const month = new Date().toLocaleString('fr-FR', {month: 'long'});
+        const year  = new Date().getFullYear();
+        labelInput.value = categoryName + ' ' + month + ' ' + year;
+    }
+}
+</script>
+{% endblock %}

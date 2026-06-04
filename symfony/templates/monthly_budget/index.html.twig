@@ -2,10 +2,6 @@
 {% extends 'base.html.twig' %}
 {% block title %}Budget {{ year }}{% endblock %}
 
-{% set month_names = {
-    1: 'Janv.', 2: 'Févr.', 3: 'Mars', 4: 'Avr.', 5: 'Mai', 6: 'Juin',
-    7: 'Juil.', 8: 'Août', 9: 'Sept.', 10: 'Oct.', 11: 'Nov.', 12: 'Déc.'
-} %}
 {% set month_names_full = {
     1: 'Janvier', 2: 'Février', 3: 'Mars', 4: 'Avril', 5: 'Mai', 6: 'Juin',
     7: 'Juillet', 8: 'Août', 9: 'Septembre', 10: 'Octobre', 11: 'Novembre', 12: 'Décembre'
@@ -17,29 +13,6 @@
     <a href="{{ path('monthly_budget_new') }}" class="btn btn-primary btn-sm">
         <i class="bi bi-plus-lg me-1"></i>Nouvelle ligne
     </a>
-</div>
-
-{# Comptes #}
-<div class="row g-3 mb-4">
-    {% for account in accounts %}
-        <div class="col-md-4 col-sm-6">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body d-flex align-items-center gap-3">
-                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                         style="width:42px;height:42px;background:{{ account.type == 'credit' ? '#d1fae5' : '#fee2e2' }}">
-                        <i class="bi {{ account.type == 'credit' ? 'bi-piggy-bank text-success' : 'bi-wallet2 text-danger' }} fs-5"></i>
-                    </div>
-                    <div class="flex-grow-1 min-w-0">
-                        <div class="small text-muted text-truncate">{{ account.name }}</div>
-                        <div class="fw-bold fs-5">{{ account.balance|number_format(2, ',', ' ') }} <span class="small fw-normal text-muted">{{ account.currency }}</span></div>
-                    </div>
-                    <span class="badge {{ account.type == 'credit' ? 'bg-success' : 'bg-secondary' }} bg-opacity-10 {{ account.type == 'credit' ? 'text-success' : 'text-secondary' }} small">
-                        {{ account.type == 'credit' ? 'crédit' : 'débit' }}
-                    </span>
-                </div>
-            </div>
-        </div>
-    {% endfor %}
 </div>
 
 {# Navigation années #}
@@ -56,79 +29,108 @@
     </div>
 </div>
 
-{# Tableau récapitulatif annuel #}
+{# Tableau récapitulatif annuel avec comptes #}
 <div class="card mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <span class="fw-semibold">Récapitulatif annuel {{ year }}</span>
-        <span class="text-muted small">Prévu vs réalisé par mois</span>
+        <span class="text-muted small">Solde fin de mois par compte</span>
     </div>
     <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table class="table table-hover mb-0 align-middle">
             <thead>
                 <tr>
-                    <th>Mois</th>
-                    <th class="text-end">Prévu</th>
-                    <th class="text-end">Réalisé</th>
-                    <th class="text-end">Écart</th>
-                    <th style="width:140px">Avancement</th>
+                    <th style="min-width:110px">Mois</th>
+                    {% for account in accounts %}
+                        <th class="text-end" style="min-width:130px">
+                            <span class="d-flex align-items-center justify-content-end gap-1">
+                                <i class="bi {{ account.type == 'credit' ? 'bi-piggy-bank text-success' : 'bi-wallet2 text-secondary' }} small"></i>
+                                {{ account.name }}
+                            </span>
+                        </th>
+                    {% endfor %}
+                    <th class="text-end" style="min-width:120px">Total</th>
+                    <th class="text-end" style="min-width:100px">Budget prévu</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                {% set total_planned = 0 %}
-                {% set total_actual  = 0 %}
                 {% for m in 1..12 %}
-                    {% set row = summary[m] ?? null %}
-                    {% set planned = row ? row.total_planned|number_format(2, ',', ' ') : '—' %}
-                    {% set actual  = row ? row.total_actual|number_format(2, ',', ' ')  : '—' %}
-                    {% set variance = row ? (row.total_planned - row.total_actual) : null %}
-                    {% set pct = (row and row.total_planned > 0) ? (row.total_actual / row.total_planned * 100)|round : 0 %}
-                    {% if row %}
-                        {% set total_planned = total_planned + row.total_planned %}
-                        {% set total_actual  = total_actual  + row.total_actual %}
-                    {% endif %}
+                    {% set budgetRow = summary[m] ?? null %}
+                    {# Calcul du total tous comptes pour ce mois #}
+                    {% set total_balance = 0 %}
+                    {% for account in accounts %}
+                        {% set ab = account_balances[account.id][m] ?? null %}
+                        {% if ab %}
+                            {% set total_balance = total_balance + ab.balance %}
+                        {% else %}
+                            {% set total_balance = total_balance + account.balance %}
+                        {% endif %}
+                    {% endfor %}
+
                     <tr>
                         <td>
-                            <a href="{{ path('monthly_budget_month', {year: year, month: m}) }}" class="text-decoration-none fw-medium">
+                            <a href="{{ path('monthly_budget_month', {year: year, month: m}) }}"
+                               class="text-decoration-none fw-semibold text-dark">
                                 {{ month_names_full[m] }}
                             </a>
-                            {% if budgets[m] is defined %}
-                                <span class="badge bg-light text-muted ms-1">{{ budgets[m]|length }}</span>
-                            {% endif %}
                         </td>
-                        <td class="text-end text-muted">{{ planned }}{% if row %} €{% endif %}</td>
-                        <td class="text-end">{{ actual }}{% if row %} €{% endif %}</td>
-                        <td class="text-end {% if variance is not null %}{{ variance >= 0 ? 'text-success' : 'text-danger' }}{% endif %}">
-                            {% if variance is not null %}
-                                {{ variance >= 0 ? '+' : '' }}{{ variance|number_format(2, ',', ' ') }} €
-                            {% else %}—{% endif %}
-                        </td>
-                        <td>
-                            {% if row and row.total_planned > 0 %}
-                                <div class="progress mt-1">
-                                    <div class="progress-bar {{ pct > 100 ? 'bg-danger' : (pct > 80 ? 'bg-warning' : 'bg-success') }}"
-                                         style="width: {{ pct > 100 ? 100 : pct }}%"></div>
+
+                        {% for account in accounts %}
+                            {% set ab = account_balances[account.id][m] ?? null %}
+                            {% set bal = ab ? ab.balance : account.balance %}
+                            {% set credit = ab ? ab.credit : 0 %}
+                            {% set debit  = ab ? ab.debit  : 0 %}
+                            <td class="text-end">
+                                <div class="fw-semibold {{ bal < 0 ? 'text-danger' : '' }}">
+                                    {{ bal|number_format(2, ',', ' ') }} €
                                 </div>
-                                <small class="text-muted">{{ pct }} %</small>
+                                {% if credit > 0 or debit > 0 %}
+                                    <div class="text-muted" style="font-size:.72rem;line-height:1.3">
+                                        {% if credit > 0 %}
+                                            <span class="text-success">+{{ credit|number_format(0, ',', ' ') }}</span>
+                                        {% endif %}
+                                        {% if debit > 0 %}
+                                            <span class="text-danger ms-1">−{{ debit|number_format(0, ',', ' ') }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+
+                        {# Total tous comptes #}
+                        <td class="text-end fw-bold {{ total_balance < 0 ? 'text-danger' : 'text-primary' }}">
+                            {{ total_balance|number_format(2, ',', ' ') }} €
+                        </td>
+
+                        {# Budget prévu #}
+                        <td class="text-end text-muted small">
+                            {% if budgetRow %}
+                                {{ budgetRow.total_planned|number_format(2, ',', ' ') }} €
+                            {% else %}
+                                —
                             {% endif %}
                         </td>
-                        <td class="text-end">
-                            <a href="{{ path('monthly_budget_month', {year: year, month: m}) }}" class="btn btn-outline-secondary btn-action">
+
+                        <td>
+                            <a href="{{ path('monthly_budget_month', {year: year, month: m}) }}"
+                               class="btn btn-outline-secondary btn-action" title="Détail">
                                 <i class="bi bi-eye"></i>
                             </a>
                         </td>
                     </tr>
                 {% endfor %}
             </tbody>
-            <tfoot class="table-light fw-semibold">
+            <tfoot class="table-light">
                 <tr>
-                    <td>Total</td>
-                    <td class="text-end">{{ total_planned|number_format(2, ',', ' ') }} €</td>
-                    <td class="text-end">{{ total_actual|number_format(2, ',', ' ') }} €</td>
-                    <td class="text-end {{ (total_planned - total_actual) >= 0 ? 'text-success' : 'text-danger' }}">
-                        {% set total_var = total_planned - total_actual %}
-                        {{ total_var >= 0 ? '+' : '' }}{{ total_var|number_format(2, ',', ' ') }} €
-                    </td>
+                    <td class="fw-semibold">Solde actuel</td>
+                    {% set grand_total = 0 %}
+                    {% for account in accounts %}
+                        <td class="text-end fw-semibold">
+                            {{ account.balance|number_format(2, ',', ' ') }} €
+                        </td>
+                        {% set grand_total = grand_total + account.balance %}
+                    {% endfor %}
+                    <td class="text-end fw-bold text-primary">{{ grand_total|number_format(2, ',', ' ') }} €</td>
                     <td colspan="2"></td>
                 </tr>
             </tfoot>

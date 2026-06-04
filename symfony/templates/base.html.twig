@@ -39,9 +39,15 @@
         <div class="collapse navbar-collapse" id="nav">
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
+                    <a class="nav-link {% if app.request.attributes.get('_route') starts with 'transaction' %}active{% endif %}"
+                       href="{{ path('transaction_index') }}">
+                        <i class="bi bi-list-ul me-1"></i>Transactions
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {% if app.request.attributes.get('_route') starts with 'monthly_budget' %}active{% endif %}"
                        href="{{ path('monthly_budget_index') }}">
-                        <i class="bi bi-calendar3 me-1"></i>Budget mensuel
+                        <i class="bi bi-calendar3 me-1"></i>Budget prévisionnel
                     </a>
                 </li>
                 <li class="nav-item">

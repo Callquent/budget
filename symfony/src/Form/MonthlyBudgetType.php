@@ -18,16 +18,27 @@ class MonthlyBudgetType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        // Années disponibles : année courante + 2 suivantes
         $currentYear = (int) (new \DateTimeImmutable())->format('Y');
-        $years = [];
-        for ($y = $currentYear; $y <= $currentYear + 2; $y++) {
+
+        // Lire l'année de l'entité liée (disponible dans $options['data'])
+        // pour inclure les années passées (ex : 2024, 2025) dans la liste.
+        /** @var MonthlyBudget|null $entity */
+        $entity      = $options['data'] ?? null;
+        $entityYear  = ($entity instanceof MonthlyBudget && $entity->getYear() > 0)
+                        ? $entity->getYear()
+                        : $currentYear;
+
+        // Plage : de la plus ancienne entre l'année de l'entité et (currentYear - 1)
+        // jusqu'à currentYear + 2, pour couvrir passé ET futur.
+        $minYear = min($entityYear, $currentYear - 1);
+        $years   = [];
+        for ($y = $minYear; $y <= $currentYear + 2; $y++) {
             $years[$y] = $y;
         }
 
         $months = [
             'Janvier'   => 1,
-            'Février'  => 2,
+            'Février'   => 2,
             'Mars'      => 3,
             'Avril'     => 4,
             'Mai'       => 5,
@@ -42,14 +53,14 @@ class MonthlyBudgetType extends AbstractType
 
         $builder
             ->add('category', EntityType::class, [
-                'label' => 'Catégorie',
-                'class' => Category::class,
+                'label'        => 'Catégorie',
+                'class'        => Category::class,
                 'choice_label' => fn(Category $c) => $c->getName(),
-                'group_by' => fn(Category $c) => match ($c->getTransactionType()) {
+                'group_by'     => fn(Category $c) => match ($c->getTransactionType()) {
                     Category::TYPE_INCOME   => 'Recettes',
                     Category::TYPE_EXPENSE  => 'Dépenses',
                     Category::TYPE_TRANSFER => 'Virements',
-                    default => 'Autre',
+                    default                 => 'Autre',
                 },
                 'constraints' => [new NotBlank()],
             ])
@@ -63,33 +74,31 @@ class MonthlyBudgetType extends AbstractType
             ->add('year', ChoiceType::class, [
                 'label'   => 'Année',
                 'choices' => $years,
-                'data'    => $options['default_year'] ?? $currentYear,
+                // Pas de 'data' : Symfony lit $entity->getYear() via le data_class.
             ])
             ->add('month', ChoiceType::class, [
                 'label'   => 'Mois',
                 'choices' => $months,
-                'data'    => $options['default_month'] ?? (int)(new \DateTimeImmutable())->format('n'),
+                // Pas de 'data' : Symfony lit $entity->getMonth() via le data_class.
             ])
             ->add('plannedAmount', MoneyType::class, [
-                'label'    => 'Montant prévu',
-                'currency' => 'EUR',
+                'label'       => 'Montant prévu',
+                'currency'    => 'EUR',
                 'constraints' => [new PositiveOrZero()],
             ])
             ->add('actualAmount', MoneyType::class, [
-                'label'    => 'Montant réalisé',
-                'currency' => 'EUR',
-                'required' => false,
+                'label'       => 'Montant réalisé',
+                'currency'    => 'EUR',
+                'required'    => false,
                 'constraints' => [new PositiveOrZero()],
-                'help' => 'Mis à jour automatiquement depuis les transactions',
+                'help'        => 'Mis à jour automatiquement depuis les transactions',
             ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class'    => MonthlyBudget::class,
-            'default_year'  => null,
-            'default_month' => null,
+            'data_class' => MonthlyBudget::class,
         ]);
     }
 }
