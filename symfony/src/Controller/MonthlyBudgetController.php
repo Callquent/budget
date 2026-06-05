@@ -222,9 +222,12 @@ class MonthlyBudgetController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $now = new \DateTimeImmutable();
+        $year = (int) $request->query->get('year', $now->format('Y'));
+        $month = (int) $request->query->get('month', $now->format('n'));
+
         $budget = new MonthlyBudget();
-        $budget->setYear((int) $now->format('Y'));
-        $budget->setMonth((int) $now->format('n'));
+        $budget->setYear($year);
+        $budget->setMonth($month);
 
         $form = $this->createForm(MonthlyBudgetType::class, $budget);
         $form->handleRequest($request);
@@ -327,8 +330,6 @@ class MonthlyBudgetController extends AbstractController
         $budget->setApprovedAt(null);
         $budget->setApprovedTransaction(null);
         $em->flush();
-
-        $budgetRepo->refreshActualAmounts($budget->getYear(), $budget->getMonth());
 
         $this->addFlash('success', 'Approbation annulée, transaction supprimée.');
         return $this->redirectToRoute('monthly_budget_month', [
