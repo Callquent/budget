@@ -74,6 +74,45 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Mouvements agrégés par compte JUSQU'AU mois donné inclus.
+     * Solde fin de mois = balance_de_base + net(jan..mois)
+     */
+    public function findMovementsUpToPeriod(int $year, int $month): array
+    {
+        return $this->createQueryBuilder('t')
+            ->select(
+                'IDENTITY(t.account) AS account_id',
+                "SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END) AS credit",
+                "SUM(CASE WHEN t.type = 'debit'  THEN t.amount ELSE 0 END) AS debit"
+            )
+            ->where('(t.year * 100 + t.month) <= :period')
+            ->setParameter('period', $year * 100 + $month)
+            ->groupBy('t.account')
+            ->getQuery()
+            ->getScalarResult();
+    }
+
+    /**
+     * Mouvements agrégés par compte APRÈS un mois donné (exclu).
+     * Sert à recalculer le solde de fin de mois à partir du solde actuel.
+     * Solde fin de mois = balance - crédits postérieurs + débits postérieurs
+     */
+    public function findMovementsAfterPeriod(int $year, int $month): array
+    {
+        return $this->createQueryBuilder('t')
+            ->select(
+                'IDENTITY(t.account) AS account_id',
+                "SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END) AS credit",
+                "SUM(CASE WHEN t.type = 'debit'  THEN t.amount ELSE 0 END) AS debit"
+            )
+            ->where('(t.year * 100 + t.month) > :period')
+            ->setParameter('period', $year * 100 + $month)
+            ->groupBy('t.account')
+            ->getQuery()
+            ->getScalarResult();
+    }
+
+    /**
      * Mouvements agrégés par compte et par mois pour une année entière.
      * Retourne : [ ['account_id'=>1, 'month'=>6, 'credit'=>1600, 'debit'=>200], … ]
      * Utilisé pour calculer les soldes cumulés mois par mois dans le récap annuel.

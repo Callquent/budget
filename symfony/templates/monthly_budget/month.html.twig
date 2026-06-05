@@ -3,6 +3,9 @@
 {% block title %}Budget prévisionnel — {{ period_label }}{% endblock %}
 
 {% block body %}
+{% set now_year  = "now"|date("Y") %}
+{% set now_month = "now"|date("n") %}
+
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
         <a href="{{ path('monthly_budget_year', {year: year}) }}" class="text-muted text-decoration-none small">
@@ -22,6 +25,38 @@
             </button>
         </form>
     </div>
+</div>
+
+{# ── Sélecteur mois/année ─────────────────────────────────────────────────── #}
+<div class="card mb-4 p-3">
+    <form method="get" class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="d-flex align-items-center gap-2">
+            <label class="text-muted small fw-semibold mb-0">MOIS</label>
+            <select name="month" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                {% for num, name in months %}
+                    <option value="{{ num }}" {{ num == month ? 'selected' : '' }}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="text-muted small fw-semibold mb-0">ANNÉE</label>
+            <select name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                {% for y in range(now_year - 2, now_year + 1) %}
+                    <option value="{{ y }}" {{ y == year ? 'selected' : '' }}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% set prev = (year ~ '-' ~ month ~ '-01')|date_modify('-1 month') %}
+        {% set next = (year ~ '-' ~ month ~ '-01')|date_modify('+1 month') %}
+        <div class="ms-auto d-flex gap-2">
+            <a href="{{ path('monthly_budget_month', {year: prev|date('Y'), month: prev|date('n')}) }}"
+               class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-left"></i></a>
+            <a href="{{ path('monthly_budget_month', {year: now_year, month: now_month}) }}"
+               class="btn btn-outline-secondary btn-sm">Aujourd'hui</a>
+            <a href="{{ path('monthly_budget_month', {year: next|date('Y'), month: next|date('n')}) }}"
+               class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-right"></i></a>
+        </div>
+    </form>
 </div>
 
 {% if budgets is empty %}
@@ -71,7 +106,7 @@
                         <div class="border-top pt-2 mt-1 d-flex justify-content-between small fw-semibold">
                             <span>Net du mois</span>
                             <span class="{{ net >= 0 ? 'text-success' : 'text-danger' }}">
-                                {{ net >= 0 ? '+' : '' }}{{ net|number_format(2, ',', ' ') }} €
+                                {{ net > 0 ? '+' : '' }}{{ net|number_format(2, ',', ' ') }} €
                             </span>
                         </div>
                     {% else %}
@@ -154,9 +189,11 @@
                     {% set total_actual_income   = 0 %}
                     {% set total_planned_expense = 0 %}
                     {% set total_actual_expense  = 0 %}
+                    {% set total_variance        = 0 %}
 
                     {% for budget in budgets %}
                         {% set variance = budget.plannedAmount - budget.actualAmount %}
+                        {% set total_variance = total_variance + variance %}
                         {% set pct = budget.plannedAmount > 0 ? (budget.actualAmount / budget.plannedAmount * 100)|round : 0 %}
 
                         {% if budget.category.transactionType == 'income' %}
@@ -190,8 +227,8 @@
                                 {% endif %}
                             </td>
                             <td class="text-end text-muted">{{ budget.plannedAmount|number_format(2, ',', ' ') }} €</td>
-                            <td class="text-end {{ variance >= 0 ? 'text-success' : 'text-danger' }}">
-                                {{ variance >= 0 ? '+' : '' }}{{ variance|number_format(2, ',', ' ') }} €
+                            <td class="text-end {{ variance > 0 ? 'text-success' : (variance < 0 ? 'text-danger' : '') }}">
+                                {{ variance > 0 ? '+' : '' }}{{ variance|number_format(2, ',', ' ') }} €
                             </td>
                             <td class="text-end">{{ budget.actualAmount|number_format(2, ',', ' ') }} €</td>
                             <td>
@@ -265,17 +302,16 @@
                 <tfoot class="table-light fw-semibold">
                     {% set total_planned_net = total_planned_income - total_planned_expense %}
                     {% set total_actual_net  = total_actual_income  - total_actual_expense %}
-                    {% set tv = total_planned_net - total_actual_net %}
                     <tr>
                         <td colspan="3">Solde net (recettes − dépenses)</td>
-                        <td class="text-end {{ total_planned_net >= 0 ? 'text-success' : 'text-danger' }}">
-                            {{ total_planned_net >= 0 ? '+' : '' }}{{ total_planned_net|number_format(2, ',', ' ') }} €
+                        <td class="text-end {{ total_planned_net > 0 ? 'text-success' : (total_planned_net < 0 ? 'text-danger' : '') }}">
+                            {{ total_planned_net > 0 ? '+' : '' }}{{ total_planned_net|number_format(2, ',', ' ') }} €
                         </td>
-                        <td class="text-end {{ tv <= 0 ? 'text-success' : 'text-danger' }}">
-                            {{ tv >= 0 ? '+' : '' }}{{ tv|number_format(2, ',', ' ') }} €
+                        <td class="text-end {{ total_variance > 0 ? 'text-success' : (total_variance < 0 ? 'text-danger' : '') }}">
+                            {{ total_variance > 0 ? '+' : '' }}{{ total_variance|number_format(2, ',', ' ') }} €
                         </td>
-                        <td class="text-end {{ total_actual_net >= 0 ? 'text-success' : 'text-danger' }}">
-                            {{ total_actual_net >= 0 ? '+' : '' }}{{ total_actual_net|number_format(2, ',', ' ') }} €
+                        <td class="text-end {{ total_actual_net > 0 ? 'text-success' : (total_actual_net < 0 ? 'text-danger' : '') }}">
+                            {{ total_actual_net > 0 ? '+' : '' }}{{ total_actual_net|number_format(2, ',', ' ') }} €
                         </td>
                         <td colspan="2"></td>
                     </tr>

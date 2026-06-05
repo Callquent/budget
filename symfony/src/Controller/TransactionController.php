@@ -33,17 +33,33 @@ class TransactionController extends AbstractController
 
         $transactions = $repo->findByPeriod($year, $month);
 
-        // Totaux du mois
+        // Mouvements cumulés par compte JUSQU'AU mois affiché inclus
+        // Solde fin mois M = balance_de_base + net(jan..M)
+        $cumulativeMovements = $repo->findMovementsUpToPeriod($year, $month);
+        $cumulativeByAccount = [];
+        foreach ($cumulativeMovements as $row) {
+            $cumulativeByAccount[(int)$row['account_id']] = [
+                'net' => (float)$row['credit'] - (float)$row['debit'],
+            ];
+        }
+
+        // Totaux du mois en cours (uniquement ce mois)
         $totalCredit = 0.0;
         $totalDebit  = 0.0;
 
-        // Totaux par compte
+        // Totaux par compte + solde fin de mois
         $byAccount = [];
         foreach ($accountRepo->findAllOrderedByName() as $acc) {
-            $byAccount[$acc->getId()] = [
-                'account' => $acc,
-                'credit'  => 0.0,
-                'debit'   => 0.0,
+            $aid               = $acc->getId();
+            $cumulativeNet     = $cumulativeByAccount[$aid]['net'] ?? 0.0;
+            // Solde fin du mois affiché = solde de base + tous les mouvements jusqu'à ce mois
+            $balanceEndOfMonth = (float)$acc->getBalance() + $cumulativeNet;
+
+            $byAccount[$aid] = [
+                'account'     => $acc,
+                'credit'      => 0.0,
+                'debit'       => 0.0,
+                'balance_end' => $balanceEndOfMonth,
             ];
         }
 
@@ -55,37 +71,41 @@ class TransactionController extends AbstractController
             }
             $aid = $tx->getAccount()->getId();
             if (!isset($byAccount[$aid])) {
-                $byAccount[$aid] = ['account' => $tx->getAccount(), 'credit' => 0.0, 'debit' => 0.0];
+                $cumulativeNet = $cumulativeByAccount[$aid]['net'] ?? 0.0;
+                $byAccount[$aid] = [
+                    'account'     => $tx->getAccount(),
+                    'credit'      => 0.0,
+                    'debit'       => 0.0,
+                    'balance_end' => (float)$tx->getAccount()->getBalance() + $cumulativeNet,
+                ];
             }
             $byAccount[$aid][$tx->getType() === Transaction::TYPE_CREDIT ? 'credit' : 'debit'] += (float) $tx->getAmount();
         }
 
         // Listes pour les filtres
         $months = [
-            1 => 'Janvier',
-            2 => 'Février',
-            3 => 'Mars',
-            4 => 'Avril',
-            5 => 'Mai',
-            6 => 'Juin',
-            7 => 'Juillet',
-            8 => 'Août',
-            9 => 'Septembre',
-            10 => 'Octobre',
-            11 => 'Novembre',
-            12 => 'Décembre',
+            1 => 'Janvier', 2 => 'Février',  3 => 'Mars',      4 => 'Avril',
+            5 => 'Mai',      6 => 'Juin',     7 => 'Juillet',   8 => 'Août',
+            9 => 'Septembre',10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre',
         ];
 
+        // Regroupement des transactions par account_id (fait en PHP, pas en Twig)
+        $txByAccountId = [];
+        foreach ($transactions as $tx) {
+            $txByAccountId[$tx->getAccount()->getId()][] = $tx;
+        }
+
         return $this->render('transaction/index.html.twig', [
-            'transactions' => $transactions,
-            'year'         => $year,
-            'month'        => $month,
-            'month_label'  => $months[$month] ?? '',
-            'months'       => $months,
-            'accounts'     => $accountRepo->findAllOrderedByName(),
-            'by_account'   => $byAccount,
-            'total_credit' => $totalCredit,
-            'total_debit'  => $totalDebit,
+            'transactions'  => $transactions,
+            'year'          => $year,
+            'month'         => $month,
+            'month_label'   => $months[$month] ?? '',
+            'months'        => $months,
+            'accounts'      => $accountRepo->findAllOrderedByName(),
+            'by_account'    => $byAccount,
+            'tx_by_account_id' => $txByAccountId,
+            'total_credit'  => $totalCredit,
+            'total_debit'   => $totalDebit,
         ]);
     }
 
@@ -102,7 +122,7 @@ class TransactionController extends AbstractController
         if ($request->query->get('year') && $request->query->get('month')) {
             $defaultDate = \DateTimeImmutable::createFromFormat(
                 'Y-n-j',
-                $request->query->get('year') . '-' . $request->query->get('month') . '-1'
+                $request->query->get('year').'-'.$request->query->get('month').'-1'
             );
         }
 
@@ -193,7 +213,7 @@ class TransactionController extends AbstractController
         $year  = $transaction->getYear();
         $month = $transaction->getMonth();
 
-        if ($this->isCsrfTokenValid('delete-tx-' . $transaction->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete-tx-'.$transaction->getId(), $request->request->get('_token'))) {
             $em->remove($transaction);
             $em->flush();
             $budgetRepo->refreshActualAmounts($year, $month);
