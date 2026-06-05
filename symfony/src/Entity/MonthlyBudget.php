@@ -13,7 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
  */
 #[ORM\Entity(repositoryClass: MonthlyBudgetRepository::class)]
 #[ORM\Table(name: 'monthly_budget')]
-#[ORM\UniqueConstraint(name: 'uniq_budget_period', columns: ['category_id', 'year', 'month'])]
+#[ORM\UniqueConstraint(name: 'uniq_budget_period', columns: ['category_id', 'year', 'month', 'label'])]
 #[ORM\Index(columns: ['year', 'month'], name: 'idx_budget_period')]
 class MonthlyBudget
 {
@@ -25,6 +25,10 @@ class MonthlyBudget
     #[ORM\ManyToOne(targetEntity: Category::class, inversedBy: 'monthlyBudgets')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Category $category = null;
+
+    /** Libellé spécifique pour cette ligne budgétaire (ex: "Courses du 18/06") */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $label = null;
 
     /** Compte concerné (optionnel : permet de rattacher un budget à un compte précis) */
     #[ORM\ManyToOne(targetEntity: Account::class)]
@@ -84,6 +88,16 @@ class MonthlyBudget
     public function setAccount(?Account $account): static
     {
         $this->account = $account;
+        return $this;
+    }
+
+    public function getLabel(): ?string
+    {
+        return $this->label;
+    }
+    public function setLabel(?string $label): static
+    {
+        $this->label = $label;
         return $this;
     }
 

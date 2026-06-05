@@ -202,6 +202,9 @@
                         <tr class="{{ budget.isApproved() ? 'table-success bg-opacity-50' : '' }}">
                             <td>
                                 <span class="fw-medium">{{ budget.category.name }}</span>
+                                {% if budget.label %}
+                                    <span class="text-muted small"> — {{ budget.label }}</span>
+                                {% endif %}
                                 <span class="badge ms-1
                                     {% if budget.category.transactionType == 'income' %}badge-income
                                     {% elseif budget.category.transactionType == 'expense' %}badge-expense

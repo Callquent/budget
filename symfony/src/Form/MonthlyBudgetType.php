@@ -79,7 +79,7 @@ class MonthlyBudgetType extends AbstractType
             ->add('month', ChoiceType::class, [
                 'label'   => 'Mois',
                 'choices' => $months,
-                // Pas de 'data' : Symfony lit $entity->getMonth() via le data_class.
+                // Pas de 'data' : Symfony lit $entity->getMonth() via the data_class.
             ])
             ->add('plannedAmount', MoneyType::class, [
                 'label'       => 'Montant prévu',
@@ -92,6 +92,12 @@ class MonthlyBudgetType extends AbstractType
                 'required'    => false,
                 'constraints' => [new PositiveOrZero()],
                 'help'        => 'Mis à jour automatiquement depuis les transactions',
+            ])
+            ->add('label', \Symfony\Component\Form\Extension\Core\Type\TextType::class, [
+                'label'       => 'Libellé (optionnel)',
+                'required'    => false,
+                'attr'        => ['placeholder' => 'ex: Courses du 18/06'],
+                'help'        => 'Permet de différencier plusieurs budgets pour la même catégorie',
             ]);
     }
 

@@ -107,7 +107,6 @@ class MonthlyBudgetController extends AbstractController
         $accountBalances = []; // [account_id][month] = solde fin de mois
         foreach ($accounts as $account) {
             $aid = $account->getId();
-            $runningBalance = (float)$account->getBalance();
 
             // On calcule d'abord le solde de DÉBUT d'année (avant janvier de $year)
             // en soustrayant tous les mouvements de l'année depuis le solde actuel
@@ -284,7 +283,7 @@ class MonthlyBudgetController extends AbstractController
             ->setAmount($budget->getActualAmount())
             ->setType($txType)
             ->setTransactionDate($txDate)
-            ->setLabel($budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel());
+            ->setLabel($budget->getLabel() ?? $budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel());
 
         $em->persist($transaction);
 
@@ -314,8 +313,7 @@ class MonthlyBudgetController extends AbstractController
     public function unapprove(
         MonthlyBudget $budget,
         Request $request,
-        EntityManagerInterface $em,
-        MonthlyBudgetRepository $budgetRepo
+        EntityManagerInterface $em
     ): Response {
         if (!$this->isCsrfTokenValid('unapprove-budget-' . $budget->getId(), $request->request->get('_token'))) {
             $this->addFlash('danger', 'Token invalide.');
