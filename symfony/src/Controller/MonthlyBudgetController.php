@@ -329,24 +329,23 @@ class MonthlyBudgetController extends AbstractController
             ->setAmount($budget->getActualAmount())
             ->setType($txType)
             ->setTransactionDate($txDate)
-            ->setLabel($budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel());
+            ->setLabel($budget->getLabel() ?? ($budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel()));
 
         $em->persist($transaction);
 
-        // Marquer la ligne comme approuvée
+        // Marquer la ligne comme approuvée.
+        // On conserve actualAmount tel quel (montant réalisé saisi par l'utilisateur).
+        // On ne recalcule PAS refreshActualAmounts : chaque ligne gère son propre montant
+        // indépendamment des autres lignes de la même catégorie.
         $budget->setApprovedAt(new \DateTimeImmutable());
         $budget->setApprovedTransaction($transaction);
-        $budget->setActualAmount($budget->getPlannedAmount());
 
         $em->flush();
-
-        // Recalcule tous les actualAmount du mois
-        $budgetRepo->refreshActualAmounts($budget->getYear(), $budget->getMonth());
 
         $this->addFlash('success', sprintf(
             '✓ « %s » approuvé — transaction de %s € créée.',
             $budget->getCategory()->getName(),
-            number_format((float) $budget->getPlannedAmount(), 2, ',', ' ')
+            number_format((float) $budget->getActualAmount(), 2, ',', ' ')
         ));
 
         return $this->redirectToRoute('monthly_budget_month', [
@@ -374,7 +373,7 @@ class MonthlyBudgetController extends AbstractController
 
         $budget->setApprovedAt(null);
         $budget->setApprovedTransaction(null);
-        // On ne recalcule PAS actualAmount : le montant réalisé saisi manuellement est conservé.
+        // On ne recalcule PAS : le montant réalisé est conservé tel quel.
         $em->flush();
 
         $this->addFlash('success', 'Approbation annulée. Le montant réalisé est conservé.');
