@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Subscription;
 use App\Form\SubscriptionType;
+use App\Repository\MonthlyBudgetRepository;
 use App\Repository\SubscriptionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -64,11 +65,35 @@ class SubscriptionController extends AbstractController
     }
 
     #[Route('/{id}/toggle', name: 'toggle', methods: ['POST'])]
-    public function toggle(Subscription $subscription, EntityManagerInterface $em): Response
+    public function toggle(Subscription $subscription, EntityManagerInterface $em, MonthlyBudgetRepository $budgetRepo): Response
     {
+        $wasActive = $subscription->isActive();
+
         $subscription->setStatus(
-            $subscription->isActive() ? Subscription::STATUS_INACTIVE : Subscription::STATUS_ACTIVE
+            $wasActive ? Subscription::STATUS_INACTIVE : Subscription::STATUS_ACTIVE
         );
+
+        // Si on désactive : supprimer les lignes budgétaires non approuvées liées à cet abonnement
+        if ($wasActive) {
+            $linkedBudgets = $budgetRepo->findBy([
+                'category' => $subscription->getCategory(),
+                'account'  => $subscription->getAccount(),
+            ]);
+            $removed = 0;
+            foreach ($linkedBudgets as $mb) {
+                if (!$mb->isApproved()) {
+                    $em->remove($mb);
+                    $removed++;
+                }
+            }
+            if ($removed > 0) {
+                $this->addFlash('info', sprintf(
+                    '%d ligne(s) budgétaire(s) non approuvée(s) supprimée(s).',
+                    $removed
+                ));
+            }
+        }
+
         $em->flush();
         $this->addFlash('success', 'Statut modifié.');
         return $this->redirectToRoute('subscription_index');

@@ -80,6 +80,9 @@
                             {% set bal = ab ? ab.balance : account.balance %}
                             {% set credit = ab ? ab.credit : 0 %}
                             {% set debit  = ab ? ab.debit  : 0 %}
+                            {# Solde projeté cumulatif depuis le contrôleur #}
+                            {% set bal_projected = ab ? ab.balance_projected : bal %}
+                            {% set planned_net   = ab ? ab.planned_net : 0 %}
                             <td class="text-end">
                                 <div class="fw-semibold {{ bal < 0 ? 'text-danger' : '' }}">
                                     {{ bal|number_format(2, ',', ' ') }} €
@@ -92,6 +95,11 @@
                                         {% if debit > 0 %}
                                             <span class="text-danger ms-1">−{{ debit|number_format(0, ',', ' ') }}</span>
                                         {% endif %}
+                                    </div>
+                                {% endif %}
+                                {% if planned_net != 0 %}
+                                    <div class="text-muted fst-italic" style="font-size:.72rem;line-height:1.4" title="Solde projeté avec budget prévu">
+                                        → <span class="{{ bal_projected < 0 ? 'text-danger' : 'text-info' }}">{{ bal_projected|number_format(2, ',', ' ') }} €</span>
                                     </div>
                                 {% endif %}
                             </td>

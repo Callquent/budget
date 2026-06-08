@@ -44,7 +44,10 @@ class MonthlyBudgetController extends AbstractController
         }
 
         // Détail budget par mois
-        $budgetsByMonth = [];
+        $budgetsByMonth   = [];
+        // [month][account_id|'all'] = ['income' => sum, 'expense' => sum]
+        // net = income - expense → à appliquer au solde pour la projection
+        $plannedByAccount = [];
         $allBudgets = $repo->createQueryBuilder('mb')
             ->addSelect('c')
             ->join('mb.category', 'c')
@@ -56,6 +59,24 @@ class MonthlyBudgetController extends AbstractController
             ->getResult();
         foreach ($allBudgets as $mb) {
             $budgetsByMonth[$mb->getMonth()][] = $mb;
+
+            // Exclure les lignes approuvées : elles ont déjà généré une transaction
+            // comptée dans account.balance, les inclure causerait un double-comptage.
+            if ($mb->isApproved()) {
+                continue;
+            }
+
+            $m   = $mb->getMonth();
+            $aid = $mb->getAccount()?->getId() ?? 'all';
+            $type = $mb->getCategory()->getTransactionType();
+            if (!isset($plannedByAccount[$m][$aid])) {
+                $plannedByAccount[$m][$aid] = ['income' => 0.0, 'expense' => 0.0];
+            }
+            if ($type === 'income') {
+                $plannedByAccount[$m][$aid]['income'] += (float) $mb->getPlannedAmount();
+            } else {
+                $plannedByAccount[$m][$aid]['expense'] += (float) $mb->getPlannedAmount();
+            }
         }
 
         $accounts = $accountRepo->findAllOrderedByName();
@@ -101,49 +122,40 @@ class MonthlyBudgetController extends AbstractController
             }
         }
 
-        // 3. Calcul des soldes cumulés : on part du solde actuel et on remonte/avance mois par mois.
-        // Stratégie : solde[mois] = balance du compte + sum(crédits 1..mois) - sum(débits 1..mois) - sum(abonnements 1..mois)
-        // Pour chaque mois on calcule le solde de fin de mois.
-        $accountBalances = []; // [account_id][month] = solde fin de mois
+        // 3. Calcul des soldes cumulés par compte, mois par mois.
+        //
+        // Logique : account.balance = solde actuel du compte (base de départ).
+        // Pour chaque mois on affiche : balance + cumul des transactions de janvier jusqu'à ce mois.
+        // Exemple : balance=1200, jan=+1665, fév=+1665
+        //   → jan : 1200 + 1665        = 2865
+        //   → fév : 1200 + 1665 + 1665 = 4530
+        $accountBalances = [];
         foreach ($accounts as $account) {
-            $aid = $account->getId();
+            $aid     = $account->getId();
+            $balance = (float) $account->getBalance();
 
-            // On calcule d'abord le solde de DÉBUT d'année (avant janvier de $year)
-            // en soustrayant tous les mouvements de l'année depuis le solde actuel
-            // (le solde actuel = état à aujourd'hui, donc on enlève les mois futurs et on garde les passés)
-            // Approche plus simple : on affiche le solde de fin de mois en accumulant depuis janvier.
-
-            // Solde de départ = balance actuelle (représente l'état courant, on l'utilise tel quel)
-            // et on projette les mouvements mois par mois.
-            $balance = (float)$account->getBalance();
-
-            // Déterminer les mouvements déjà inclus dans balance (mois passés vs futurs)
-            // Pour simplifier : on affiche simplement balance + mouvements cumulés depuis janvier du $year
-            // C'est la vision "si le solde actuel est la référence aujourd'hui, voici ce que ça donne mois par mois"
-
-            // Calculer le total annuel des transactions pour repartir du solde de début d'année
-            $totalYearCredit = 0.0;
-            $totalYearDebit  = 0.0;
-            $totalYearSubs   = 0.0;
+            $cumNet         = 0.0;
+            $cumPlannedNet  = 0.0; // cumul des planned non approuvés de janvier jusqu'au mois m
             for ($m = 1; $m <= 12; $m++) {
-                $totalYearCredit += $txMovements[$aid][$m]['credit'] ?? 0;
-                $totalYearDebit  += $txMovements[$aid][$m]['debit']  ?? 0;
-                $totalYearSubs   += $subMovements[$aid][$m] ?? 0;
-            }
-            // Solde de début d'année estimé
-            $startBalance = $balance - $totalYearCredit + $totalYearDebit + $totalYearSubs;
+                $credit  = $txMovements[$aid][$m]['credit'] ?? 0;
+                $debit   = $txMovements[$aid][$m]['debit']  ?? 0;
+                $subs    = $subMovements[$aid][$m] ?? 0;
+                $cumNet += $credit - $debit;
 
-            $cumBalance = $startBalance;
-            for ($m = 1; $m <= 12; $m++) {
-                $credit = $txMovements[$aid][$m]['credit'] ?? 0;
-                $debit  = $txMovements[$aid][$m]['debit']  ?? 0;
-                $subs   = $subMovements[$aid][$m] ?? 0;
-                $cumBalance = $cumBalance + $credit - $debit - $subs;
+                // Planned net cumulatif : on additionne income et soustrait expense
+                // pour ce compte + les budgets sans compte (clé 'all')
+                $pAccount = $plannedByAccount[$m][$aid]    ?? ['income' => 0.0, 'expense' => 0.0];
+                $pAll     = $plannedByAccount[$m]['all']   ?? ['income' => 0.0, 'expense' => 0.0];
+                $cumPlannedNet += ($pAccount['income'] + $pAll['income'])
+                                - ($pAccount['expense'] + $pAll['expense']);
+
                 $accountBalances[$aid][$m] = [
-                    'balance' => $cumBalance,
-                    'credit'  => $credit,
-                    'debit'   => $debit + $subs,
-                    'subs'    => $subs,
+                    'balance'           => $balance + $cumNet,
+                    'balance_projected' => $balance + $cumNet + $cumPlannedNet,
+                    'credit'            => $credit,
+                    'debit'             => $debit,
+                    'subs'              => $subs,
+                    'planned_net'       => $cumPlannedNet,
                 ];
             }
         }
@@ -156,6 +168,7 @@ class MonthlyBudgetController extends AbstractController
             'budgets'          => $budgetsByMonth,
             'accounts'         => $accounts,
             'account_balances' => $accountBalances,
+            'planned_by_account' => $plannedByAccount,
         ]);
     }
 
@@ -163,11 +176,39 @@ class MonthlyBudgetController extends AbstractController
      * Vue détaillée d'un mois spécifique.
      */
     #[Route('/{year}/{month}', name: 'month', requirements: ['year' => '\d{4}', 'month' => '\d{1,2}'])]
-    public function month(MonthlyBudgetRepository $repo, AccountRepository $accountRepo, TransactionRepository $txRepo, SubscriptionRepository $subRepo, int $year, int $month): Response
+    public function month(MonthlyBudgetRepository $repo, AccountRepository $accountRepo, TransactionRepository $txRepo, SubscriptionRepository $subRepo, EntityManagerInterface $em, int $year, int $month): Response
     {
-        $budgets       = $repo->findByPeriod($year, $month);
         $accounts      = $accountRepo->findAllOrderedByName();
         $subscriptions = $subRepo->findActiveForPeriod($year, $month);
+
+        // ── Synchronisation abonnements → lignes budgétaires ─────────────────
+        // Pour chaque abonnement actif du mois, on crée une ligne MonthlyBudget
+        // si elle n'existe pas encore (détection par category + account + year + month).
+        $synced = 0;
+        foreach ($subscriptions as $sub) {
+            $existing = $repo->findOneBy([
+                'category' => $sub->getCategory(),
+                'account'  => $sub->getAccount(),
+                'year'     => $year,
+                'month'    => $month,
+            ]);
+            if (!$existing) {
+                $mb = (new MonthlyBudget())
+                    ->setCategory($sub->getCategory())
+                    ->setAccount($sub->getAccount())
+                    ->setYear($year)
+                    ->setMonth($month)
+                    ->setPlannedAmount((string) $sub->getAmount())
+                    ->setActualAmount((string) $sub->getAmount());
+                $em->persist($mb);
+                $synced++;
+            }
+        }
+        if ($synced > 0) {
+            $em->flush();
+        }
+
+        $budgets = $repo->findByPeriod($year, $month);
 
         // Solde des transactions du mois par compte
         $txByAccount = [];
@@ -221,12 +262,14 @@ class MonthlyBudgetController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $now = new \DateTimeImmutable();
-        $year = (int) $request->query->get('year', $now->format('Y'));
-        $month = (int) $request->query->get('month', $now->format('n'));
-
         $budget = new MonthlyBudget();
-        $budget->setYear($year);
-        $budget->setMonth($month);
+
+        // Pré-remplir depuis ?year=2026&month=11 pour conserver le contexte
+        // quand on arrive depuis /budget/2026/11
+        $preYear  = (int) ($request->query->get('year',  $now->format('Y')));
+        $preMonth = (int) ($request->query->get('month', $now->format('n')));
+        $budget->setYear($preYear);
+        $budget->setMonth($preMonth);
 
         $form = $this->createForm(MonthlyBudgetType::class, $budget);
         $form->handleRequest($request);
@@ -235,7 +278,10 @@ class MonthlyBudgetController extends AbstractController
             $em->persist($budget);
             $em->flush();
             $this->addFlash('success', 'Ligne budgétaire ajoutée pour ' . $budget->getPeriodLabel() . '.');
-            return $this->redirectToRoute('monthly_budget_year', ['year' => $budget->getYear()]);
+            return $this->redirectToRoute('monthly_budget_month', [
+                'year'  => $budget->getYear(),
+                'month' => $budget->getMonth(),
+            ]);
         }
 
         return $this->render('monthly_budget/form.html.twig', [
@@ -283,7 +329,7 @@ class MonthlyBudgetController extends AbstractController
             ->setAmount($budget->getActualAmount())
             ->setType($txType)
             ->setTransactionDate($txDate)
-            ->setLabel($budget->getLabel() ?? $budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel());
+            ->setLabel($budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel());
 
         $em->persist($transaction);
 
@@ -313,7 +359,8 @@ class MonthlyBudgetController extends AbstractController
     public function unapprove(
         MonthlyBudget $budget,
         Request $request,
-        EntityManagerInterface $em
+        EntityManagerInterface $em,
+        MonthlyBudgetRepository $budgetRepo
     ): Response {
         if (!$this->isCsrfTokenValid('unapprove-budget-' . $budget->getId(), $request->request->get('_token'))) {
             $this->addFlash('danger', 'Token invalide.');
@@ -327,9 +374,10 @@ class MonthlyBudgetController extends AbstractController
 
         $budget->setApprovedAt(null);
         $budget->setApprovedTransaction(null);
+        // On ne recalcule PAS actualAmount : le montant réalisé saisi manuellement est conservé.
         $em->flush();
 
-        $this->addFlash('success', 'Approbation annulée, transaction supprimée.');
+        $this->addFlash('success', 'Approbation annulée. Le montant réalisé est conservé.');
         return $this->redirectToRoute('monthly_budget_month', [
             'year'  => $budget->getYear(),
             'month' => $budget->getMonth(),
