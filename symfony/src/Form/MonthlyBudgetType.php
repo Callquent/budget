@@ -9,11 +9,11 @@ use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\MoneyType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\PositiveOrZero;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
 
 class MonthlyBudgetType extends AbstractType
 {
@@ -26,8 +26,8 @@ class MonthlyBudgetType extends AbstractType
         /** @var MonthlyBudget|null $entity */
         $entity      = $options['data'] ?? null;
         $entityYear  = ($entity instanceof MonthlyBudget && $entity->getYear() > 0)
-            ? $entity->getYear()
-            : $currentYear;
+                        ? $entity->getYear()
+                        : $currentYear;
 
         // Plage : de la plus ancienne entre l'année de l'entité et (currentYear - 1)
         // jusqu'à currentYear + 2, pour couvrir passé ET futur.
@@ -72,6 +72,11 @@ class MonthlyBudgetType extends AbstractType
                 'required'     => false,
                 'placeholder'  => '— Tous les comptes —',
             ])
+            ->add('label', TextType::class, [
+                'label'       => 'Libellé',
+                'constraints' => [new NotBlank(message: 'Le libellé est obligatoire.')],
+                'attr'        => ['placeholder' => 'ex : Assurance habitation novembre 2026'],
+            ])
             ->add('year', ChoiceType::class, [
                 'label'   => 'Année',
                 'choices' => $years,
@@ -80,7 +85,7 @@ class MonthlyBudgetType extends AbstractType
             ->add('month', ChoiceType::class, [
                 'label'   => 'Mois',
                 'choices' => $months,
-                // Pas de 'data' : Symfony lit $entity->getMonth() via the data_class.
+                // Pas de 'data' : Symfony lit $entity->getMonth() via le data_class.
             ])
             ->add('plannedAmount', MoneyType::class, [
                 'label'       => 'Montant prévu',
@@ -93,11 +98,6 @@ class MonthlyBudgetType extends AbstractType
                 'required'    => false,
                 'constraints' => [new PositiveOrZero()],
                 'help'        => 'Mis à jour automatiquement depuis les transactions',
-            ])
-            ->add('label', TextType::class, [
-                'label'       => 'Libellé (optionnel)',
-                'required'    => false,
-                'attr'        => ['placeholder' => 'ex: Courses du 18/06'],
             ]);
     }
 

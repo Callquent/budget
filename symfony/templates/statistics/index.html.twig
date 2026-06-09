@@ -1,0 +1,229 @@
+{# templates/statistics/index.html.twig #}
+{% extends 'base.html.twig' %}
+{% block title %}Statistiques Budget {{ year }}{% endblock %}
+
+{% block body %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-graph-up-arrow me-2 text-primary"></i>Statistiques Budget {{ year }}</h1>
+
+    {# Navigation années #}
+    <div class="d-flex align-items-center gap-2 year-nav">
+        <span class="text-muted me-2 small fw-semibold">ANNÉE</span>
+        {% for y in available_years %}
+            <a href="{{ path('statistics_year', {year: y}) }}"
+               class="btn btn-sm {{ y == year ? 'btn-dark' : 'btn-outline-secondary' }}">
+                {{ y }}
+                {% if y == current_year %}<span class="badge bg-primary ms-1" style="font-size:.6rem">en cours</span>{% endif %}
+            </a>
+        {% endfor %}
+    </div>
+</div>
+
+{% if summary is not empty %}
+{# Onglets de navigation #}
+<ul class="nav nav-tabs mb-4" id="statsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="dist-tab" data-bs-toggle="tab" data-bs-target="#dist" type="button" role="tab">
+            <i class="bi bi-pie-chart-fill me-2"></i>Répartition
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="evo-tab" data-bs-toggle="tab" data-bs-target="#evo" type="button" role="tab">
+            <i class="bi bi-graph-up me-2"></i>Évolution Mensuelle
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="statsTabsContent">
+    {# Onglet 1 : Répartition #}
+    <div class="tab-pane fade show active" id="dist" role="tabpanel" aria-labelledby="dist-tab">
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-white fw-semibold">
+                        <i class="bi bi-pie-chart-fill me-2 text-primary"></i>Répartition Prévue (Annuelle)
+                    </div>
+                    <div class="card-body d-flex justify-content-center">
+                        <canvas id="plannedChart" style="max-width: 400px; max-height: 400px;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-white fw-semibold">
+                        <i class="bi bi-pie-chart-fill me-2 text-success"></i>Répartition Réelle (Annuelle)
+                    </div>
+                    <div class="card-body d-flex justify-content-center">
+                        <canvas id="actualChart" style="max-width: 400px; max-height: 400px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-white fw-semibold">
+                <i class="bi bi-table me-2 text-primary"></i>Détail par catégorie
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Catégorie</th>
+                            <th class="text-end">Total Prévu</th>
+                            <th class="text-end">Total Réalisé</th>
+                            <th class="text-end">Écart</th>
+                        </tr>
+                    </thead>
+                    <tbody >
+                        {% for row in summary %}
+                            {% set variance = row.planned - row.actual %}
+                            <tr >
+                                <td class="fw-medium">{{ row.category_name }}</td>
+                                <td class="text-end text-muted">{{ row.planned|number_format(2, ',', ' ') }} €</td>
+                                <td class="text-end">{{ row.actual|number_format(2, ',', ' ') }} €</td>
+                                <td class="text-end {{ variance > 0 ? 'text-success' : (variance < 0 ? 'text-danger' : '') }}">
+                                    {{ variance > 0 ? '+' : '' }}{{ variance|number_format(2, ',', ' ') }} €
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr >
+                            <td >TOTAL</td>
+                            <td class="text-end">
+                                {{ summary|reduce((carry, row) => carry + row.planned, 0)|number_format(2, ',', ' ') }} €
+                            </td>
+                            <td class="text-end">
+                                {{ summary|reduce((carry, row) => carry + row.actual, 0)|number_format(2, ',', ' ') }} €
+                            </td>
+                            <td class="text-end">
+                                {{ (summary|reduce((carry, row) => carry + row.planned, 0) - summary|reduce((carry, row) => carry + row.actual, 0))|number_format(2, ',', ' ') }} €
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Onglet 2 : Évolution #}
+    <div class="tab-pane fade" id="evo" role="tabpanel" aria-labelledby="evo-tab">
+        <div class="card">
+            <div class="card-header bg-white fw-semibold">
+                <i class="bi bi-graph-up me-2 text-primary"></i>Évolution des dépenses mensuelles
+            </div>
+            <div class="card-body">
+                <div style="position: relative; height:400px; width:100%">
+                    <canvas id="evolutionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info text-center py-5">
+    <i class="bi bi-info-circle me-2"></i>Aucune donnée budgétaire pour l'année {{ year }}.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function() {
+        const plannedData = {{ planned_chart|json_encode|raw }};
+        const actualData = {{ actual_chart|json_encode|raw }};
+        const labels = {{ categories|json_encode|raw }};
+
+        const plannedMonthly = {{ planned_monthly|json_encode|raw }};
+        const actualMonthly = {{ actual_monthly|json_encode|raw }};
+        const monthLabels = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+
+        const createPieChart = (ctxId, dataObj) => {
+            const ctx = document.getElementById(ctxId);
+            if (!ctx) return;
+
+            const values = labels.map(l => dataObj[l] || 0);
+            if (values.every(v => v === 0)) return;
+
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: [
+                            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+                            '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6',
+                            '#94a3b8', '#fca5a5', '#fde68a', '#bbf7d0', '#bfdbfe'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                        title: { display: false }
+                    }
+                }
+            });
+        };
+
+        const createLineChart = () => {
+            const ctx = document.getElementById('evolutionChart');
+            if (!ctx) return;
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: monthLabels,
+                    datasets: [
+                        {
+                            label: 'Prévu',
+                            data: plannedMonthly,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'Réalisé',
+                            data: actualMonthly,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) { return value + ' €'; }
+                            }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        };
+
+        createPieChart('plannedChart', plannedData);
+        createPieChart('actualChart', actualData);
+        createLineChart();
+    })();
+</script>
+{% endblock %}

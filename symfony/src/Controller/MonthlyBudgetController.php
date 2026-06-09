@@ -15,7 +15,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/budget', name: 'monthly_budget_')]
+#[Route('/', name: 'monthly_budget_')]
 class MonthlyBudgetController extends AbstractController
 {
     /**

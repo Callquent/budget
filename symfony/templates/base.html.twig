@@ -45,12 +45,6 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if app.request.attributes.get('_route') starts with 'monthly_budget' %}active{% endif %}"
-                       href="{{ path('monthly_budget_index') }}">
-                        <i class="bi bi-calendar3 me-1"></i>Budget prévisionnel
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a class="nav-link {% if app.request.attributes.get('_route') starts with 'subscription' %}active{% endif %}"
                        href="{{ path('subscription_index') }}">
                         <i class="bi bi-arrow-repeat me-1"></i>Abonnements
@@ -66,6 +60,12 @@
                     <a class="nav-link {% if app.request.attributes.get('_route') starts with 'category' %}active{% endif %}"
                        href="{{ path('category_index') }}">
                         <i class="bi bi-tags me-1"></i>Catégories
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if app.request.attributes.get('_route') starts with 'statistics' %}active{% endif %}"
+                       href="{{ path('statistics_index') }}">
+                        <i class="bi bi-graph-up-arrow me-1"></i>Statistiques
                     </a>
                 </li>
             </ul>
