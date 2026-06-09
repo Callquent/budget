@@ -25,7 +25,7 @@ class MonthlyBudgetController extends AbstractController
      */
     #[Route('', name: 'index')]
     #[Route('/{year}', name: 'year', requirements: ['year' => '\d{4}'])]
-    public function index(MonthlyBudgetRepository $repo, AccountRepository $accountRepo, TransactionRepository $txRepo, SubscriptionRepository $subRepo, int $year = 0): Response
+    public function index(MonthlyBudgetRepository $repo, AccountRepository $accountRepo, TransactionRepository $txRepo, SubscriptionRepository $subRepo, EntityManagerInterface $em, int $year = 0): Response
     {
         $now = new \DateTimeImmutable();
 
@@ -34,6 +34,37 @@ class MonthlyBudgetController extends AbstractController
             if ((int) $now->format('n') === 12) {
                 $year++;
             }
+        }
+
+        // ── Synchronisation abonnements → lignes budgétaires pour toute l'année ──
+        // Même logique que dans month() : on crée les lignes manquantes pour chaque
+        // mois de l'année, afin que findAnnualSummary() les voie immédiatement
+        // sans avoir à visiter chaque page mois.
+        $synced = 0;
+        for ($m = 1; $m <= 12; $m++) {
+            $subscriptions = $subRepo->findActiveForPeriod($year, $m);
+            foreach ($subscriptions as $sub) {
+                $existing = $repo->findOneBy([
+                    'category' => $sub->getCategory(),
+                    'account'  => $sub->getAccount(),
+                    'year'     => $year,
+                    'month'    => $m,
+                ]);
+                if (!$existing) {
+                    $mb = (new MonthlyBudget())
+                        ->setCategory($sub->getCategory())
+                        ->setAccount($sub->getAccount())
+                        ->setYear($year)
+                        ->setMonth($m)
+                        ->setPlannedAmount((string) $sub->getAmount())
+                        ->setActualAmount((string) $sub->getAmount());
+                    $em->persist($mb);
+                    $synced++;
+                }
+            }
+        }
+        if ($synced > 0) {
+            $em->flush();
         }
 
         // Résumé mensuel budget prévu vs réalisé
@@ -130,24 +161,33 @@ class MonthlyBudgetController extends AbstractController
         //   → jan : 1200 + 1665        = 2865
         //   → fév : 1200 + 1665 + 1665 = 4530
         $accountBalances = [];
+        $currentMonth   = (int) $now->format('n');
+        $currentYearNow = (int) $now->format('Y');
+
         foreach ($accounts as $account) {
             $aid     = $account->getId();
             $balance = (float) $account->getBalance();
 
-            $cumNet         = 0.0;
-            $cumPlannedNet  = 0.0; // cumul des planned non approuvés de janvier jusqu'au mois m
+            $cumNet        = 0.0;
+            $cumPlannedNet = 0.0;
             for ($m = 1; $m <= 12; $m++) {
                 $credit  = $txMovements[$aid][$m]['credit'] ?? 0;
                 $debit   = $txMovements[$aid][$m]['debit']  ?? 0;
                 $subs    = $subMovements[$aid][$m] ?? 0;
                 $cumNet += $credit - $debit;
 
-                // Planned net cumulatif : on additionne income et soustrait expense
-                // pour ce compte + les budgets sans compte (clé 'all')
-                $pAccount = $plannedByAccount[$m][$aid]    ?? ['income' => 0.0, 'expense' => 0.0];
-                $pAll     = $plannedByAccount[$m]['all']   ?? ['income' => 0.0, 'expense' => 0.0];
-                $cumPlannedNet += ($pAccount['income'] + $pAll['income'])
-                                - ($pAccount['expense'] + $pAll['expense']);
+                // On n'applique le planned que pour les mois >= mois courant.
+                // Les mois passés sont déjà reflétés dans account.balance via les transactions.
+                // Cela évite qu'un budget annuel (ex: Assurance auto en mars) soit
+                // re-projeté sur tous les mois suivants jusqu'en décembre.
+                $pAccount = $plannedByAccount[$m][$aid]  ?? ['income' => 0.0, 'expense' => 0.0];
+                $pAll     = $plannedByAccount[$m]['all'] ?? ['income' => 0.0, 'expense' => 0.0];
+                $isCurrentOrFuture = ($year > $currentYearNow)
+                    || ($year === $currentYearNow && $m >= $currentMonth);
+                if ($isCurrentOrFuture) {
+                    $cumPlannedNet += ($pAccount['income'] + $pAll['income'])
+                                    - ($pAccount['expense'] + $pAll['expense']);
+                }
 
                 $accountBalances[$aid][$m] = [
                     'balance'           => $balance + $cumNet,
@@ -163,6 +203,7 @@ class MonthlyBudgetController extends AbstractController
         return $this->render('monthly_budget/index.html.twig', [
             'year'             => $year,
             'current_year'     => $currentYear,
+            'current_month'    => $currentMonth,
             'available_years'  => $availableYears,
             'summary'          => $summaryByMonth,
             'budgets'          => $budgetsByMonth,
@@ -334,9 +375,9 @@ class MonthlyBudgetController extends AbstractController
         $em->persist($transaction);
 
         // Marquer la ligne comme approuvée.
-        // On conserve actualAmount tel quel (montant réalisé saisi par l'utilisateur).
-        // On ne recalcule PAS refreshActualAmounts : chaque ligne gère son propre montant
-        // indépendamment des autres lignes de la même catégorie.
+        // On conserve actualAmount tel quel — ne pas écraser avec plannedAmount.
+        // On ne recalcule PAS refreshActualAmounts : chaque ligne gère son propre
+        // montant indépendamment des autres lignes de la même catégorie.
         $budget->setApprovedAt(new \DateTimeImmutable());
         $budget->setApprovedTransaction($transaction);
 

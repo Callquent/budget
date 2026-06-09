@@ -72,6 +72,9 @@
                             <a href="{{ path('monthly_budget_month', {year: year, month: m}) }}"
                                class="text-decoration-none fw-semibold text-dark">
                                 {{ month_names_full[m] }}
+                                {% if year == current_year and m == current_month %}
+                                    <span class="badge bg-primary ms-1" style="font-size:.6rem">en cours</span>
+                                {% endif %}
                             </a>
                         </td>
 

@@ -71,17 +71,33 @@ class MonthlyBudgetRepository extends ServiceEntityRepository
      */
     public function findAnnualSummary(int $year): array
     {
-        return $this->createQueryBuilder('mb')
+        $rows = $this->createQueryBuilder('mb')
+            ->join('mb.category', 'c')
             ->select(
                 'mb.month',
-                'SUM(mb.plannedAmount) AS total_planned',
-                'SUM(mb.actualAmount)  AS total_actual'
+                'c.transactionType AS tx_type',
+                'SUM(mb.plannedAmount) AS sum_planned',
+                'SUM(mb.actualAmount)  AS sum_actual'
             )
             ->where('mb.year = :year')
             ->setParameter('year', $year)
-            ->groupBy('mb.month')
+            ->groupBy('mb.month', 'c.transactionType')
             ->orderBy('mb.month', 'ASC')
             ->getQuery()
             ->getScalarResult();
+
+        // Regrouper par mois en calculant le solde net : income - expense
+        $byMonth = [];
+        foreach ($rows as $row) {
+            $m = (int) $row['month'];
+            if (!isset($byMonth[$m])) {
+                $byMonth[$m] = ['month' => $m, 'total_planned' => 0.0, 'total_actual' => 0.0];
+            }
+            $sign = $row['tx_type'] === 'income' ? 1 : ($row['tx_type'] === 'transfer' ? 0 : -1);
+            $byMonth[$m]['total_planned'] += $sign * (float) $row['sum_planned'];
+            $byMonth[$m]['total_actual']  += $sign * (float) $row['sum_actual'];
+        }
+
+        return array_values($byMonth);
     }
 }
