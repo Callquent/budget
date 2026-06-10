@@ -1,15 +1,6 @@
-@import "tailwindcss";
-
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,7 +11,55 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: #f8f9fa !important;
+  color: #212529;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: -.5px;
+}
+
+.nav-link.active {
+    font-weight: 600;
+}
+
+.card {
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+
+.badge-income   { background: #d1fae5; color: #065f46; }
+.badge-expense  { background: #fee2e2; color: #991b1b; }
+.badge-transfer { background: #dbeafe; color: #1e40af; }
+.badge-monthly    { background: #f3f4f6; color: #374151; }
+.badge-yearly     { background: #fef9c3; color: #854d0e; }
+.badge-quarterly  { background: #ede9fe; color: #5b21b6; }
+.badge-occasional { background: #e0f2fe; color: #0c4a6e; }
+
+.table th {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #6c757d;
+    border-top: none;
+}
+
+.progress {
+    height: 6px;
+    border-radius: 3px;
+}
+
+.btn-action {
+    padding: .2rem .5rem;
+    font-size: .8rem;
+}
+
+.year-nav .btn {
+    min-width: 70px;
+}
+
+.alert {
+    border-radius: .5rem;
 }
