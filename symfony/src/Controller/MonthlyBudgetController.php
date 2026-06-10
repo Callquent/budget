@@ -164,12 +164,49 @@ class MonthlyBudgetController extends AbstractController
         $currentMonth   = (int) $now->format('n');
         $currentYearNow = (int) $now->format('Y');
 
+        // Pour les années futures (ex: 2027) :
+        // - solde de départ réel   = account.balance + tous les mouvements jusqu'au 31/12/(year-1)
+        // - projection de départ   = cumul des planned non approuvés de toute l'année (year-1)
+        //   Ces deux valeurs servent de base à janvier de l'année affichée.
+        $startingNetByAccount      = []; // mouvements réels cumulés jusqu'à fin (year-1)
+        $startingPlannedByAccount  = []; // planned net cumulé sur toute l'année (year-1)
+
+        if ($year > $currentYearNow) {
+            // Mouvements réels jusqu'à fin décembre (year-1)
+            foreach ($txRepo->findMovementsUpToPeriod($year - 1, 12) as $row) {
+                $aid = (int) $row['account_id'];
+                $startingNetByAccount[$aid] = (float)$row['credit'] - (float)$row['debit'];
+            }
+
+            // Planned net cumulé de l'année (year-1) pour chaque compte
+            // On charge les budgets de l'année précédente
+            $prevYearBudgets = $repo->createQueryBuilder('mb')
+                ->join('mb.category', 'c')
+                ->where('mb.year = :y')
+                ->setParameter('y', $year - 1)
+                ->getQuery()
+                ->getResult();
+
+            foreach ($prevYearBudgets as $mb) {
+                $aid  = $mb->getAccount()?->getId() ?? 'all';
+                $type = $mb->getCategory()->getTransactionType();
+                $amt  = (float) $mb->getPlannedAmount();
+                if (!isset($startingPlannedByAccount[$aid])) {
+                    $startingPlannedByAccount[$aid] = 0.0;
+                }
+                $startingPlannedByAccount[$aid] += $type === 'income' ? $amt : -$amt;
+            }
+        }
+
         foreach ($accounts as $account) {
             $aid     = $account->getId();
-            $balance = (float) $account->getBalance();
+            $balance = (float) $account->getBalance() + ($startingNetByAccount[$aid] ?? 0.0);
+            // Projection de départ : planned de l'année précédente (pour année future)
+            $basePlannedNet = ($startingPlannedByAccount[$aid] ?? 0.0)
+                            + ($startingPlannedByAccount['all'] ?? 0.0);
 
             $cumNet        = 0.0;
-            $cumPlannedNet = 0.0;
+            $cumPlannedNet = $basePlannedNet;
             for ($m = 1; $m <= 12; $m++) {
                 $credit  = $txMovements[$aid][$m]['credit'] ?? 0;
                 $debit   = $txMovements[$aid][$m]['debit']  ?? 0;
