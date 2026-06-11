@@ -11,18 +11,27 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/subscriptions', name: 'subscription_')]
 class SubscriptionController extends AbstractController
 {
-    #[Route('', name: 'index')]
+    public function __construct(
+        private SerializerInterface $serializer,
+    ) {}
+
+    #[Route('', name: 'index', methods: ['GET'])]
     public function index(SubscriptionRepository $repo): Response
     {
-        return $this->render('subscription/index.html.twig', [
-            'subscriptions' => $repo->findAllWithRelations(),
-        ]);
-    }
+        $subscriptions = $repo->findAllWithRelations();
 
+        return $this->json(
+            ['subscriptions' => $subscriptions],
+            200,
+            [],
+            ['groups' => ['subscription:read']]
+        );
+    }
     #[Route('/new', name: 'new')]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
@@ -35,7 +44,7 @@ class SubscriptionController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($subscription);
             $em->flush();
-            $this->addFlash('success', 'Abonnement « '.$subscription->getName().' » créé.');
+            $this->addFlash('success', 'Abonnement « ' . $subscription->getName() . ' » créé.');
             return $this->redirectToRoute('subscription_index');
         }
 
@@ -59,7 +68,7 @@ class SubscriptionController extends AbstractController
 
         return $this->render('subscription/form.html.twig', [
             'form'         => $form,
-            'title'        => 'Modifier « '.$subscription->getName().' »',
+            'title'        => 'Modifier « ' . $subscription->getName() . ' »',
             'subscription' => $subscription,
         ]);
     }
@@ -102,7 +111,7 @@ class SubscriptionController extends AbstractController
     #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
     public function delete(Subscription $subscription, Request $request, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete-sub-'.$subscription->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete-sub-' . $subscription->getId(), $request->request->get('_token'))) {
             $em->remove($subscription);
             $em->flush();
             $this->addFlash('success', 'Abonnement supprimé.');

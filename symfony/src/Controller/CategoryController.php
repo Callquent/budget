@@ -25,7 +25,7 @@ class CategoryController extends AbstractController
             $grouped[$cat->getTransactionType()][] = $cat;
         }
 
-        return $this->render('category/index.html.twig', [
+        return $this->json([
             'grouped' => $grouped,
         ]);
     }
@@ -40,7 +40,7 @@ class CategoryController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($category);
             $em->flush();
-            $this->addFlash('success', 'Catégorie « '.$category->getName().' » créée.');
+            $this->addFlash('success', 'Catégorie « ' . $category->getName() . ' » créée.');
             return $this->redirectToRoute('category_index');
         }
 
@@ -64,7 +64,7 @@ class CategoryController extends AbstractController
 
         return $this->render('category/form.html.twig', [
             'form'     => $form,
-            'title'    => 'Modifier « '.$category->getName().' »',
+            'title'    => 'Modifier « ' . $category->getName() . ' »',
             'category' => $category,
         ]);
     }
@@ -72,7 +72,7 @@ class CategoryController extends AbstractController
     #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
     public function delete(Category $category, Request $request, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete-category-'.$category->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete-category-' . $category->getId(), $request->request->get('_token'))) {
             $em->remove($category);
             $em->flush();
             $this->addFlash('success', 'Catégorie supprimée.');

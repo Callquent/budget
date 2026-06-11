@@ -14,6 +14,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpFoundation\JsonResponse;
 
 #[Route('/', name: 'monthly_budget_')]
 class MonthlyBudgetController extends AbstractController
@@ -203,7 +204,7 @@ class MonthlyBudgetController extends AbstractController
             $balance = (float) $account->getBalance() + ($startingNetByAccount[$aid] ?? 0.0);
             // Projection de départ : planned de l'année précédente (pour année future)
             $basePlannedNet = ($startingPlannedByAccount[$aid] ?? 0.0)
-                            + ($startingPlannedByAccount['all'] ?? 0.0);
+                + ($startingPlannedByAccount['all'] ?? 0.0);
 
             $cumNet        = 0.0;
             $cumPlannedNet = $basePlannedNet;
@@ -223,7 +224,7 @@ class MonthlyBudgetController extends AbstractController
                     || ($year === $currentYearNow && $m >= $currentMonth);
                 if ($isCurrentOrFuture) {
                     $cumPlannedNet += ($pAccount['income'] + $pAll['income'])
-                                    - ($pAccount['expense'] + $pAll['expense']);
+                        - ($pAccount['expense'] + $pAll['expense']);
                 }
 
                 $accountBalances[$aid][$m] = [
@@ -237,16 +238,33 @@ class MonthlyBudgetController extends AbstractController
             }
         }
 
-        return $this->render('monthly_budget/index.html.twig', [
-            'year'             => $year,
-            'current_year'     => $currentYear,
-            'current_month'    => $currentMonth,
-            'available_years'  => $availableYears,
-            'summary'          => $summaryByMonth,
-            'budgets'          => $budgetsByMonth,
-            'accounts'         => $accounts,
-            'account_balances' => $accountBalances,
-            'planned_by_account' => $plannedByAccount,
+        $accountBalancesJson = [];
+        foreach ($accountBalances as $aid => $months) {
+            foreach ($months as $m => $ab) {
+                $accountBalancesJson[$aid][$m] = $ab;
+            }
+        }
+
+        $summaryJson = [];
+        foreach ($summaryByMonth as $m => $row) {
+            $summaryJson[$m] = $row;
+        }
+
+        $accountsJson = array_map(fn($a) => [
+            'id'      => $a->getId(),
+            'name'    => $a->getName(),
+            'type'    => $a->getType(),
+            'balance' => (float) $a->getBalance(),
+        ], $accounts);
+
+        return $this->json([
+            'year'            => $year,
+            'currentYear'     => $currentYear,
+            'currentMonth'    => $currentMonth,
+            'availableYears'  => $availableYears,
+            'accounts'        => $accountsJson,
+            'summary'         => $summaryJson,
+            'accountBalances' => $accountBalancesJson,
         ]);
     }
 
@@ -314,20 +332,73 @@ class MonthlyBudgetController extends AbstractController
         $formatter = new \IntlDateFormatter('fr_FR', \IntlDateFormatter::NONE, \IntlDateFormatter::NONE, null, null, 'MMMM yyyy');
 
         $months = [
-            1 => 'Janvier', 2 => 'Février',  3 => 'Mars',      4 => 'Avril',
-            5 => 'Mai',      6 => 'Juin',     7 => 'Juillet',   8 => 'Août',
-            9 => 'Septembre',10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre',
+            1 => 'Janvier',
+            2 => 'Février',
+            3 => 'Mars',
+            4 => 'Avril',
+            5 => 'Mai',
+            6 => 'Juin',
+            7 => 'Juillet',
+            8 => 'Août',
+            9 => 'Septembre',
+            10 => 'Octobre',
+            11 => 'Novembre',
+            12 => 'Décembre',
         ];
 
-        return $this->render('monthly_budget/month.html.twig', [
-            'year'           => $year,
-            'month'          => $month,
-            'period_label'   => $formatter->format($date),
-            'budgets'        => $budgets,
-            'accounts'       => $accounts,
-            'tx_by_account'  => $txByAccount,
-            'subscriptions'  => $subscriptions,
-            'months'         => $months,
+        $now = new \DateTimeImmutable();
+
+        $budgetsJson = array_map(fn($mb) => [
+            'id'            => $mb->getId(),
+            'label'         => $mb->getLabel(),
+            'plannedAmount' => (float) $mb->getPlannedAmount(),
+            'actualAmount'  => (float) $mb->getActualAmount(),
+            'isApproved'    => $mb->isApproved(),
+            'approvedAt'    => $mb->getApprovedAt()?->format('d/m/Y'),
+            'account'       => $mb->getAccount() ? [
+                'id'   => $mb->getAccount()->getId(),
+                'name' => $mb->getAccount()->getName(),
+            ] : null,
+            'category' => [
+                'id'              => $mb->getCategory()->getId(),
+                'name'            => $mb->getCategory()->getName(),
+                'transactionType' => $mb->getCategory()->getTransactionType(),
+                'frequency'       => $mb->getCategory()->getFrequency() ?? 'monthly',
+            ],
+        ], $budgets);
+
+        $accountsJson = array_map(fn($a) => [
+            'id'       => $a->getId(),
+            'name'     => $a->getName(),
+            'type'     => $a->getType(),
+            'balance'  => (float) $a->getBalance(),
+            'currency' => '€',
+        ], $accounts);
+
+        $subsJson = array_map(fn($s) => [
+            'id'        => $s->getId(),
+            'name'      => $s->getName(),
+            'amount'    => (float) $s->getAmount(),
+            'frequency' => $s->getFrequency(),
+            'account'   => ['name' => $s->getAccount()->getName()],
+            'category'  => ['name' => $s->getCategory()->getName()],
+        ], $subscriptions);
+
+        $txJson = [];
+        foreach ($txByAccount as $aid => $tx) {
+            $txJson[$aid] = $tx;
+        }
+
+        return $this->json([
+            'year'          => $year,
+            'month'         => $month,
+            'nowYear'       => (int) $now->format('Y'),
+            'nowMonth'      => (int) $now->format('n'),
+            'periodLabel'   => $formatter->format($date),
+            'accounts'      => $accountsJson,
+            'txByAccount'   => $txJson,
+            'subscriptions' => $subsJson,
+            'budgets'       => $budgetsJson,
         ]);
     }
 

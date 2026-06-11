@@ -6,6 +6,7 @@ use App\Repository\CategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: CategoryRepository::class)]
 #[ORM\Table(name: 'category')]
@@ -25,15 +26,12 @@ class Category
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['subscription:read'])]
     private ?int $id = null;
 
-    /**
-     * Exemples : "Salaire", "Abonnement transport", "Courses",
-     *            "Électricité", "Assurance habitation",
-     *            "Charges habitation", "Virement Livret A"
-     */
     #[ORM\Column(length: 100)]
-    private string $name;
+    #[Groups(['subscription:read'])]
+    private ?string $name = null;
 
     /** 'income', 'expense' ou 'transfer' */
     #[ORM\Column(length: 20)]
@@ -58,22 +56,62 @@ class Category
         $this->monthlyBudgets = new ArrayCollection();
     }
 
-    public function getId(): ?int { return $this->id; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-    public function getName(): string { return $this->name; }
-    public function setName(string $name): static { $this->name = $name; return $this; }
+    public function getName(): string
+    {
+        return $this->name;
+    }
+    public function setName(string $name): static
+    {
+        $this->name = $name;
+        return $this;
+    }
 
-    public function getTransactionType(): string { return $this->transactionType; }
-    public function setTransactionType(string $type): static { $this->transactionType = $type; return $this; }
+    public function getTransactionType(): string
+    {
+        return $this->transactionType;
+    }
+    public function setTransactionType(string $type): static
+    {
+        $this->transactionType = $type;
+        return $this;
+    }
 
-    public function getFrequency(): string { return $this->frequency; }
-    public function setFrequency(string $frequency): static { $this->frequency = $frequency; return $this; }
+    public function getFrequency(): string
+    {
+        return $this->frequency;
+    }
+    public function setFrequency(string $frequency): static
+    {
+        $this->frequency = $frequency;
+        return $this;
+    }
 
-    public function getDescription(): ?string { return $this->description; }
-    public function setDescription(?string $description): static { $this->description = $description; return $this; }
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+    public function setDescription(?string $description): static
+    {
+        $this->description = $description;
+        return $this;
+    }
 
-    public function getTransactions(): Collection { return $this->transactions; }
-    public function getMonthlyBudgets(): Collection { return $this->monthlyBudgets; }
+    public function getTransactions(): Collection
+    {
+        return $this->transactions;
+    }
+    public function getMonthlyBudgets(): Collection
+    {
+        return $this->monthlyBudgets;
+    }
 
-    public function __toString(): string { return $this->name; }
+    public function __toString(): string
+    {
+        return $this->name;
+    }
 }
