@@ -14,12 +14,15 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/accounts', name: 'account_')]
 class AccountController extends AbstractController
 {
-    #[Route('', name: 'index')]
+    #[Route('', name: 'index', methods: ['GET'])]
     public function index(AccountRepository $repo): Response
     {
-        return $this->render('account/index.html.twig', [
-            'accounts' => $repo->findAllOrderedByName(),
-        ]);
+        return $this->json(
+            ['accounts' => $repo->findAllOrderedByName()],
+            200,
+            [],
+            ['groups' => ['account:read']]
+        );
     }
 
     #[Route('/new', name: 'new')]
@@ -62,13 +65,11 @@ class AccountController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
-    public function delete(Account $account, Request $request, EntityManagerInterface $em): Response
+    public function delete(Account $account, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete-account-'.$account->getId(), $request->request->get('_token'))) {
-            $em->remove($account);
-            $em->flush();
-            $this->addFlash('success', 'Compte supprimé.');
-        }
-        return $this->redirectToRoute('account_index');
+        $em->remove($account);
+        $em->flush();
+
+        return $this->json(['deleted' => true]);
     }
 }

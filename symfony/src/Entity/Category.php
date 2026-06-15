@@ -26,22 +26,25 @@ class Category
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['subscription:read'])]
+    #[Groups(['subscription:read', 'category:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['subscription:read'])]
+    #[Groups(['subscription:read', 'category:read'])]
     private ?string $name = null;
 
     /** 'income', 'expense' ou 'transfer' */
     #[ORM\Column(length: 20)]
+    #[Groups(['category:read'])]
     private string $transactionType;
 
     /** 'monthly', 'yearly', 'quarterly', 'occasional' */
     #[ORM\Column(length: 20)]
+    #[Groups(['category:read'])]
     private string $frequency;
 
     #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['category:read'])]
     private ?string $description = null;
 
     #[ORM\OneToMany(mappedBy: 'category', targetEntity: Transaction::class)]

@@ -25,9 +25,12 @@ class CategoryController extends AbstractController
             $grouped[$cat->getTransactionType()][] = $cat;
         }
 
-        return $this->json([
-            'grouped' => $grouped,
-        ]);
+        return $this->json(
+            ['grouped' => $grouped],
+            200,
+            [],
+            ['groups' => ['category:read']]
+        );
     }
 
     #[Route('/new', name: 'new')]

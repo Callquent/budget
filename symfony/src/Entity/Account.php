@@ -19,22 +19,25 @@ class Account
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['subscription:read'])]
+    #[Groups(['subscription:read', 'account:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['subscription:read'])]
+    #[Groups(['subscription:read', 'account:read'])]
     private string $name;
 
     /** 'credit' ou 'debit' */
     #[ORM\Column(length: 20)]
+    #[Groups(['account:read'])]
     private string $type;
 
     #[ORM\Column(length: 3, options: ['default' => 'EUR'])]
+    #[Groups(['account:read'])]
     private string $currency = 'EUR';
 
     /** Solde initial/courant du compte */
     #[ORM\Column(type: 'decimal', precision: 12, scale: 2, options: ['default' => '0.00'])]
+    #[Groups(['account:read'])]
     private string $balance = '0.00';
 
     #[ORM\Column(type: 'datetime_immutable')]
