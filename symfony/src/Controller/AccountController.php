@@ -17,12 +17,14 @@ class AccountController extends AbstractController
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(AccountRepository $repo): Response
     {
-        return $this->json(
-            ['accounts' => $repo->findAllOrderedByName()],
-            200,
-            [],
-            ['groups' => ['account:read']]
-        );
+        $accounts = $repo->findAllOrderedByName();
+
+        return $this->json([
+            'accounts' => array_map(
+                fn(Account $a) => $this->serialize($a),
+                $accounts
+            ),
+        ]);
     }
 
     #[Route('/new', name: 'new')]
@@ -64,12 +66,23 @@ class AccountController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'delete', methods: ['DELETE'])]
     public function delete(Account $account, EntityManagerInterface $em): Response
     {
         $em->remove($account);
         $em->flush();
 
         return $this->json(['deleted' => true]);
+    }
+
+    private function serialize(Account $a): array
+    {
+        return [
+            'id'       => $a->getId(),
+            'name'     => $a->getName(),
+            'type'     => $a->getType(),
+            'currency' => $a->getCurrency(),
+            'balance'  => $a->getBalance(),
+        ];
     }
 }

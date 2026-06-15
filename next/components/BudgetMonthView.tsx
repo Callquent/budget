@@ -860,44 +860,28 @@ export default function BudgetMonthView({
               <tfoot className="table-light fw-semibold">
                 <tr>
                   <td colSpan={3}>Solde net (recettes − dépenses)</td>
-                  <td className="text-end text-success">
-                    +
-                    {fmt(
-                      budgets
-                        .filter((b) => b.category.transactionType === "income")
-                        .reduce((s, b) => s + b.plannedAmount, 0) -
-                        budgets
-                          .filter(
-                            (b) => b.category.transactionType === "expense",
-                          )
-                          .reduce((s, b) => s + b.plannedAmount, 0),
-                    )}{" "}
-                    €
-                  </td>
-                  <td className="text-end text-success">
-                    +
-                    {fmt(
-                      budgets.reduce(
-                        (s, b) => s + (b.plannedAmount - b.actualAmount),
-                        0,
-                      ),
-                    )}{" "}
-                    €
-                  </td>
-                  <td className="text-end text-success">
-                    +
-                    {fmt(
-                      budgets
-                        .filter((b) => b.category.transactionType === "income")
-                        .reduce((s, b) => s + b.actualAmount, 0) -
-                        budgets
-                          .filter(
-                            (b) => b.category.transactionType === "expense",
-                          )
-                          .reduce((s, b) => s + b.actualAmount, 0),
-                    )}{" "}
-                    €
-                  </td>
+                  {(() => {
+                    const netPlanned =
+                      budgets.filter((b) => b.category.transactionType === "income").reduce((s, b) => s + b.plannedAmount, 0) -
+                      budgets.filter((b) => b.category.transactionType === "expense").reduce((s, b) => s + b.plannedAmount, 0);
+                    const variance = budgets.reduce((s, b) => s + (b.plannedAmount - b.actualAmount), 0);
+                    const netActual =
+                      budgets.filter((b) => b.category.transactionType === "income").reduce((s, b) => s + b.actualAmount, 0) -
+                      budgets.filter((b) => b.category.transactionType === "expense").reduce((s, b) => s + b.actualAmount, 0);
+                    return (
+                      <>
+                        <td className={`text-end fw-semibold ${netPlanned >= 0 ? "text-success" : "text-danger"}`}>
+                          {netPlanned > 0 ? "+" : ""}{fmt(netPlanned)} €
+                        </td>
+                        <td className={`text-end fw-semibold ${variance >= 0 ? "text-success" : "text-danger"}`}>
+                          {variance > 0 ? "+" : ""}{fmt(variance)} €
+                        </td>
+                        <td className={`text-end fw-semibold ${netActual >= 0 ? "text-success" : "text-danger"}`}>
+                          {netActual > 0 ? "+" : ""}{fmt(netActual)} €
+                        </td>
+                      </>
+                    );
+                  })()}
                   <td colSpan={2}></td>
                 </tr>
               </tfoot>

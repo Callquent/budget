@@ -46,16 +46,16 @@ class StatisticsController extends AbstractController
         $currentYear = (int) $now->format('Y');
         $availableYears = range($currentYear - 2, $currentYear + 1);
 
-        return $this->render('statistics/index.html.twig', [
-            'year'            => $year,
-            'current_year'    => $currentYear,
-            'available_years' => $availableYears,
-            'planned_chart'    => $plannedChart,
-            'actual_chart'    => $actualChart,
-            'categories'      => $categories,
-            'summary'         => $summary,
-            'planned_monthly'  => array_values($plannedMonthly),
-            'actual_monthly'   => array_values($actualMonthly),
+        return $this->json([
+            'year'           => $year,
+            'currentYear'    => $currentYear,
+            'availableYears' => $availableYears,
+            'plannedChart'   => $plannedChart,
+            'actualChart'    => $actualChart,
+            'categories'     => $categories,
+            'summary'        => $summary,
+            'plannedMonthly' => array_values($plannedMonthly),
+            'actualMonthly'  => array_values($actualMonthly),
         ]);
     }
 }

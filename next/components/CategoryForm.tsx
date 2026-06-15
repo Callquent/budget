@@ -3,39 +3,38 @@ import React from "react";
 import Link from "next/link";
 
 interface CategoryFormProps {
-  initialData?: any;
+  initialData?: {
+    id?: string;
+    name?: string;
+    transactionType?: string;
+    frequency?: string;
+    description?: string;
+  };
   title: string;
-  onSubmit: (data: any) => void;
+  action: (formData: FormData) => Promise<void>;
 }
 
 export default function CategoryForm({
   initialData,
   title,
-  onSubmit,
+  action,
 }: CategoryFormProps) {
   return (
     <div className="row justify-content-center">
       <div className="col-lg-5">
         <div className="d-flex align-items-center mb-4">
-          <Link
-            href="/categories"
-            className="text-muted text-decoration-none me-3"
-          >
+          <Link href="/categories" className="text-muted text-decoration-none me-3">
             <i className="bi bi-chevron-left"></i>
           </Link>
           <h1 className="h4 mb-0">{title}</h1>
         </div>
         <div className="card p-4">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSubmit({});
-            }}
-          >
+          <form action={action}>
             <div className="mb-3">
               <label className="form-label">Nom</label>
               <input
                 type="text"
+                name="name"
                 className="form-control"
                 defaultValue={initialData?.name || ""}
               />
@@ -44,6 +43,7 @@ export default function CategoryForm({
               <div className="col-6">
                 <label className="form-label">Type de transaction</label>
                 <select
+                  name="transactionType"
                   className="form-select"
                   defaultValue={initialData?.transactionType || "expense"}
                 >
@@ -55,6 +55,7 @@ export default function CategoryForm({
               <div className="col-6">
                 <label className="form-label">Fréquence</label>
                 <select
+                  name="frequency"
                   className="form-select"
                   defaultValue={initialData?.frequency || "monthly"}
                 >
@@ -68,6 +69,7 @@ export default function CategoryForm({
             <div className="mb-3">
               <label className="form-label">Description</label>
               <textarea
+                name="description"
                 className="form-control"
                 rows={3}
                 defaultValue={initialData?.description || ""}

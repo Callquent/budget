@@ -84,9 +84,18 @@ class TransactionController extends AbstractController
 
         // Listes pour les filtres
         $months = [
-            1 => 'Janvier', 2 => 'Février',  3 => 'Mars',      4 => 'Avril',
-            5 => 'Mai',      6 => 'Juin',     7 => 'Juillet',   8 => 'Août',
-            9 => 'Septembre',10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre',
+            1 => 'Janvier',
+            2 => 'Février',
+            3 => 'Mars',
+            4 => 'Avril',
+            5 => 'Mai',
+            6 => 'Juin',
+            7 => 'Juillet',
+            8 => 'Août',
+            9 => 'Septembre',
+            10 => 'Octobre',
+            11 => 'Novembre',
+            12 => 'Décembre',
         ];
 
         // Regroupement des transactions par account_id (fait en PHP, pas en Twig)
@@ -109,6 +118,83 @@ class TransactionController extends AbstractController
         ]);
     }
 
+    #[Route('/{year}/{month}', name: 'by_month', methods: ['GET'], requirements: ['year' => '\d{4}', 'month' => '\d{1,2}'])]
+    public function byMonth(
+        TransactionRepository $repo,
+        AccountRepository $accountRepo,
+        int $year,
+        int $month
+    ): Response {
+        $now = new \DateTimeImmutable();
+        $transactions = $repo->findByPeriod($year, $month);
+        $accounts = $accountRepo->findAllOrderedByName();
+
+        $totalCredit = 0.0;
+        $totalDebit  = 0.0;
+        $byAccountMap = [];
+
+        foreach ($accounts as $account) {
+            $byAccountMap[$account->getId()] = [
+                'account'      => [
+                    'id'       => $account->getId(),
+                    'name'     => $account->getName(),
+                    'type'     => $account->getType(),
+                    'currency' => '€',
+                    'balance'  => (float) $account->getBalance(),
+                ],
+                'credit'       => 0.0,
+                'debit'        => 0.0,
+                'balanceEnd'   => (float) $account->getBalance(),
+                'transactions' => [],
+            ];
+        }
+
+        $txAll = [];
+        foreach ($transactions as $tx) {
+            $aid    = $tx->getAccount()->getId();
+            $amount = (float) $tx->getAmount();
+            $type   = $tx->getType(); // 'credit' ou 'debit'
+
+            if ($type === 'credit') {
+                $totalCredit += $amount;
+                $byAccountMap[$aid]['credit'] += $amount;
+                $byAccountMap[$aid]['balanceEnd'] += $amount;
+            } else {
+                $totalDebit += $amount;
+                $byAccountMap[$aid]['debit'] += $amount;
+                $byAccountMap[$aid]['balanceEnd'] -= $amount;
+            }
+
+            $txData = [
+                'id'              => $tx->getId(),
+                'transactionDate' => $tx->getTransactionDate()->format('Y-m-d'),
+                'label'           => $tx->getLabel(),
+                'type'            => $type,
+                'amount'          => $amount,
+                'notes'           => $tx->getNotes(),
+                'category'        => [
+                    'name'            => $tx->getCategory()->getName(),
+                    'transactionType' => $tx->getCategory()->getTransactionType(),
+                ],
+                'account'         => ['name' => $tx->getAccount()->getName()],
+            ];
+
+            $byAccountMap[$aid]['transactions'][] = $txData;
+            $txAll[] = $txData;
+        }
+
+        return $this->json([
+            'year'         => $year,
+            'month'        => $month,
+            'nowYear'      => (int) $now->format('Y'),
+            'nowMonth'     => (int) $now->format('n'),
+            'totalCredit'  => $totalCredit,
+            'totalDebit'   => $totalDebit,
+            'byAccount'    => array_values($byAccountMap),
+            'transactions' => $txAll,
+        ]);
+    }
+
     #[Route('/new', name: 'new')]
     public function new(
         Request $request,
@@ -122,7 +208,7 @@ class TransactionController extends AbstractController
         if ($request->query->get('year') && $request->query->get('month')) {
             $defaultDate = \DateTimeImmutable::createFromFormat(
                 'Y-n-j',
-                $request->query->get('year').'-'.$request->query->get('month').'-1'
+                $request->query->get('year') . '-' . $request->query->get('month') . '-1'
             );
         }
 
@@ -213,7 +299,7 @@ class TransactionController extends AbstractController
         $year  = $transaction->getYear();
         $month = $transaction->getMonth();
 
-        if ($this->isCsrfTokenValid('delete-tx-'.$transaction->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete-tx-' . $transaction->getId(), $request->request->get('_token'))) {
             $em->remove($transaction);
             $em->flush();
             $budgetRepo->refreshActualAmounts($year, $month);

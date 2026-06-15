@@ -328,9 +328,6 @@ class MonthlyBudgetController extends AbstractController
             $txByAccount[$aid]['subs']  += (float) $sub->getAmount();
         }
 
-        $date      = \DateTimeImmutable::createFromFormat('Y-n', "$year-$month");
-        $formatter = new \IntlDateFormatter('fr_FR', \IntlDateFormatter::NONE, \IntlDateFormatter::NONE, null, null, 'MMMM yyyy');
-
         $months = [
             1 => 'Janvier',
             2 => 'Février',
@@ -394,7 +391,7 @@ class MonthlyBudgetController extends AbstractController
             'month'         => $month,
             'nowYear'       => (int) $now->format('Y'),
             'nowMonth'      => (int) $now->format('n'),
-            'periodLabel'   => $formatter->format($date),
+            'periodLabel'   => $months[$month] . ' ' . $year,
             'accounts'      => $accountsJson,
             'txByAccount'   => $txJson,
             'subscriptions' => $subsJson,

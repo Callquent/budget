@@ -3,39 +3,34 @@ import React from "react";
 import Link from "next/link";
 
 interface AccountFormProps {
-  initialData?: any;
+  initialData?: {
+    id?: string;
+    name?: string;
+    type?: string;
+    currency?: string;
+    balance?: number;
+  };
   title: string;
-  onSubmit: (data: any) => void;
+  action: (formData: FormData) => Promise<void>;
 }
 
-export default function AccountForm({
-  initialData,
-  title,
-  onSubmit,
-}: AccountFormProps) {
+export default function AccountForm({ initialData, title, action }: AccountFormProps) {
   return (
     <div className="row justify-content-center">
       <div className="col-lg-5">
         <div className="d-flex align-items-center mb-4">
-          <Link
-            href="/accounts"
-            className="text-muted text-decoration-none me-3"
-          >
+          <Link href="/accounts" className="text-muted text-decoration-none me-3">
             <i className="bi bi-chevron-left"></i>
           </Link>
           <h1 className="h4 mb-0">{title}</h1>
         </div>
         <div className="card p-4">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSubmit({});
-            }}
-          >
+          <form action={action}>
             <div className="mb-3">
               <label className="form-label">Nom du compte</label>
               <input
                 type="text"
+                name="name"
                 className="form-control"
                 defaultValue={initialData?.name || ""}
               />
@@ -43,10 +38,7 @@ export default function AccountForm({
             <div className="row g-3 mb-3">
               <div className="col-6">
                 <label className="form-label">Type</label>
-                <select
-                  className="form-select"
-                  defaultValue={initialData?.type || "debit"}
-                >
+                <select name="type" className="form-select" defaultValue={initialData?.type || "debit"}>
                   <option value="credit">Crédit</option>
                   <option value="debit">Débit</option>
                 </select>
@@ -55,6 +47,7 @@ export default function AccountForm({
                 <label className="form-label">Devise</label>
                 <input
                   type="text"
+                  name="currency"
                   className="form-control"
                   defaultValue={initialData?.currency || "€"}
                 />
@@ -65,6 +58,7 @@ export default function AccountForm({
               <div className="input-group">
                 <input
                   type="number"
+                  name="balance"
                   step="0.01"
                   className="form-control"
                   defaultValue={initialData?.balance || ""}
