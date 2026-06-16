@@ -27,43 +27,42 @@ class AccountController extends AbstractController
         ]);
     }
 
-    #[Route('/new', name: 'new')]
+    #[Route('/new', name: 'new', methods: ['POST'])]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
+        $data = json_decode($request->getContent(), true);
+
         $account = new Account();
-        $form = $this->createForm(AccountType::class, $account);
-        $form->handleRequest($request);
+        $account->setName($data['name']);
+        $account->setType($data['type']);
+        $account->setCurrency($data['currency'] ?? 'EUR');
+        $account->setBalance($data['balance'] ?? '0');
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($account);
-            $em->flush();
-            $this->addFlash('success', 'Compte « '.$account->getName().' » créé.');
-            return $this->redirectToRoute('account_index');
-        }
+        $em->persist($account);
+        $em->flush();
 
-        return $this->render('account/form.html.twig', [
-            'form'  => $form,
-            'title' => 'Nouveau compte',
-        ]);
+        return $this->json($this->serialize($account), 201);
     }
 
-    #[Route('/{id}/edit', name: 'edit')]
+    #[Route('/{id}', name: 'show', methods: ['GET'])]
+    public function show(Account $account): Response
+    {
+        return $this->json($this->serialize($account));
+    }
+
+    #[Route('/{id}/edit', name: 'edit', methods: ['POST'])]
     public function edit(Account $account, Request $request, EntityManagerInterface $em): Response
     {
-        $form = $this->createForm(AccountType::class, $account);
-        $form->handleRequest($request);
+        $data = json_decode($request->getContent(), true);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
-            $this->addFlash('success', 'Compte mis à jour.');
-            return $this->redirectToRoute('account_index');
-        }
+        $account->setName($data['name']);
+        $account->setType($data['type']);
+        $account->setCurrency($data['currency'] ?? 'EUR');
+        $account->setBalance($data['balance'] ?? $account->getBalance());
 
-        return $this->render('account/form.html.twig', [
-            'form'    => $form,
-            'title'   => 'Modifier « '.$account->getName().' »',
-            'account' => $account,
-        ]);
+        $em->flush();
+
+        return $this->json($this->serialize($account));
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['DELETE'])]
