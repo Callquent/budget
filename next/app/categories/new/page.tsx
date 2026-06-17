@@ -1,10 +1,5 @@
-import CategoryForm from '@/components/CategoryForm';
+import CategoryForm from "@/components/CategoryForm";
 
 export default function CategoryNewPage() {
-  return (
-    <CategoryForm
-      title="Nouvelle catégorie"
-      onSubmit={(data) => console.log('Saving new category:', data)}
-    />
-  );
+  return <CategoryForm title="Nouvelle catégorie" />;
 }

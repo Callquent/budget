@@ -45,8 +45,16 @@ export default function AccountList() {
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("Supprimer ce compte ?")) return;
-    await fetch(`${API}/accounts/${id}/delete`, { method: "POST" });
-    fetchAccounts();
+    try {
+      const res = await fetch(`${API}/accounts/${id}/delete`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`${res.status} — ${body}`);
+      }
+      fetchAccounts();
+    } catch (e: any) {
+      alert(`Erreur lors de la suppression : ${e.message}`);
+    }
   };
 
   if (loading)

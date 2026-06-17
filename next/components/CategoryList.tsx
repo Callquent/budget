@@ -38,23 +38,38 @@ export default function CategoryList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchCategories = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/categories`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const data: ApiResponse = await res.json();
+      setGrouped(data.grouped);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCategories = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`${API}/categories`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`Erreur ${res.status}`);
-        const data: ApiResponse = await res.json();
-        setGrouped(data.grouped);
-      } catch (e: any) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchCategories();
   }, []);
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!window.confirm(`Supprimer « ${name} » ?`)) return;
+    try {
+      const res = await fetch(`${API}/categories/${id}/delete`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`${res.status} — ${body}`);
+      }
+      fetchCategories();
+    } catch (e: any) {
+      alert(`Erreur lors de la suppression : ${e.message}`);
+    }
+  };
 
   if (loading)
     return (
@@ -137,9 +152,7 @@ export default function CategoryList() {
                         </Link>
                         <button
                           className="btn btn-outline-danger btn-action"
-                          onClick={() =>
-                            window.confirm(`Supprimer « ${category.name} » ?`)
-                          }
+                          onClick={() => handleDelete(category.id, category.name)}
                         >
                           <i className="bi bi-trash"></i>
                         </button>
