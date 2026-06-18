@@ -3,7 +3,6 @@
 namespace App\Controller;
 
 use App\Entity\Subscription;
-use App\Form\SubscriptionType;
 use App\Repository\MonthlyBudgetRepository;
 use App\Repository\SubscriptionRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -11,15 +10,10 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/subscriptions', name: 'subscription_')]
 class SubscriptionController extends AbstractController
 {
-    public function __construct(
-        private SerializerInterface $serializer,
-    ) {}
-
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(SubscriptionRepository $repo): Response
     {
@@ -32,45 +26,35 @@ class SubscriptionController extends AbstractController
             ['groups' => ['subscription:read']]
         );
     }
-    #[Route('/new', name: 'new')]
+    #[Route('/new', name: 'new', methods: ['POST'])]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
+        $data = json_decode($request->getContent(), true);
+
         $subscription = new Subscription();
-        $subscription->setStartDate(new \DateTimeImmutable());
+        $this->hydrate($subscription, $data, $em);
 
-        $form = $this->createForm(SubscriptionType::class, $subscription);
-        $form->handleRequest($request);
+        $em->persist($subscription);
+        $em->flush();
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($subscription);
-            $em->flush();
-            $this->addFlash('success', 'Abonnement « ' . $subscription->getName() . ' » créé.');
-            return $this->redirectToRoute('subscription_index');
-        }
-
-        return $this->render('subscription/form.html.twig', [
-            'form'  => $form,
-            'title' => 'Nouvel abonnement',
-        ]);
+        return $this->json($this->serialize($subscription), 201, [], ['groups' => ['subscription:read']]);
     }
 
-    #[Route('/{id}/edit', name: 'edit')]
+    #[Route('/{id}', name: 'show', methods: ['GET'])]
+    public function show(Subscription $subscription): Response
+    {
+        return $this->json($subscription, 200, [], ['groups' => ['subscription:read']]);
+    }
+
+    #[Route('/{id}/edit', name: 'edit', methods: ['POST'])]
     public function edit(Subscription $subscription, Request $request, EntityManagerInterface $em): Response
     {
-        $form = $this->createForm(SubscriptionType::class, $subscription);
-        $form->handleRequest($request);
+        $data = json_decode($request->getContent(), true);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
-            $this->addFlash('success', 'Abonnement mis à jour.');
-            return $this->redirectToRoute('subscription_index');
-        }
+        $this->hydrate($subscription, $data, $em);
+        $em->flush();
 
-        return $this->render('subscription/form.html.twig', [
-            'form'         => $form,
-            'title'        => 'Modifier « ' . $subscription->getName() . ' »',
-            'subscription' => $subscription,
-        ]);
+        return $this->json($subscription, 200, [], ['groups' => ['subscription:read']]);
     }
 
     #[Route('/{id}/toggle', name: 'toggle', methods: ['POST'])]
@@ -109,13 +93,45 @@ class SubscriptionController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
-    public function delete(Subscription $subscription, Request $request, EntityManagerInterface $em): Response
+    public function delete(Subscription $subscription, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete-sub-' . $subscription->getId(), $request->request->get('_token'))) {
-            $em->remove($subscription);
-            $em->flush();
-            $this->addFlash('success', 'Abonnement supprimé.');
-        }
-        return $this->redirectToRoute('subscription_index');
+        $em->remove($subscription);
+        $em->flush();
+
+        return $this->json(['deleted' => true]);
+    }
+
+    private function hydrate(Subscription $subscription, array $data, EntityManagerInterface $em): void
+    {
+        $accountRepo  = $em->getRepository(\App\Entity\Account::class);
+        $categoryRepo = $em->getRepository(\App\Entity\Category::class);
+
+        $subscription->setName($data['name']);
+        $subscription->setAmount($data['amount']);
+        $subscription->setFrequency($data['frequency']);
+        $subscription->setStatus($data['status'] ?? Subscription::STATUS_ACTIVE);
+        $subscription->setStartDate(new \DateTimeImmutable($data['startDate']));
+        $subscription->setEndDate(isset($data['endDate']) && $data['endDate'] ? new \DateTimeImmutable($data['endDate']) : null);
+        $subscription->setDayOfMonth($data['dayOfMonth'] ?? null);
+        $subscription->setNotes($data['notes'] ?? null);
+        $subscription->setAccount($accountRepo->find($data['accountId']));
+        $subscription->setCategory($categoryRepo->find($data['categoryId']));
+    }
+
+    private function serialize(Subscription $s): array
+    {
+        return [
+            'id'         => $s->getId(),
+            'name'       => $s->getName(),
+            'amount'     => $s->getAmount(),
+            'frequency'  => $s->getFrequency(),
+            'status'     => $s->getStatus(),
+            'startDate'  => $s->getStartDate()->format('Y-m-d'),
+            'endDate'    => $s->getEndDate()?->format('Y-m-d'),
+            'dayOfMonth' => $s->getDayOfMonth(),
+            'notes'      => $s->getNotes(),
+            'account'    => ['id' => $s->getAccount()->getId(), 'name' => $s->getAccount()->getName()],
+            'category'   => ['id' => $s->getCategory()->getId(), 'name' => $s->getCategory()->getName()],
+        ];
     }
 }
