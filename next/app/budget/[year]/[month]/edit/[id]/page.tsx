@@ -1,39 +1,20 @@
-import BudgetForm from '@/components/BudgetForm';
+import BudgetForm from "@/components/BudgetForm";
 
-async function updateBudget(formData: FormData) {
-  'use server';
+// next/app/budget/edit/[id]/page.tsx
+export default async function BudgetEditPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const apiUrl = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL;
+  const res = await fetch(`${apiUrl}/budget/${id}`, { cache: "no-store" });
+  const data = await res.json();
 
-  const data = {
-    label: formData.get('label'),
-    categoryId: formData.get('categoryId'),
-    accountId: formData.get('accountId'),
-    year: formData.get('year'),
-    month: formData.get('month'),
-    plannedAmount: formData.get('plannedAmount'),
-    actualAmount: formData.get('actualAmount'),
-  };
-
-  console.log('Updating budget:', data);
-
-  // Exemple : await db.update(...).where(eq(budget.id, id));
-  // revalidatePath('/budget');
-  // redirect('/budget');
-}
-
-export default function BudgetEditPage() {
   return (
     <BudgetForm
-      title="Modifier la ligne de budget"
-      initialData={{
-        label: 'Exemple de label',
-        categoryId: '1',
-        accountId: '1',
-        year: 2026,
-        month: 6,
-        plannedAmount: 500,
-        actualAmount: 480,
-      }}
-      action={updateBudget}
+      title={data.isApproved ? `Budget verrouillé — ${data.label ?? ""}` : "Modifier le budget"}
+      initialData={data}
     />
   );
 }

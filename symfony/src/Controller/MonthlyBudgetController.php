@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\Entity\MonthlyBudget;
 use App\Entity\Transaction;
-use App\Form\MonthlyBudgetType;
 use App\Repository\AccountRepository;
 use App\Repository\MonthlyBudgetRepository;
 use App\Repository\SubscriptionRepository;
@@ -16,7 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
-#[Route('/', name: 'monthly_budget_')]
+#[Route('/budget', name: 'monthly_budget_')]
 class MonthlyBudgetController extends AbstractController
 {
     /**
@@ -404,59 +403,38 @@ class MonthlyBudgetController extends AbstractController
      * crée la transaction correspondante et marque la ligne comme approuvée.
      * Si le compte n'est pas renseigné sur la ligne, on redirige vers l'édition.
      */
-    #[Route('/new', name: 'new')]
+    #[Route('/new', name: 'new', methods: ['POST'])]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
-        $now = new \DateTimeImmutable();
+        $data = json_decode($request->getContent(), true);
+
         $budget = new MonthlyBudget();
+        $this->hydrate($budget, $data, $em);
 
-        // Pré-remplir depuis ?year=2026&month=11 pour conserver le contexte
-        // quand on arrive depuis /budget/2026/11
-        $preYear  = (int) ($request->query->get('year',  $now->format('Y')));
-        $preMonth = (int) ($request->query->get('month', $now->format('n')));
-        $budget->setYear($preYear);
-        $budget->setMonth($preMonth);
+        $em->persist($budget);
+        $em->flush();
 
-        $form = $this->createForm(MonthlyBudgetType::class, $budget);
-        $form->handleRequest($request);
+        return $this->json($this->serializeBudget($budget), 201);
+    }
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($budget);
-            $em->flush();
-            $this->addFlash('success', 'Ligne budgétaire ajoutée pour ' . $budget->getPeriodLabel() . '.');
-            return $this->redirectToRoute('monthly_budget_month', [
-                'year'  => $budget->getYear(),
-                'month' => $budget->getMonth(),
-            ]);
-        }
-
-        return $this->render('monthly_budget/form.html.twig', [
-            'form'  => $form,
-            'title' => 'Nouvelle ligne budgétaire',
-        ]);
+    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function show(MonthlyBudget $budget): Response
+    {
+        return $this->json($this->serializeBudget($budget));
     }
 
     #[Route('/{id}/approve', name: 'approve', methods: ['POST'])]
     public function approve(
         MonthlyBudget $budget,
-        Request $request,
-        EntityManagerInterface $em,
-        MonthlyBudgetRepository $budgetRepo
+        EntityManagerInterface $em
     ): Response {
-        if (!$this->isCsrfTokenValid('approve-budget-' . $budget->getId(), $request->request->get('_token'))) {
-            $this->addFlash('danger', 'Token invalide.');
-            return $this->redirectToRoute('monthly_budget_month', ['year' => $budget->getYear(), 'month' => $budget->getMonth()]);
-        }
-
         if ($budget->isApproved()) {
-            $this->addFlash('warning', 'Cette ligne est déjà approuvée.');
-            return $this->redirectToRoute('monthly_budget_month', ['year' => $budget->getYear(), 'month' => $budget->getMonth()]);
+            return $this->json(['error' => 'Cette ligne est déjà approuvée.'], 409);
         }
 
         // Le compte est obligatoire pour créer une transaction
         if (!$budget->getAccount()) {
-            $this->addFlash('warning', 'Veuillez d\'abord associer un compte à cette ligne budgétaire avant d\'approuver.');
-            return $this->redirectToRoute('monthly_budget_edit', ['id' => $budget->getId()]);
+            return $this->json(['error' => "Veuillez d'abord associer un compte à cette ligne budgétaire avant d'approuver."], 422);
         }
 
         // Déterminer le type de transaction selon la catégorie
@@ -488,30 +466,14 @@ class MonthlyBudgetController extends AbstractController
 
         $em->flush();
 
-        $this->addFlash('success', sprintf(
-            '✓ « %s » approuvé — transaction de %s € créée.',
-            $budget->getCategory()->getName(),
-            number_format((float) $budget->getActualAmount(), 2, ',', ' ')
-        ));
-
-        return $this->redirectToRoute('monthly_budget_month', [
-            'year'  => $budget->getYear(),
-            'month' => $budget->getMonth(),
-        ]);
+        return $this->json($this->serializeBudget($budget));
     }
 
     #[Route('/{id}/unapprove', name: 'unapprove', methods: ['POST'])]
     public function unapprove(
         MonthlyBudget $budget,
-        Request $request,
-        EntityManagerInterface $em,
-        MonthlyBudgetRepository $budgetRepo
+        EntityManagerInterface $em
     ): Response {
-        if (!$this->isCsrfTokenValid('unapprove-budget-' . $budget->getId(), $request->request->get('_token'))) {
-            $this->addFlash('danger', 'Token invalide.');
-            return $this->redirectToRoute('monthly_budget_month', ['year' => $budget->getYear(), 'month' => $budget->getMonth()]);
-        }
-
         $tx = $budget->getApprovedTransaction();
         if ($tx) {
             $em->remove($tx);
@@ -522,56 +484,60 @@ class MonthlyBudgetController extends AbstractController
         // On ne recalcule PAS : le montant réalisé est conservé tel quel.
         $em->flush();
 
-        $this->addFlash('success', 'Approbation annulée. Le montant réalisé est conservé.');
-        return $this->redirectToRoute('monthly_budget_month', [
-            'year'  => $budget->getYear(),
-            'month' => $budget->getMonth(),
-        ]);
+        return $this->json($this->serializeBudget($budget));
     }
 
 
-    #[Route('/{id}/edit', name: 'edit')]
+    #[Route('/{id}/edit', name: 'edit', methods: ['POST'])]
     public function edit(MonthlyBudget $budget, Request $request, EntityManagerInterface $em): Response
     {
-        // Ligne verrouillée : affichage lecture seule, pas de soumission possible
         if ($budget->isApproved()) {
-            $this->addFlash('warning', 'Cette ligne est verrouillée car elle a été approuvée. Annulez d\'abord l\'approbation pour la modifier.');
-            return $this->render('monthly_budget/form.html.twig', [
-                'form'   => $this->createForm(MonthlyBudgetType::class, $budget),
-                'title'  => 'Budget verrouillé — ' . $budget->getPeriodLabel(),
-                'budget' => $budget,
-            ]);
+            return $this->json(['error' => 'Ligne verrouillée car approuvée.'], 409);
         }
 
-        $form = $this->createForm(MonthlyBudgetType::class, $budget);
-        $form->handleRequest($request);
+        $data = json_decode($request->getContent(), true);
+        $this->hydrate($budget, $data, $em);
+        $em->flush();
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
-            $this->addFlash('success', 'Ligne budgétaire mise à jour.');
-            return $this->redirectToRoute('monthly_budget_month', [
-                'year'  => $budget->getYear(),
-                'month' => $budget->getMonth(),
-            ]);
-        }
-
-        return $this->render('monthly_budget/form.html.twig', [
-            'form'   => $form,
-            'title'  => 'Modifier le budget — ' . $budget->getPeriodLabel(),
-            'budget' => $budget,
-        ]);
+        return $this->json($this->serializeBudget($budget));
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
-    public function delete(MonthlyBudget $budget, Request $request, EntityManagerInterface $em): Response
+    public function delete(MonthlyBudget $budget, EntityManagerInterface $em): Response
     {
-        $year = $budget->getYear();
-        if ($this->isCsrfTokenValid('delete-budget-' . $budget->getId(), $request->request->get('_token'))) {
-            $em->remove($budget);
-            $em->flush();
-            $this->addFlash('success', 'Ligne supprimée.');
-        }
-        return $this->redirectToRoute('monthly_budget_year', ['year' => $year]);
+        $em->remove($budget);
+        $em->flush();
+
+        return $this->json(['deleted' => true]);
+    }
+
+    private function hydrate(MonthlyBudget $budget, array $data, EntityManagerInterface $em): void
+    {
+        $categoryRepo = $em->getRepository(\App\Entity\Category::class);
+        $accountRepo  = $em->getRepository(\App\Entity\Account::class);
+
+        $budget->setLabel($data['label'] ?? null);
+        $budget->setCategory($categoryRepo->find($data['categoryId']));
+        $budget->setAccount(!empty($data['accountId']) ? $accountRepo->find($data['accountId']) : null);
+        $budget->setYear((int) $data['year']);
+        $budget->setMonth((int) $data['month']);
+        $budget->setPlannedAmount((string) $data['plannedAmount']);
+        $budget->setActualAmount((string) ($data['actualAmount'] ?? $data['plannedAmount']));
+    }
+
+    private function serializeBudget(MonthlyBudget $b): array
+    {
+        return [
+            'id'            => $b->getId(),
+            'label'         => $b->getLabel(),
+            'categoryId'    => $b->getCategory()->getId(),
+            'accountId'     => $b->getAccount()?->getId(),
+            'year'          => $b->getYear(),
+            'month'         => $b->getMonth(),
+            'plannedAmount' => (float) $b->getPlannedAmount(),
+            'actualAmount'  => (float) $b->getActualAmount(),
+            'isApproved'    => $b->isApproved(),
+        ];
     }
 
     /**

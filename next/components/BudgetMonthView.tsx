@@ -133,7 +133,7 @@ export default function BudgetMonthView({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${y}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budget/${y}`, {
         headers: { Accept: "application/json" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -150,7 +150,7 @@ export default function BudgetMonthView({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${y}/${m}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budget/${y}/${m}`, {
         headers: { Accept: "application/json" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -169,7 +169,7 @@ export default function BudgetMonthView({
 
   // ── Actions POST (vue mois) ───────────────────────────────────────────────
   async function postAction(path: string) {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budget${path}`, {
       method: "POST",
       headers: { Accept: "application/json" },
     });

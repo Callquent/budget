@@ -1,23 +1,26 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Category {
-  id: number | string;
+  id: number;
   name: string;
   transactionType?: string;
 }
 
 interface Account {
-  id: number | string;
+  id: number;
   name: string;
   type?: string;
 }
 
 interface BudgetFormProps {
   initialData?: {
+    id?: number;
     label?: string;
-    categoryId?: string;
-    accountId?: string;
+    categoryId?: number;
+    accountId?: number;
     year?: number;
     month?: number;
     plannedAmount?: number;
@@ -25,36 +28,104 @@ interface BudgetFormProps {
     isApproved?: boolean;
   };
   title: string;
-  action: (formData: FormData) => Promise<void>;
-  /** Listes dynamiques issues du controller Symfony */
-  categories?: Category[];
-  accounts?: Account[];
-  /** Année et mois courants (pré-remplissage) */
+  /** Année et mois courants (pré-remplissage pour une nouvelle ligne) */
   currentYear?: number;
   currentMonth?: number;
-  /** Mode lecture seule (ligne approuvée) */
-  readOnly?: boolean;
 }
+
+const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function BudgetForm({
   initialData,
   title,
-  action,
-  categories = [],
-  accounts = [],
   currentYear = new Date().getFullYear(),
   currentMonth = new Date().getMonth() + 1,
-  readOnly = false,
 }: BudgetFormProps) {
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Champs contrôlés : on ne peut pas compter sur defaultValue pour les <select>
+  // car les options (categories/accounts) arrivent de façon async après le montage.
+  // defaultValue n'est appliqué qu'au montage initial, donc si initialData.categoryId
+  // existe avant que les <option> ne soient rendues, le select reste vide.
+  const [categoryId, setCategoryId] = useState<string>(
+    initialData?.categoryId != null ? String(initialData.categoryId) : ""
+  );
+  const [accountId, setAccountId] = useState<string>(
+    initialData?.accountId != null ? String(initialData.accountId) : ""
+  );
+
   const isApproved = initialData?.isApproved ?? false;
+
+  // Si initialData arrive/charge après le premier rendu (ex: fetch SSR résolu plus tard,
+  // ou navigation client vers un autre id), on resynchronise les selects contrôlés.
+  useEffect(() => {
+    setCategoryId(initialData?.categoryId != null ? String(initialData.categoryId) : "");
+    setAccountId(initialData?.accountId != null ? String(initialData.accountId) : "");
+  }, [initialData?.categoryId, initialData?.accountId]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API}/categories`).then((r) => r.json()),
+      fetch(`${API}/accounts`).then((r) => r.json()),
+    ]).then(([categoriesData, accountsData]) => {
+      const allCategories: Category[] = Object.values(
+        categoriesData.grouped ?? {}
+      ).flat() as Category[];
+      setCategories(allCategories);
+      setAccounts(accountsData.accounts ?? []);
+    });
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    const form = e.currentTarget;
+    const get = (name: string) =>
+      (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement).value;
+
+    const body = {
+      label:         get("label") || null,
+      categoryId:    parseInt(categoryId),
+      accountId:     accountId ? parseInt(accountId) : null,
+      year:          parseInt(get("year")),
+      month:         parseInt(get("month")),
+      plannedAmount: get("plannedAmount"),
+      actualAmount:  get("actualAmount") || get("plannedAmount"),
+    };
+
+    const url = initialData?.id
+      ? `${API}/budget/${initialData.id}/edit`
+      : `${API}/budget/new`;
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const saved = await res.json();
+      router.push(`/budget/${saved.year}/${saved.month}`);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="row justify-content-center">
       <div className="col-lg-6">
         <div className="d-flex align-items-center mb-4">
-          <a href="/" className="text-muted text-decoration-none me-3">
+          <Link href="/" className="text-muted text-decoration-none me-3">
             <i className="bi bi-chevron-left"></i>
-          </a>
+          </Link>
           <h1 className="h4 mb-0">{title}</h1>
         </div>
 
@@ -68,9 +139,14 @@ export default function BudgetForm({
           </div>
         )}
 
+        {error && (
+          <div className="alert alert-danger mb-3">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>{error}
+          </div>
+        )}
+
         <div className="card p-4">
-          <form action={action}>
-            {/* Label */}
+          <form onSubmit={handleSubmit}>
             <div className="mb-3">
               <label className="form-label">Label</label>
               <input
@@ -78,22 +154,23 @@ export default function BudgetForm({
                 name="label"
                 className="form-control"
                 defaultValue={initialData?.label ?? ""}
-                disabled={readOnly || isApproved}
+                disabled={isApproved}
               />
             </div>
 
-            {/* Catégorie — options dynamiques issues du controller */}
             <div className="mb-3">
               <label className="form-label">Catégorie</label>
               <select
                 name="categoryId"
                 className="form-select"
-                defaultValue={initialData?.categoryId ?? ""}
-                disabled={readOnly || isApproved}
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                disabled={isApproved}
+                required
               >
                 <option value="">Sélectionnez une catégorie</option>
                 {categories.map((cat) => (
-                  <option key={cat.id} value={String(cat.id)}>
+                  <option key={cat.id} value={cat.id}>
                     {cat.name}
                     {cat.transactionType ? ` (${cat.transactionType})` : ""}
                   </option>
@@ -101,23 +178,20 @@ export default function BudgetForm({
               </select>
             </div>
 
-            {/* Compte — options dynamiques issues du controller (AccountRepository) */}
             <div className="mb-3">
               <label className="form-label">Compte</label>
               <select
                 name="accountId"
                 className="form-select"
-                defaultValue={initialData?.accountId ?? ""}
-                disabled={readOnly || isApproved}
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                disabled={isApproved}
               >
                 <option value="">Sélectionnez un compte</option>
                 {accounts.map((acc) => (
-                  <option key={acc.id} value={String(acc.id)}>
-                    {acc.name}
-                  </option>
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
                 ))}
               </select>
-              {/* Avertissement compte manquant — requis pour l'approbation */}
               {!initialData?.accountId && (
                 <div className="form-text text-warning">
                   <i className="bi bi-exclamation-triangle me-1"></i>
@@ -126,7 +200,6 @@ export default function BudgetForm({
               )}
             </div>
 
-            {/* Année / Mois */}
             <div className="row g-3 mb-3">
               <div className="col-6">
                 <label className="form-label">Année</label>
@@ -135,7 +208,8 @@ export default function BudgetForm({
                   name="year"
                   className="form-control"
                   defaultValue={initialData?.year ?? currentYear}
-                  disabled={readOnly || isApproved}
+                  disabled={isApproved}
+                  required
                 />
               </div>
               <div className="col-6">
@@ -147,12 +221,12 @@ export default function BudgetForm({
                   defaultValue={initialData?.month ?? currentMonth}
                   min="1"
                   max="12"
-                  disabled={readOnly || isApproved}
+                  disabled={isApproved}
+                  required
                 />
               </div>
             </div>
 
-            {/* Montant prévu */}
             <div className="mb-3">
               <label className="form-label">Montant prévu</label>
               <div className="input-group">
@@ -162,13 +236,13 @@ export default function BudgetForm({
                   step="0.01"
                   className="form-control"
                   defaultValue={initialData?.plannedAmount ?? ""}
-                  disabled={readOnly || isApproved}
+                  disabled={isApproved}
+                  required
                 />
                 <span className="input-group-text">€</span>
               </div>
             </div>
 
-            {/* Montant réalisé — éditable même si approuvée (avant dés-approbation) */}
             <div className="mb-3">
               <label className="form-label">Montant réalisé</label>
               <div className="input-group">
@@ -178,19 +252,22 @@ export default function BudgetForm({
                   step="0.01"
                   className="form-control"
                   defaultValue={initialData?.actualAmount ?? ""}
-                  disabled={readOnly || isApproved}
+                  disabled={isApproved}
                 />
                 <span className="input-group-text">€</span>
               </div>
             </div>
 
             <div className="d-flex gap-2 mt-3">
-              {!readOnly && !isApproved && (
-                <button type="submit" className="btn btn-primary">
-                  <i className="bi bi-check-lg me-1"></i>Enregistrer
+              {!isApproved && (
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving
+                    ? <><span className="spinner-border spinner-border-sm me-1"></span>Enregistrement…</>
+                    : <><i className="bi bi-check-lg me-1"></i>Enregistrer</>
+                  }
                 </button>
               )}
-              <a
+              <Link
                 href={
                   initialData?.year && initialData?.month
                     ? `/budget/${initialData.year}/${initialData.month}`
@@ -198,8 +275,8 @@ export default function BudgetForm({
                 }
                 className="btn btn-outline-secondary"
               >
-                {readOnly || isApproved ? "Retour" : "Annuler"}
-              </a>
+                {isApproved ? "Retour" : "Annuler"}
+              </Link>
             </div>
           </form>
         </div>
