@@ -1,14 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-
-export interface Account {
-  id: number;
-  name: string;
-  type: "debit" | "credit";
-  balance: string;
-  currency: string;
-}
+import type { AccountInterface } from "./Account.interface";
 
 function formatNumber(num: number) {
   return new Intl.NumberFormat("fr-FR", {
@@ -20,7 +13,7 @@ function formatNumber(num: number) {
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function AccountList() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<AccountInterface[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +39,9 @@ export default function AccountList() {
   const handleDelete = async (id: number) => {
     if (!window.confirm("Supprimer ce compte ?")) return;
     try {
-      const res = await fetch(`${API}/accounts/${id}/delete`, { method: "DELETE" });
+      const res = await fetch(`${API}/accounts/${id}/delete`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         const body = await res.text();
         throw new Error(`${res.status} — ${body}`);

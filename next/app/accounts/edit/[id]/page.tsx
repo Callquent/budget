@@ -1,4 +1,4 @@
-import AccountForm from "@/components/AccountForm";
+import AccountForm from "@/components/Account/AccountForm";
 
 // next/app/accounts/edit/[id]/page.tsx
 export default async function AccountEditPage({

@@ -2,15 +2,10 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { AccountInterface } from "./Account.interface";
 
 interface AccountFormProps {
-  initialData?: {
-    id?: number;
-    name?: string;
-    type?: string;
-    currency?: string;
-    balance?: string;
-  };
+  initialData?: Partial<AccountInterface>;
   title: string;
 }
 
@@ -28,10 +23,10 @@ export default function AccountForm({ initialData, title }: AccountFormProps) {
 
     const form = e.currentTarget;
     const body = {
-      name:     (form.elements.namedItem("name") as HTMLInputElement).value,
-      type:     (form.elements.namedItem("type") as HTMLSelectElement).value,
+      name: (form.elements.namedItem("name") as HTMLInputElement).value,
+      type: (form.elements.namedItem("type") as HTMLSelectElement).value,
       currency: (form.elements.namedItem("currency") as HTMLInputElement).value,
-      balance:  (form.elements.namedItem("balance") as HTMLInputElement).value,
+      balance: (form.elements.namedItem("balance") as HTMLInputElement).value,
     };
 
     const url = initialData?.id
@@ -57,7 +52,10 @@ export default function AccountForm({ initialData, title }: AccountFormProps) {
     <div className="row justify-content-center">
       <div className="col-lg-5">
         <div className="d-flex align-items-center mb-4">
-          <Link href="/accounts" className="text-muted text-decoration-none me-3">
+          <Link
+            href="/accounts"
+            className="text-muted text-decoration-none me-3"
+          >
             <i className="bi bi-chevron-left"></i>
           </Link>
           <h1 className="h4 mb-0">{title}</h1>
@@ -65,7 +63,8 @@ export default function AccountForm({ initialData, title }: AccountFormProps) {
         <div className="card p-4">
           {error && (
             <div className="alert alert-danger mb-3">
-              <i className="bi bi-exclamation-triangle-fill me-2"></i>{error}
+              <i className="bi bi-exclamation-triangle-fill me-2"></i>
+              {error}
             </div>
           )}
           <form onSubmit={handleSubmit}>
@@ -82,7 +81,11 @@ export default function AccountForm({ initialData, title }: AccountFormProps) {
             <div className="row g-3 mb-3">
               <div className="col-6">
                 <label className="form-label">Type</label>
-                <select name="type" className="form-select" defaultValue={initialData?.type ?? "debit"}>
+                <select
+                  name="type"
+                  className="form-select"
+                  defaultValue={initialData?.type ?? "debit"}
+                >
                   <option value="credit">Crédit</option>
                   <option value="debit">Débit</option>
                 </select>
@@ -112,11 +115,21 @@ export default function AccountForm({ initialData, title }: AccountFormProps) {
               </div>
             </div>
             <div className="d-flex gap-2 mt-3">
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving
-                  ? <><span className="spinner-border spinner-border-sm me-1"></span>Enregistrement…</>
-                  : <><i className="bi bi-check-lg me-1"></i>Enregistrer</>
-                }
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-1"></span>
+                    Enregistrement…
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check-lg me-1"></i>Enregistrer
+                  </>
+                )}
               </button>
               <Link href="/accounts" className="btn btn-outline-secondary">
                 Annuler

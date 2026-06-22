@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import AccountList from "@/components/AccountList";
+import AccountList from "@/components/Account/AccountList";
 
 export default function AccountsPage() {
   return (
