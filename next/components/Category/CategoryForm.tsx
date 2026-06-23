@@ -2,17 +2,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-interface CategoryFormProps {
-  initialData?: {
-    id?: number;
-    name?: string;
-    transactionType?: string;
-    frequency?: string;
-    description?: string;
-  };
-  title: string;
-}
+import type { CategoryFormProps } from "./Category.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 

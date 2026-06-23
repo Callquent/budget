@@ -2,12 +2,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { AccountInterface } from "./Account.interface";
-
-interface AccountFormProps {
-  initialData?: Partial<AccountInterface>;
-  title: string;
-}
+import type { AccountFormProps } from "./Account.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 

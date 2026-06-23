@@ -5,3 +5,8 @@ export interface AccountInterface {
   balance: string;
   currency: string;
 }
+
+export interface AccountFormProps {
+  initialData?: Partial<AccountInterface>;
+  title: string;
+}

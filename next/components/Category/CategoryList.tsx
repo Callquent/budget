@@ -1,11 +1,7 @@
 "use client";
 import React, { Fragment as ReactFragment, useState, useEffect } from "react";
 import Link from "next/link";
-import type { CategoryInterface } from "./Category.interface";
-
-interface ApiResponse {
-  grouped: Record<string, CategoryInterface[]>;
-}
+import type { CategoryInterface, CategoryApiResponse } from "./Category.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -39,7 +35,7 @@ export default function CategoryList() {
     try {
       const res = await fetch(`${API}/categories`, { cache: "no-store" });
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
-      const data: ApiResponse = await res.json();
+      const data: CategoryApiResponse = await res.json();
       setGrouped(data.grouped);
     } catch (e: any) {
       setError(e.message);

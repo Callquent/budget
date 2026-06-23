@@ -4,24 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { CategoryInterface } from "../Category/Category.interface";
-
-interface BudgetFormProps {
-  initialData?: {
-    id?: number;
-    label?: string;
-    categoryId?: number;
-    accountId?: number;
-    year?: number;
-    month?: number;
-    plannedAmount?: number;
-    actualAmount?: number;
-    isApproved?: boolean;
-  };
-  title: string;
-  /** Année et mois courants (pré-remplissage pour une nouvelle ligne) */
-  currentYear?: number;
-  currentMonth?: number;
-}
+import type { BudgetFormProps } from "./Budget.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 

@@ -4,23 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { CategoryInterface } from "../Category/Category.interface";
-
-interface SubscriptionFormProps {
-  initialData?: {
-    id?: number;
-    name?: string;
-    accountId?: number;
-    categoryId?: number;
-    amount?: string;
-    frequency?: string;
-    startDate?: string;
-    endDate?: string | null;
-    dayOfMonth?: number | null;
-    status?: string;
-    notes?: string;
-  };
-  title: string;
-}
+import type { SubscriptionFormProps } from "./Subscription.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 

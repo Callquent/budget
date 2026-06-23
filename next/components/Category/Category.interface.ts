@@ -5,3 +5,12 @@ export interface CategoryInterface {
   description: string;
   transactionType: string;
 }
+
+export interface CategoryFormProps {
+  initialData?: Partial<CategoryInterface>;
+  title: string;
+}
+
+export interface CategoryApiResponse {
+  grouped: Record<string, CategoryInterface[]>;
+}

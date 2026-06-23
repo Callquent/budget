@@ -3,59 +3,7 @@ import React, { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { SubscriptionInterface } from "../Subscription/Subscription.interface";
-
-interface Budget {
-  id: number;
-  plannedAmount: number;
-  actualAmount: number;
-  isApproved: boolean;
-  approvedAt?: string;
-  label?: string;
-  account: { name: string } | null;
-  category: { name: string; transactionType: string; frequency: string };
-}
-
-interface TxByAccount {
-  [accountId: number]: { credit: number; debit: number; subs: number };
-}
-
-interface SummaryRow {
-  total_planned: number;
-  total_actual: number;
-}
-
-interface AccountBalance {
-  balance: number;
-  balance_projected: number;
-  credit: number;
-  debit: number;
-  subs: number;
-  planned_net: number;
-}
-
-// Vue mois
-interface MonthData {
-  year: number;
-  month: number;
-  nowYear: number;
-  nowMonth: number;
-  periodLabel: string;
-  accounts: AccountInterface[];
-  txByAccount: TxByAccount;
-  subscriptions: SubscriptionInterface[];
-  budgets: Budget[];
-}
-
-// Vue année
-interface YearData {
-  year: number;
-  currentYear: number;
-  currentMonth: number;
-  availableYears: number[];
-  accounts: AccountInterface[];
-  summary: Record<number, SummaryRow>;
-  accountBalances: Record<number, Record<number, AccountBalance>>;
-}
+import type { Budget, TxByAccount, SummaryRow, AccountBalance, MonthData, YearData } from "./Budget.interface";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 

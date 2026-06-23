@@ -3,29 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import StatisticsChart from "@/components/Statistics/StatisticsChart";
-
-interface SummaryRow {
-  category_name: string;
-  planned: number;
-  actual: number;
-}
-
-interface ApiData {
-  currentYear: number;
-  availableYears: number[];
-  summary: SummaryRow[];
-  plannedChart: Record<string, number>;
-  actualChart: Record<string, number>;
-  categories: string[];
-  plannedMonthly: number[];
-  actualMonthly: number[];
-}
+import type { SummaryRow, ApiData, StatisticsViewProps } from "./Statistics.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
-
-interface StatisticsViewProps {
-  year: string;
-}
 
 export default function StatisticsView({ year }: StatisticsViewProps) {
   const [data, setData] = useState<ApiData | null>(null);

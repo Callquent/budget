@@ -19,14 +19,7 @@ ChartJS.register(
   LineElement, Title, Tooltip, Legend, Filler
 );
 
-interface StatisticsChartProps {
-  summary: { category_name: string; planned: number; actual: number }[];
-  plannedChart: Record<string, number>;
-  actualChart: Record<string, number>;
-  categories: string[];
-  plannedMonthly: number[];
-  actualMonthly: number[];
-}
+import type { StatisticsChartProps } from "./Statistics.interface";
 
 function formatNumber(num: number) {
   return new Intl.NumberFormat("fr-FR", {
