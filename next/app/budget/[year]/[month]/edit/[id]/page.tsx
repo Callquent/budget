@@ -1,4 +1,4 @@
-import BudgetForm from "@/components/BudgetForm";
+import BudgetForm from "@/components/Budget/BudgetForm";
 
 // next/app/budget/edit/[id]/page.tsx
 export default async function BudgetEditPage({
@@ -13,7 +13,11 @@ export default async function BudgetEditPage({
 
   return (
     <BudgetForm
-      title={data.isApproved ? `Budget verrouillé — ${data.label ?? ""}` : "Modifier le budget"}
+      title={
+        data.isApproved
+          ? `Budget verrouillé — ${data.label ?? ""}`
+          : "Modifier le budget"
+      }
       initialData={data}
     />
   );

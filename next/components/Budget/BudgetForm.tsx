@@ -2,18 +2,8 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-interface Category {
-  id: number;
-  name: string;
-  transactionType?: string;
-}
-
-interface Account {
-  id: number;
-  name: string;
-  type?: string;
-}
+import type { AccountInterface } from "../Account/Account.interface";
+import type { CategoryInterface } from "../Category/Category.interface";
 
 interface BudgetFormProps {
   initialData?: {
@@ -42,8 +32,8 @@ export default function BudgetForm({
   currentMonth = new Date().getMonth() + 1,
 }: BudgetFormProps) {
   const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<CategoryInterface[]>([]);
+  const [accounts, setAccounts] = useState<AccountInterface[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -52,10 +42,10 @@ export default function BudgetForm({
   // defaultValue n'est appliqué qu'au montage initial, donc si initialData.categoryId
   // existe avant que les <option> ne soient rendues, le select reste vide.
   const [categoryId, setCategoryId] = useState<string>(
-    initialData?.categoryId != null ? String(initialData.categoryId) : ""
+    initialData?.categoryId != null ? String(initialData.categoryId) : "",
   );
   const [accountId, setAccountId] = useState<string>(
-    initialData?.accountId != null ? String(initialData.accountId) : ""
+    initialData?.accountId != null ? String(initialData.accountId) : "",
   );
 
   const isApproved = initialData?.isApproved ?? false;
@@ -63,8 +53,12 @@ export default function BudgetForm({
   // Si initialData arrive/charge après le premier rendu (ex: fetch SSR résolu plus tard,
   // ou navigation client vers un autre id), on resynchronise les selects contrôlés.
   useEffect(() => {
-    setCategoryId(initialData?.categoryId != null ? String(initialData.categoryId) : "");
-    setAccountId(initialData?.accountId != null ? String(initialData.accountId) : "");
+    setCategoryId(
+      initialData?.categoryId != null ? String(initialData.categoryId) : "",
+    );
+    setAccountId(
+      initialData?.accountId != null ? String(initialData.accountId) : "",
+    );
   }, [initialData?.categoryId, initialData?.accountId]);
 
   useEffect(() => {
@@ -72,9 +66,9 @@ export default function BudgetForm({
       fetch(`${API}/categories`).then((r) => r.json()),
       fetch(`${API}/accounts`).then((r) => r.json()),
     ]).then(([categoriesData, accountsData]) => {
-      const allCategories: Category[] = Object.values(
-        categoriesData.grouped ?? {}
-      ).flat() as Category[];
+      const allCategories: CategoryInterface[] = Object.values(
+        categoriesData.grouped ?? {},
+      ).flat() as CategoryInterface[];
       setCategories(allCategories);
       setAccounts(accountsData.accounts ?? []);
     });
@@ -87,16 +81,17 @@ export default function BudgetForm({
 
     const form = e.currentTarget;
     const get = (name: string) =>
-      (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement).value;
+      (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement)
+        .value;
 
     const body = {
-      label:         get("label") || null,
-      categoryId:    parseInt(categoryId),
-      accountId:     accountId ? parseInt(accountId) : null,
-      year:          parseInt(get("year")),
-      month:         parseInt(get("month")),
+      label: get("label") || null,
+      categoryId: parseInt(categoryId),
+      accountId: accountId ? parseInt(accountId) : null,
+      year: parseInt(get("year")),
+      month: parseInt(get("month")),
       plannedAmount: get("plannedAmount"),
-      actualAmount:  get("actualAmount") || get("plannedAmount"),
+      actualAmount: get("actualAmount") || get("plannedAmount"),
     };
 
     const url = initialData?.id
@@ -133,15 +128,16 @@ export default function BudgetForm({
           <div className="alert alert-warning d-flex align-items-center gap-2 mb-3">
             <i className="bi bi-lock-fill"></i>
             <span>
-              Cette ligne est <strong>verrouillée</strong> car elle a été approuvée.
-              Annulez d'abord l'approbation pour la modifier.
+              Cette ligne est <strong>verrouillée</strong> car elle a été
+              approuvée. Annulez d'abord l'approbation pour la modifier.
             </span>
           </div>
         )}
 
         {error && (
           <div className="alert alert-danger mb-3">
-            <i className="bi bi-exclamation-triangle-fill me-2"></i>{error}
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            {error}
           </div>
         )}
 
@@ -189,7 +185,9 @@ export default function BudgetForm({
               >
                 <option value="">Sélectionnez un compte</option>
                 {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name}
+                  </option>
                 ))}
               </select>
               {!initialData?.accountId && (
@@ -260,11 +258,21 @@ export default function BudgetForm({
 
             <div className="d-flex gap-2 mt-3">
               {!isApproved && (
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving
-                    ? <><span className="spinner-border spinner-border-sm me-1"></span>Enregistrement…</>
-                    : <><i className="bi bi-check-lg me-1"></i>Enregistrer</>
-                  }
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1"></span>
+                      Enregistrement…
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-check-lg me-1"></i>Enregistrer
+                    </>
+                  )}
                 </button>
               )}
               <Link

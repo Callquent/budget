@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { AccountRow, formatNumber } from "./types";
+import { AccountRow, formatNumber } from "./Transaction.interface";
 
 interface AccountsTransactionsTabProps {
   byAccount: AccountRow[];
@@ -18,7 +18,13 @@ export default function AccountsTransactionsTab({
   return (
     <div className="tab-pane fade show active p-3">
       {byAccount.map((row, idx) => {
-        const { account, credit, debit, balanceEnd, transactions: accTxs } = row;
+        const {
+          account,
+          credit,
+          debit,
+          balanceEnd,
+          transactions: accTxs,
+        } = row;
         const net = credit - debit;
         const creditTxs = accTxs.filter((t) => t.type === "credit");
         const debitTxs = accTxs.filter((t) => t.type !== "credit");
@@ -31,7 +37,8 @@ export default function AccountsTransactionsTab({
                   style={{
                     width: "38px",
                     height: "38px",
-                    background: account.type === "credit" ? "#d1fae5" : "#fee2e2",
+                    background:
+                      account.type === "credit" ? "#d1fae5" : "#fee2e2",
                   }}
                 >
                   <i
@@ -42,7 +49,9 @@ export default function AccountsTransactionsTab({
                   <span className="fw-semibold fs-6">{account.name}</span>
                   <span className="text-muted small ms-2">
                     Solde fin {monthLabel} :{" "}
-                    <strong className={balanceEnd < 0 ? "text-danger" : "text-dark"}>
+                    <strong
+                      className={balanceEnd < 0 ? "text-danger" : "text-dark"}
+                    >
                       {formatNumber(balanceEnd)} {account.currency}
                     </strong>
                   </span>
@@ -51,18 +60,21 @@ export default function AccountsTransactionsTab({
               <div className="d-flex gap-3 align-items-center">
                 {credit > 0 && (
                   <span className="small text-success fw-semibold">
-                    <i className="bi bi-arrow-down-circle me-1"></i>+{formatNumber(credit)} €
+                    <i className="bi bi-arrow-down-circle me-1"></i>+
+                    {formatNumber(credit)} €
                   </span>
                 )}
                 {debit > 0 && (
                   <span className="small text-danger fw-semibold">
-                    <i className="bi bi-arrow-up-circle me-1"></i>−{formatNumber(debit)} €
+                    <i className="bi bi-arrow-up-circle me-1"></i>−
+                    {formatNumber(debit)} €
                   </span>
                 )}
                 <span
                   className={`badge ${net >= 0 ? "bg-success" : "bg-danger"} bg-opacity-10 ${net >= 0 ? "text-success" : "text-danger"} fw-semibold`}
                 >
-                  Net {net >= 0 ? "+" : ""}{formatNumber(net)} €
+                  Net {net >= 0 ? "+" : ""}
+                  {formatNumber(net)} €
                 </span>
               </div>
             </div>
@@ -70,7 +82,8 @@ export default function AccountsTransactionsTab({
               <div className="col-md-6 border-end">
                 <div className="px-3 py-2 bg-light border-bottom">
                   <span className="small fw-semibold text-success">
-                    <i className="bi bi-arrow-down-circle me-1"></i>CRÉDIT — entrées
+                    <i className="bi bi-arrow-down-circle me-1"></i>CRÉDIT —
+                    entrées
                   </span>
                 </div>
                 <table className="table table-sm mb-0">
@@ -84,7 +97,10 @@ export default function AccountsTransactionsTab({
                   <tbody>
                     {creditTxs.length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="text-muted small text-center py-3">
+                        <td
+                          colSpan={3}
+                          className="text-muted small text-center py-3"
+                        >
                           Aucune entrée
                         </td>
                       </tr>
@@ -92,12 +108,18 @@ export default function AccountsTransactionsTab({
                       <>
                         {creditTxs.map((tx) => (
                           <tr key={tx.id}>
-                            <td className="ps-3 text-muted small" style={{ whiteSpace: "nowrap" }}>
+                            <td
+                              className="ps-3 text-muted small"
+                              style={{ whiteSpace: "nowrap" }}
+                            >
                               {tx.transactionDate}
                             </td>
                             <td>
                               <div className="small fw-medium">{tx.label}</div>
-                              <span className="badge badge-income" style={{ fontSize: ".65rem" }}>
+                              <span
+                                className="badge badge-income"
+                                style={{ fontSize: ".65rem" }}
+                              >
                                 {tx.category.name}
                               </span>
                             </td>
@@ -125,7 +147,8 @@ export default function AccountsTransactionsTab({
               <div className="col-md-6">
                 <div className="px-3 py-2 bg-light border-bottom">
                   <span className="small fw-semibold text-danger">
-                    <i className="bi bi-arrow-up-circle me-1"></i>DÉBIT — sorties
+                    <i className="bi bi-arrow-up-circle me-1"></i>DÉBIT —
+                    sorties
                   </span>
                 </div>
                 <table className="table table-sm mb-0">
@@ -139,7 +162,10 @@ export default function AccountsTransactionsTab({
                   <tbody>
                     {debitTxs.length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="text-muted small text-center py-3">
+                        <td
+                          colSpan={3}
+                          className="text-muted small text-center py-3"
+                        >
                           Aucune sortie
                         </td>
                       </tr>
@@ -147,7 +173,10 @@ export default function AccountsTransactionsTab({
                       <>
                         {debitTxs.map((tx) => (
                           <tr key={tx.id}>
-                            <td className="ps-3 text-muted small" style={{ whiteSpace: "nowrap" }}>
+                            <td
+                              className="ps-3 text-muted small"
+                              style={{ whiteSpace: "nowrap" }}
+                            >
                               {tx.transactionDate}
                             </td>
                             <td>
@@ -185,7 +214,10 @@ export default function AccountsTransactionsTab({
               <span className="small text-muted">
                 {accTxs.length} transaction{accTxs.length > 1 ? "s" : ""}
               </span>
-              <Link href={`/transactions/${year}/${month}/new`} className="btn btn-outline-primary btn-sm">
+              <Link
+                href={`/transactions/${year}/${month}/new`}
+                className="btn btn-outline-primary btn-sm"
+              >
                 <i className="bi bi-plus-lg me-1"></i>Ajouter
               </Link>
             </div>

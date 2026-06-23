@@ -1,4 +1,4 @@
-import CategoryForm from "@/components/CategoryForm";
+import CategoryForm from "@/components/Category/CategoryForm";
 
 // next/app/categories/edit/[id]/page.tsx
 export default async function CategoryEditPage({
@@ -11,5 +11,7 @@ export default async function CategoryEditPage({
   const res = await fetch(`${apiUrl}/categories/${id}`, { cache: "no-store" });
   const data = await res.json();
 
-  return <CategoryForm title={`Modifier « ${data.name} »`} initialData={data} />;
+  return (
+    <CategoryForm title={`Modifier « ${data.name} »`} initialData={data} />
+  );
 }

@@ -1,30 +1,18 @@
-import TransactionForm from '@/components/TransactionForm';
+import TransactionForm from "@/components/Transaction/TransactionForm";
 
-async function saveTransaction(formData: FormData) {
-  'use server';
+// next/app/transactions/[year]/[month]/new/page.tsx
+export default async function TransactionNewPage({
+  params,
+}: {
+  params: Promise<{ year: string; month: string }>;
+}) {
+  const { year, month } = await params;
 
-  const data = {
-    transactionDate: formData.get('transactionDate'),
-    accountId: formData.get('accountId'),
-    type: formData.get('type'),
-    categoryId: formData.get('categoryId'),
-    amount: formData.get('amount'),
-    label: formData.get('label'),
-    notes: formData.get('notes'),
-  };
-
-  console.log('Saving new transaction:', data);
-
-  // await db.insert(...);
-  // revalidatePath('/transactions');
-  // redirect('/transactions');
-}
-
-export default function TransactionNewPage() {
   return (
     <TransactionForm
       title="Nouvelle transaction"
-      action={saveTransaction}
+      defaultYear={parseInt(year)}
+      defaultMonth={parseInt(month)}
     />
   );
 }

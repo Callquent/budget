@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import StatisticsChart from "@/components/StatisticsChart";
+import StatisticsChart from "@/components/Statistics/StatisticsChart";
 
 interface SummaryRow {
   category_name: string;
@@ -36,7 +36,9 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/statistics/${year}`, { cache: "no-store" });
+      const res = await fetch(`${API}/statistics/${year}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
       setData(await res.json());
     } catch (e: any) {
@@ -64,7 +66,10 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
       <div className="alert alert-danger d-flex align-items-center gap-2">
         <i className="bi bi-exclamation-triangle-fill"></i>
         Impossible de charger les statistiques : {error}
-        <button className="btn btn-sm btn-outline-danger ms-auto" onClick={fetchData}>
+        <button
+          className="btn btn-sm btn-outline-danger ms-auto"
+          onClick={fetchData}
+        >
           Réessayer
         </button>
       </div>
@@ -72,7 +77,16 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
 
   if (!data) return null;
 
-  const { currentYear, availableYears, summary, plannedChart, actualChart, categories, plannedMonthly, actualMonthly } = data;
+  const {
+    currentYear,
+    availableYears,
+    summary,
+    plannedChart,
+    actualChart,
+    categories,
+    plannedMonthly,
+    actualMonthly,
+  } = data;
 
   return (
     <>
@@ -86,7 +100,10 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
           >
             {y}
             {y === currentYear && (
-              <span className="badge bg-primary ms-1" style={{ fontSize: ".6rem" }}>
+              <span
+                className="badge bg-primary ms-1"
+                style={{ fontSize: ".6rem" }}
+              >
                 en cours
               </span>
             )}

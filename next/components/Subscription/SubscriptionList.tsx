@@ -2,18 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-
-export interface Subscription {
-  id: number;
-  name: string;
-  amount: string;
-  frequency: "monthly" | "yearly" | "quarterly" | "occasional";
-  status: "active" | "inactive";
-  account: { name: string };
-  category: { name: string };
-  startDate: string;
-  endDate: string | null;
-}
+import type { SubscriptionInterface } from "./Subscription.interface";
 
 const freqLabels: Record<string, string> = {
   monthly: "Mensuel",
@@ -37,7 +26,9 @@ function formatDate(iso: string | null) {
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function SubscriptionList() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionInterface[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -170,8 +161,12 @@ export default function SubscriptionList() {
                     <td className="text-end fw-semibold">
                       {formatNumber(parseFloat(sub.amount))} €
                     </td>
-                    <td className="text-muted small">{formatDate(sub.startDate)}</td>
-                    <td className="text-muted small">{formatDate(sub.endDate) ?? "∞"}</td>
+                    <td className="text-muted small">
+                      {formatDate(sub.startDate)}
+                    </td>
+                    <td className="text-muted small">
+                      {formatDate(sub.endDate) ?? "∞"}
+                    </td>
                     <td className="text-end" style={{ whiteSpace: "nowrap" }}>
                       <Link
                         href={`/subscriptions/edit/${sub.id}`}
@@ -227,7 +222,9 @@ export default function SubscriptionList() {
                     <td>{sub.account.name}</td>
                     <td>{sub.category.name}</td>
                     <td>{freqLabels[sub.frequency] ?? sub.frequency}</td>
-                    <td className="text-end">{formatNumber(parseFloat(sub.amount))} €</td>
+                    <td className="text-end">
+                      {formatNumber(parseFloat(sub.amount))} €
+                    </td>
                     <td className="text-end" style={{ whiteSpace: "nowrap" }}>
                       <Link
                         href={`/subscriptions/edit/${sub.id}`}

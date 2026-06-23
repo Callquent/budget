@@ -1,15 +1,5 @@
-export interface Category {
-  name: string;
-  transactionType: string;
-}
-
-export interface Account {
-  id: number;
-  name: string;
-  type: string;
-  currency: string;
-  balance: number;
-}
+import type { AccountInterface } from "../Account/Account.interface";
+import type { CategoryInterface } from "../Category/Category.interface";
 
 export interface Transaction {
   id: number;
@@ -17,7 +7,7 @@ export interface Transaction {
   label: string;
   type: "credit" | "debit";
   amount: number;
-  category: Category;
+  category: CategoryInterface;
   notes?: string;
 }
 
@@ -26,7 +16,7 @@ export interface TransactionWithAccount extends Transaction {
 }
 
 export interface AccountRow {
-  account: Account;
+  account: AccountInterface;
   credit: number;
   debit: number;
   balanceEnd: number;

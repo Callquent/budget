@@ -1,4 +1,4 @@
-import BudgetForm from "@/components/BudgetForm";
+import BudgetForm from "@/components/Budget/BudgetForm";
 
 export default async function BudgetNewPage({
   searchParams,

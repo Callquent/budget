@@ -1,17 +1,10 @@
 "use client";
 import React, { Fragment as ReactFragment, useState, useEffect } from "react";
 import Link from "next/link";
-
-interface Category {
-  id: number;
-  name: string;
-  frequency: string;
-  description: string;
-  transactionType: string;
-}
+import type { CategoryInterface } from "./Category.interface";
 
 interface ApiResponse {
-  grouped: Record<string, Category[]>;
+  grouped: Record<string, CategoryInterface[]>;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -34,7 +27,9 @@ const freqLabels = {
 };
 
 export default function CategoryList() {
-  const [grouped, setGrouped] = useState<Record<string, Category[]>>({});
+  const [grouped, setGrouped] = useState<Record<string, CategoryInterface[]>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +55,9 @@ export default function CategoryList() {
   const handleDelete = async (id: number, name: string) => {
     if (!window.confirm(`Supprimer « ${name} » ?`)) return;
     try {
-      const res = await fetch(`${API}/categories/${id}/delete`, { method: "DELETE" });
+      const res = await fetch(`${API}/categories/${id}/delete`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         const body = await res.text();
         throw new Error(`${res.status} — ${body}`);
@@ -152,7 +149,9 @@ export default function CategoryList() {
                         </Link>
                         <button
                           className="btn btn-outline-danger btn-action"
-                          onClick={() => handleDelete(category.id, category.name)}
+                          onClick={() =>
+                            handleDelete(category.id, category.name)
+                          }
                         >
                           <i className="bi bi-trash"></i>
                         </button>

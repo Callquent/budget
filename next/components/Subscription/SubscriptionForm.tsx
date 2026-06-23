@@ -2,17 +2,8 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-interface Account {
-  id: number;
-  name: string;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  transactionType: string;
-}
+import type { AccountInterface } from "../Account/Account.interface";
+import type { CategoryInterface } from "../Category/Category.interface";
 
 interface SubscriptionFormProps {
   initialData?: {
@@ -33,10 +24,13 @@ interface SubscriptionFormProps {
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-export default function SubscriptionForm({ initialData, title }: SubscriptionFormProps) {
+export default function SubscriptionForm({
+  initialData,
+  title,
+}: SubscriptionFormProps) {
   const router = useRouter();
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<AccountInterface[]>([]);
+  const [categories, setCategories] = useState<CategoryInterface[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -48,9 +42,9 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
     ]).then(([accountsData, categoriesData]) => {
       setAccounts(accountsData.accounts ?? []);
       // Aplatir les catégories groupées
-      const allCategories: Category[] = Object.values(
-        categoriesData.grouped ?? {}
-      ).flat() as Category[];
+      const allCategories: CategoryInterface[] = Object.values(
+        categoriesData.grouped ?? {},
+      ).flat() as CategoryInterface[];
       setCategories(allCategories);
     });
   }, []);
@@ -62,19 +56,24 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
 
     const form = e.currentTarget;
     const get = (name: string) =>
-      (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
+      (
+        form.elements.namedItem(name) as
+          | HTMLInputElement
+          | HTMLSelectElement
+          | HTMLTextAreaElement
+      ).value;
 
     const body = {
-      name:       get("name"),
-      accountId:  parseInt(get("accountId")),
+      name: get("name"),
+      accountId: parseInt(get("accountId")),
       categoryId: parseInt(get("categoryId")),
-      amount:     get("amount"),
-      frequency:  get("frequency"),
-      startDate:  get("startDate"),
-      endDate:    get("endDate") || null,
+      amount: get("amount"),
+      frequency: get("frequency"),
+      startDate: get("startDate"),
+      endDate: get("endDate") || null,
       dayOfMonth: get("dayOfMonth") ? parseInt(get("dayOfMonth")) : null,
-      status:     get("status"),
-      notes:      get("notes") || null,
+      status: get("status"),
+      notes: get("notes") || null,
     };
 
     const url = initialData?.id
@@ -100,7 +99,10 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
     <div className="row justify-content-center">
       <div className="col-lg-6">
         <div className="d-flex align-items-center mb-4">
-          <Link href="/subscriptions" className="text-muted text-decoration-none me-3">
+          <Link
+            href="/subscriptions"
+            className="text-muted text-decoration-none me-3"
+          >
             <i className="bi bi-chevron-left"></i>
           </Link>
           <h1 className="h4 mb-0">{title}</h1>
@@ -108,7 +110,8 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
         <div className="card p-4">
           {error && (
             <div className="alert alert-danger mb-3">
-              <i className="bi bi-exclamation-triangle-fill me-2"></i>{error}
+              <i className="bi bi-exclamation-triangle-fill me-2"></i>
+              {error}
             </div>
           )}
           <form onSubmit={handleSubmit}>
@@ -125,19 +128,33 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
             <div className="row g-3 mb-3">
               <div className="col-6">
                 <label className="form-label">Compte</label>
-                <select name="accountId" className="form-select" defaultValue={initialData?.accountId ?? ""} required>
+                <select
+                  name="accountId"
+                  className="form-select"
+                  defaultValue={initialData?.accountId ?? ""}
+                  required
+                >
                   <option value="">Sélectionnez un compte</option>
                   {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
                   ))}
                 </select>
               </div>
               <div className="col-6">
                 <label className="form-label">Catégorie</label>
-                <select name="categoryId" className="form-select" defaultValue={initialData?.categoryId ?? ""} required>
+                <select
+                  name="categoryId"
+                  className="form-select"
+                  defaultValue={initialData?.categoryId ?? ""}
+                  required
+                >
                   <option value="">Sélectionnez une catégorie</option>
                   {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -159,7 +176,11 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
               </div>
               <div className="col-6">
                 <label className="form-label">Fréquence</label>
-                <select name="frequency" className="form-select" defaultValue={initialData?.frequency ?? "monthly"}>
+                <select
+                  name="frequency"
+                  className="form-select"
+                  defaultValue={initialData?.frequency ?? "monthly"}
+                >
                   <option value="monthly">Mensuel</option>
                   <option value="yearly">Annuel</option>
                   <option value="quarterly">Trimestriel</option>
@@ -174,7 +195,10 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
                   type="date"
                   name="startDate"
                   className="form-control"
-                  defaultValue={initialData?.startDate ?? new Date().toISOString().slice(0, 10)}
+                  defaultValue={
+                    initialData?.startDate ??
+                    new Date().toISOString().slice(0, 10)
+                  }
                   required
                 />
               </div>
@@ -202,7 +226,11 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
               </div>
               <div className="col-6">
                 <label className="form-label">Statut</label>
-                <select name="status" className="form-select" defaultValue={initialData?.status ?? "active"}>
+                <select
+                  name="status"
+                  className="form-select"
+                  defaultValue={initialData?.status ?? "active"}
+                >
                   <option value="active">Actif</option>
                   <option value="inactive">Inactif</option>
                 </select>
@@ -218,11 +246,21 @@ export default function SubscriptionForm({ initialData, title }: SubscriptionFor
               />
             </div>
             <div className="d-flex gap-2 mt-3">
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving
-                  ? <><span className="spinner-border spinner-border-sm me-1"></span>Enregistrement…</>
-                  : <><i className="bi bi-check-lg me-1"></i>Enregistrer</>
-                }
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-1"></span>
+                    Enregistrement…
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check-lg me-1"></i>Enregistrer
+                  </>
+                )}
               </button>
               <Link href="/subscriptions" className="btn btn-outline-secondary">
                 Annuler

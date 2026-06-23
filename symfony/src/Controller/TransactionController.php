@@ -3,7 +3,6 @@
 namespace App\Controller;
 
 use App\Entity\Transaction;
-use App\Form\TransactionType;
 use App\Repository\AccountRepository;
 use App\Repository\CategoryRepository;
 use App\Repository\MonthlyBudgetRepository;
@@ -195,117 +194,125 @@ class TransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/new', name: 'new')]
+    #[Route('/new', name: 'new', methods: ['POST'])]
     public function new(
         Request $request,
         EntityManagerInterface $em,
+        AccountRepository $accountRepo,
+        CategoryRepository $categoryRepo,
         MonthlyBudgetRepository $budgetRepo
     ): Response {
+        $data = json_decode($request->getContent(), true);
+
         $transaction = new Transaction();
+        $this->hydrate($transaction, $data, $em, $accountRepo, $categoryRepo);
 
-        // Pré-remplir la date depuis l'URL si on vient d'une vue mois
-        $defaultDate = null;
-        if ($request->query->get('year') && $request->query->get('month')) {
-            $defaultDate = \DateTimeImmutable::createFromFormat(
-                'Y-n-j',
-                $request->query->get('year') . '-' . $request->query->get('month') . '-1'
-            );
-        }
+        $em->persist($transaction);
+        $em->flush();
 
-        $form = $this->createForm(TransactionType::class, $transaction, [
-            'default_date' => $defaultDate ?? new \DateTimeImmutable(),
-        ]);
-        $form->handleRequest($request);
+        $budgetRepo->refreshActualAmounts($transaction->getYear(), $transaction->getMonth());
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($transaction);
-            $em->flush();
-
-            // Recalcule le budget réalisé pour le mois concerné
-            $budgetRepo->refreshActualAmounts($transaction->getYear(), $transaction->getMonth());
-
-            $this->addFlash('success', sprintf(
-                'Transaction « %s » ajoutée (%s %s €).',
-                $transaction->getLabel(),
-                $transaction->getType() === Transaction::TYPE_CREDIT ? '+' : '−',
-                number_format((float) $transaction->getAmount(), 2, ',', ' ')
-            ));
-
-            // Retour vers la vue mois si on vient de là
-            $ref = $request->query->get('ref');
-            if ($ref === 'month') {
-                return $this->redirectToRoute('monthly_budget_month', [
-                    'year'  => $transaction->getYear(),
-                    'month' => $transaction->getMonth(),
-                ]);
-            }
-
-            return $this->redirectToRoute('transaction_index', [
-                'year'  => $transaction->getYear(),
-                'month' => $transaction->getMonth(),
-            ]);
-        }
-
-        return $this->render('transaction/form.html.twig', [
-            'form'  => $form,
-            'title' => 'Nouvelle transaction',
-            'transaction' => null,
-        ]);
+        return $this->json($this->serializeTransaction($transaction), 201);
     }
 
-    #[Route('/{id}/edit', name: 'edit')]
+    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function show(Transaction $transaction): Response
+    {
+        return $this->json($this->serializeTransaction($transaction));
+    }
+
+    #[Route('/{id}/edit', name: 'edit', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function edit(
         Transaction $transaction,
         Request $request,
         EntityManagerInterface $em,
+        AccountRepository $accountRepo,
+        CategoryRepository $categoryRepo,
         MonthlyBudgetRepository $budgetRepo
     ): Response {
         $oldYear  = $transaction->getYear();
         $oldMonth = $transaction->getMonth();
 
-        $form = $this->createForm(TransactionType::class, $transaction);
-        $form->handleRequest($request);
+        $data = json_decode($request->getContent(), true);
+        $this->hydrate($transaction, $data, $em, $accountRepo, $categoryRepo);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
+        $em->flush();
 
-            // Recalcule l'ancien mois ET le nouveau (si la date a changé)
-            $budgetRepo->refreshActualAmounts($oldYear, $oldMonth);
-            if ($oldYear !== $transaction->getYear() || $oldMonth !== $transaction->getMonth()) {
-                $budgetRepo->refreshActualAmounts($transaction->getYear(), $transaction->getMonth());
-            }
-
-            $this->addFlash('success', 'Transaction mise à jour.');
-            return $this->redirectToRoute('transaction_index', [
-                'year'  => $transaction->getYear(),
-                'month' => $transaction->getMonth(),
-            ]);
+        // Recalcule l'ancien mois ET le nouveau si la date a changé
+        $budgetRepo->refreshActualAmounts($oldYear, $oldMonth);
+        if ($oldYear !== $transaction->getYear() || $oldMonth !== $transaction->getMonth()) {
+            $budgetRepo->refreshActualAmounts($transaction->getYear(), $transaction->getMonth());
         }
 
-        return $this->render('transaction/form.html.twig', [
-            'form'        => $form,
-            'title'       => 'Modifier la transaction',
-            'transaction' => $transaction,
-        ]);
+        return $this->json($this->serializeTransaction($transaction));
     }
 
-    #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     public function delete(
         Transaction $transaction,
-        Request $request,
         EntityManagerInterface $em,
         MonthlyBudgetRepository $budgetRepo
     ): Response {
         $year  = $transaction->getYear();
         $month = $transaction->getMonth();
 
-        if ($this->isCsrfTokenValid('delete-tx-' . $transaction->getId(), $request->request->get('_token'))) {
-            $em->remove($transaction);
-            $em->flush();
-            $budgetRepo->refreshActualAmounts($year, $month);
-            $this->addFlash('success', 'Transaction supprimée.');
-        }
+        $em->remove($transaction);
+        $em->flush();
+        $budgetRepo->refreshActualAmounts($year, $month);
 
-        return $this->redirectToRoute('transaction_index', ['year' => $year, 'month' => $month]);
+        return $this->json(['year' => $year, 'month' => $month]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers privés
+    // -------------------------------------------------------------------------
+
+    private function hydrate(
+        Transaction $tx,
+        array $data,
+        EntityManagerInterface $em,
+        AccountRepository $accountRepo,
+        CategoryRepository $categoryRepo
+    ): void {
+        if (!empty($data['transactionDate'])) {
+            $tx->setTransactionDate(new \DateTimeImmutable($data['transactionDate']));
+        }
+        if (!empty($data['accountId'])) {
+            $tx->setAccount($accountRepo->find((int) $data['accountId']));
+        }
+        if (!empty($data['categoryId'])) {
+            $tx->setCategory($categoryRepo->find((int) $data['categoryId']));
+        }
+        if (isset($data['type'])) {
+            $tx->setType($data['type']);
+        }
+        if (isset($data['amount'])) {
+            $tx->setAmount((string) $data['amount']);
+        }
+        if (array_key_exists('label', $data)) {
+            $tx->setLabel($data['label'] ?: null);
+        }
+        if (array_key_exists('notes', $data)) {
+            $tx->setNotes($data['notes'] ?: null);
+        }
+    }
+
+    private function serializeTransaction(Transaction $tx): array
+    {
+        return [
+            'id'              => $tx->getId(),
+            'transactionDate' => $tx->getTransactionDate()->format('Y-m-d'),
+            'label'           => $tx->getLabel(),
+            'notes'           => $tx->getNotes(),
+            'type'            => $tx->getType(),
+            'amount'          => (float) $tx->getAmount(),
+            'year'            => $tx->getYear(),
+            'month'           => $tx->getMonth(),
+            'accountId'       => $tx->getAccount()?->getId(),
+            'accountName'     => $tx->getAccount()?->getName(),
+            'categoryId'      => $tx->getCategory()?->getId(),
+            'categoryName'    => $tx->getCategory()?->getName(),
+            'categoryType'    => $tx->getCategory()?->getTransactionType(),
+        ];
     }
 }

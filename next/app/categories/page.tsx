@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import CategoryList from "@/components/CategoryList";
+import CategoryList from "@/components/Category/CategoryList";
 
 export default function CategoriesPage() {
   return (

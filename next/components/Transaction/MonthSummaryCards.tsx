@@ -1,12 +1,15 @@
 "use client";
-import { formatNumber } from "./types";
+import { formatNumber } from "./Transaction.interface";
 
 interface MonthSummaryCardsProps {
   totalCredit: number;
   totalDebit: number;
 }
 
-export default function MonthSummaryCards({ totalCredit, totalDebit }: MonthSummaryCardsProps) {
+export default function MonthSummaryCards({
+  totalCredit,
+  totalDebit,
+}: MonthSummaryCardsProps) {
   const netGlobal = totalCredit - totalDebit;
 
   return (
@@ -22,7 +25,9 @@ export default function MonthSummaryCards({ totalCredit, totalDebit }: MonthSumm
             </div>
             <div>
               <div className="small text-muted">Total crédits</div>
-              <div className="fw-bold fs-5 text-success">+{formatNumber(totalCredit)} €</div>
+              <div className="fw-bold fs-5 text-success">
+                +{formatNumber(totalCredit)} €
+              </div>
             </div>
           </div>
         </div>
@@ -38,7 +43,9 @@ export default function MonthSummaryCards({ totalCredit, totalDebit }: MonthSumm
             </div>
             <div>
               <div className="small text-muted">Total débits</div>
-              <div className="fw-bold fs-5 text-danger">−{formatNumber(totalDebit)} €</div>
+              <div className="fw-bold fs-5 text-danger">
+                −{formatNumber(totalDebit)} €
+              </div>
             </div>
           </div>
         </div>
@@ -48,14 +55,23 @@ export default function MonthSummaryCards({ totalCredit, totalDebit }: MonthSumm
           <div className="card-body d-flex align-items-center gap-3">
             <div
               className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-              style={{ width: "44px", height: "44px", background: netGlobal >= 0 ? "#dbeafe" : "#fef3c7" }}
+              style={{
+                width: "44px",
+                height: "44px",
+                background: netGlobal >= 0 ? "#dbeafe" : "#fef3c7",
+              }}
             >
-              <i className={`bi bi-wallet2 ${netGlobal >= 0 ? "text-primary" : "text-warning"} fs-5`}></i>
+              <i
+                className={`bi bi-wallet2 ${netGlobal >= 0 ? "text-primary" : "text-warning"} fs-5`}
+              ></i>
             </div>
             <div>
               <div className="small text-muted">Net du mois</div>
-              <div className={`fw-bold fs-5 ${netGlobal >= 0 ? "text-primary" : "text-warning"}`}>
-                {netGlobal >= 0 ? "+" : ""}{formatNumber(netGlobal)} €
+              <div
+                className={`fw-bold fs-5 ${netGlobal >= 0 ? "text-primary" : "text-warning"}`}
+              >
+                {netGlobal >= 0 ? "+" : ""}
+                {formatNumber(netGlobal)} €
               </div>
             </div>
           </div>

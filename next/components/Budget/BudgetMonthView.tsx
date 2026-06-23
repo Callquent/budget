@@ -1,25 +1,8 @@
 "use client";
 import React, { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Account {
-  id: number;
-  name: string;
-  type: string;
-  balance: number;
-  currency?: string;
-}
-
-interface Subscription {
-  id: number;
-  name: string;
-  amount: number;
-  frequency: string;
-  account: { name: string };
-  category: { name: string };
-}
+import type { AccountInterface } from "../Account/Account.interface";
+import type { SubscriptionInterface } from "../Subscription/Subscription.interface";
 
 interface Budget {
   id: number;
@@ -57,9 +40,9 @@ interface MonthData {
   nowYear: number;
   nowMonth: number;
   periodLabel: string;
-  accounts: Account[];
+  accounts: AccountInterface[];
   txByAccount: TxByAccount;
-  subscriptions: Subscription[];
+  subscriptions: SubscriptionInterface[];
   budgets: Budget[];
 }
 
@@ -69,7 +52,7 @@ interface YearData {
   currentYear: number;
   currentMonth: number;
   availableYears: number[];
-  accounts: Account[];
+  accounts: AccountInterface[];
   summary: Record<number, SummaryRow>;
   accountBalances: Record<number, Record<number, AccountBalance>>;
 }
@@ -133,9 +116,12 @@ export default function BudgetMonthView({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budget/${y}`, {
-        headers: { Accept: "application/json" },
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/budget/${y}`,
+        {
+          headers: { Accept: "application/json" },
+        },
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setYearData(await res.json());
       setYearState(y);
@@ -150,9 +136,12 @@ export default function BudgetMonthView({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budget/${y}/${m}`, {
-        headers: { Accept: "application/json" },
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/budget/${y}/${m}`,
+        {
+          headers: { Accept: "application/json" },
+        },
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setMonthData(await res.json());
     } catch (e) {
@@ -169,10 +158,13 @@ export default function BudgetMonthView({
 
   // ── Actions POST (vue mois) ───────────────────────────────────────────────
   async function postAction(path: string) {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budget${path}`, {
-      method: "POST",
-      headers: { Accept: "application/json" },
-    });
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/budget${path}`,
+      {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      },
+    );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
@@ -862,22 +854,42 @@ export default function BudgetMonthView({
                   <td colSpan={3}>Solde net (recettes − dépenses)</td>
                   {(() => {
                     const netPlanned =
-                      budgets.filter((b) => b.category.transactionType === "income").reduce((s, b) => s + b.plannedAmount, 0) -
-                      budgets.filter((b) => b.category.transactionType === "expense").reduce((s, b) => s + b.plannedAmount, 0);
-                    const variance = budgets.reduce((s, b) => s + (b.plannedAmount - b.actualAmount), 0);
+                      budgets
+                        .filter((b) => b.category.transactionType === "income")
+                        .reduce((s, b) => s + b.plannedAmount, 0) -
+                      budgets
+                        .filter((b) => b.category.transactionType === "expense")
+                        .reduce((s, b) => s + b.plannedAmount, 0);
+                    const variance = budgets.reduce(
+                      (s, b) => s + (b.plannedAmount - b.actualAmount),
+                      0,
+                    );
                     const netActual =
-                      budgets.filter((b) => b.category.transactionType === "income").reduce((s, b) => s + b.actualAmount, 0) -
-                      budgets.filter((b) => b.category.transactionType === "expense").reduce((s, b) => s + b.actualAmount, 0);
+                      budgets
+                        .filter((b) => b.category.transactionType === "income")
+                        .reduce((s, b) => s + b.actualAmount, 0) -
+                      budgets
+                        .filter((b) => b.category.transactionType === "expense")
+                        .reduce((s, b) => s + b.actualAmount, 0);
                     return (
                       <>
-                        <td className={`text-end fw-semibold ${netPlanned >= 0 ? "text-success" : "text-danger"}`}>
-                          {netPlanned > 0 ? "+" : ""}{fmt(netPlanned)} €
+                        <td
+                          className={`text-end fw-semibold ${netPlanned >= 0 ? "text-success" : "text-danger"}`}
+                        >
+                          {netPlanned > 0 ? "+" : ""}
+                          {fmt(netPlanned)} €
                         </td>
-                        <td className={`text-end fw-semibold ${variance >= 0 ? "text-success" : "text-danger"}`}>
-                          {variance > 0 ? "+" : ""}{fmt(variance)} €
+                        <td
+                          className={`text-end fw-semibold ${variance >= 0 ? "text-success" : "text-danger"}`}
+                        >
+                          {variance > 0 ? "+" : ""}
+                          {fmt(variance)} €
                         </td>
-                        <td className={`text-end fw-semibold ${netActual >= 0 ? "text-success" : "text-danger"}`}>
-                          {netActual > 0 ? "+" : ""}{fmt(netActual)} €
+                        <td
+                          className={`text-end fw-semibold ${netActual >= 0 ? "text-success" : "text-danger"}`}
+                        >
+                          {netActual > 0 ? "+" : ""}
+                          {fmt(netActual)} €
                         </td>
                       </>
                     );

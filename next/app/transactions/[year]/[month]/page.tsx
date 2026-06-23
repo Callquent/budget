@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import Link from "next/link";
-import TransactionList from "@/components/TransactionList";
+import TransactionList from "@/components/Transaction/TransactionList";
 
 export default function TransactionsPage({
   params,
@@ -17,7 +17,10 @@ export default function TransactionsPage({
         <h1 className="h3 mb-0">
           <i className="bi bi-list-ul me-2 text-primary"></i>Transactions
         </h1>
-        <Link href={`/transactions/${year}/${month}/new`} className="btn btn-primary btn-sm">
+        <Link
+          href={`/transactions/${year}/${month}/new`}
+          className="btn btn-primary btn-sm"
+        >
           <i className="bi bi-plus-lg me-1"></i>Nouvelle transaction
         </Link>
       </div>

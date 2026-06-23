@@ -1,5 +1,5 @@
 import Link from "next/link";
-import SubscriptionList from "@/components/SubscriptionList";
+import SubscriptionList from "@/components/Subscription/SubscriptionList";
 
 export default function SubscriptionsPage() {
   return (

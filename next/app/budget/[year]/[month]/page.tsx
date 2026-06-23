@@ -1,4 +1,4 @@
-import BudgetMonthView from "@/components/BudgetMonthView";
+import BudgetMonthView from "@/components/Budget/BudgetMonthView";
 
 export default function BudgetMonthPage({
   params,

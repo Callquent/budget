@@ -1,4 +1,4 @@
-import StatisticsView from "@/components/StatisticsView";
+import StatisticsView from "@/components/Statistics/StatisticsView";
 
 export default async function StatisticsPage({
   params,
