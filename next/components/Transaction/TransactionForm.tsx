@@ -214,22 +214,22 @@ export default function TransactionForm({
               </select>
             </div>
 
-            {/* Catégorie — select contrôlé */}
+            {/* Catégorie — Boutons dynamiques */}
             <div className="mb-3">
               <label className="form-label">Catégorie</label>
-              <select
-                className="form-select"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                required
-              >
-                <option value="">Sélectionnez une catégorie</option>
+              <ul className="nav nav-tabs mb-0" role="tablist">
                 {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {categoryLabel(cat)}
-                  </option>
+                  <li className="nav-item" role="presentation" key={cat.id}>
+                    <button
+                      className={`btn btn-outline-secondary btn-sm ${categoryId === String(cat.id) ? "active" : ""}`}
+                      onClick={() => setCategoryId(String(cat.id))}
+                      type="button"
+                    >
+                      {cat.name}
+                    </button>
+                  </li>
                 ))}
-              </select>
+              </ul>
             </div>
 
             {/* Montant */}

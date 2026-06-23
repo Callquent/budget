@@ -139,22 +139,20 @@ export default function BudgetForm({
 
             <div className="mb-3">
               <label className="form-label">Catégorie</label>
-              <select
-                name="categoryId"
-                className="form-select"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                disabled={isApproved}
-                required
-              >
-                <option value="">Sélectionnez une catégorie</option>
+              <ul className="nav nav-tabs mb-0" role="tablist">
                 {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                    {cat.transactionType ? ` (${cat.transactionType})` : ""}
-                  </option>
+                  <li className="nav-item" role="presentation" key={cat.id}>
+                    <button
+                      className={`btn btn-outline-secondary btn-sm ${categoryId === String(cat.id) ? "active" : ""}`}
+                      onClick={() => setCategoryId(String(cat.id))}
+                      type="button"
+                      disabled={isApproved}
+                    >
+                      {cat.name}
+                    </button>
+                  </li>
                 ))}
-              </select>
+              </ul>
             </div>
 
             <div className="mb-3">

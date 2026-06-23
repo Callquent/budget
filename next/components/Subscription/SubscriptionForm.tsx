@@ -15,8 +15,17 @@ export default function SubscriptionForm({
   const router = useRouter();
   const [accounts, setAccounts] = useState<AccountInterface[]>([]);
   const [categories, setCategories] = useState<CategoryInterface[]>([]);
+  const [categoryId, setCategoryId] = useState<string>(
+    initialData?.categoryId != null ? String(initialData.categoryId) : "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setCategoryId(
+      initialData?.categoryId != null ? String(initialData.categoryId) : "",
+    );
+  }, [initialData?.categoryId]);
 
   useEffect(() => {
     // Charger comptes et catégories en parallèle
@@ -50,7 +59,7 @@ export default function SubscriptionForm({
     const body = {
       name: get("name"),
       accountId: parseInt(get("accountId")),
-      categoryId: parseInt(get("categoryId")),
+      categoryId: categoryId ? parseInt(categoryId) : null,
       amount: get("amount"),
       frequency: get("frequency"),
       startDate: get("startDate"),
@@ -126,22 +135,22 @@ export default function SubscriptionForm({
                   ))}
                 </select>
               </div>
-              <div className="col-6">
-                <label className="form-label">Catégorie</label>
-                <select
-                  name="categoryId"
-                  className="form-select"
-                  defaultValue={initialData?.categoryId ?? ""}
-                  required
-                >
-                  <option value="">Sélectionnez une catégorie</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Catégorie</label>
+              <ul className="nav nav-tabs mb-0" role="tablist">
+                {categories.map((cat) => (
+                  <li className="nav-item" role="presentation" key={cat.id}>
+                    <button
+                      className={`btn btn-outline-secondary btn-sm ${categoryId === String(cat.id) ? "active" : ""}`}
+                      onClick={() => setCategoryId(String(cat.id))}
+                      type="button"
+                    >
+                      {cat.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
             <div className="row g-3 mb-3">
               <div className="col-6">
