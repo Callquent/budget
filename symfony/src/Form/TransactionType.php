@@ -52,7 +52,6 @@ class TransactionType extends AbstractType
                 'choices' => [
                     'Crédit — entrée d\'argent (+)' => Transaction::TYPE_CREDIT,
                     'Débit — sortie d\'argent (−)'  => Transaction::TYPE_DEBIT,
-                    'Virement interne'               => Transaction::TYPE_TRANSFER,
                 ],
                 'constraints' => [new NotBlank()],
             ])

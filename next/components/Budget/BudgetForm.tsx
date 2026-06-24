@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { CategoryInterface } from "../Category/Category.interface";
 import type { BudgetFormProps } from "./Budget.interface";
+import CategoryPicker from "../Category/CategoryPicker";
+import AccountPicker from "../Account/AccountPicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -15,15 +17,11 @@ export default function BudgetForm({
   currentMonth = new Date().getMonth() + 1,
 }: BudgetFormProps) {
   const router = useRouter();
-  const [categories, setCategories] = useState<CategoryInterface[]>([]);
+  const [grouped, setGrouped] = useState<Record<string, CategoryInterface[]>>({});
   const [accounts, setAccounts] = useState<AccountInterface[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Champs contrôlés : on ne peut pas compter sur defaultValue pour les <select>
-  // car les options (categories/accounts) arrivent de façon async après le montage.
-  // defaultValue n'est appliqué qu'au montage initial, donc si initialData.categoryId
-  // existe avant que les <option> ne soient rendues, le select reste vide.
   const [categoryId, setCategoryId] = useState<string>(
     initialData?.categoryId != null ? String(initialData.categoryId) : "",
   );
@@ -33,8 +31,6 @@ export default function BudgetForm({
 
   const isApproved = initialData?.isApproved ?? false;
 
-  // Si initialData arrive/charge après le premier rendu (ex: fetch SSR résolu plus tard,
-  // ou navigation client vers un autre id), on resynchronise les selects contrôlés.
   useEffect(() => {
     setCategoryId(
       initialData?.categoryId != null ? String(initialData.categoryId) : "",
@@ -49,10 +45,7 @@ export default function BudgetForm({
       fetch(`${API}/categories`).then((r) => r.json()),
       fetch(`${API}/accounts`).then((r) => r.json()),
     ]).then(([categoriesData, accountsData]) => {
-      const allCategories: CategoryInterface[] = Object.values(
-        categoriesData.grouped ?? {},
-      ).flat() as CategoryInterface[];
-      setCategories(allCategories);
+      setGrouped(categoriesData.grouped ?? {});
       setAccounts(accountsData.accounts ?? []);
     });
   }, []);
@@ -139,40 +132,24 @@ export default function BudgetForm({
 
             <div className="mb-3">
               <label className="form-label">Catégorie</label>
-              <ul className="nav nav-tabs mb-0" role="tablist">
-                {categories.map((cat) => (
-                  <li className="nav-item" role="presentation" key={cat.id}>
-                    <button
-                      className={`btn btn-outline-secondary btn-sm ${categoryId === String(cat.id) ? "active" : ""}`}
-                      onClick={() => setCategoryId(String(cat.id))}
-                      type="button"
-                      disabled={isApproved}
-                    >
-                      {cat.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <CategoryPicker
+                grouped={grouped}
+                value={categoryId}
+                onChange={setCategoryId}
+                disabled={isApproved}
+              />
             </div>
 
             <div className="mb-3">
               <label className="form-label">Compte</label>
-              <select
-                name="accountId"
-                className="form-select"
+              <AccountPicker
+                accounts={accounts}
                 value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
+                onChange={setAccountId}
                 disabled={isApproved}
-              >
-                <option value="">Sélectionnez un compte</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </option>
-                ))}
-              </select>
+              />
               {!initialData?.accountId && (
-                <div className="form-text text-warning">
+                <div className="form-text text-warning mt-1">
                   <i className="bi bi-exclamation-triangle me-1"></i>
                   Un compte est requis pour pouvoir approuver cette ligne.
                 </div>

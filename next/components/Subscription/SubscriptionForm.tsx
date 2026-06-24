@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { CategoryInterface } from "../Category/Category.interface";
 import type { SubscriptionFormProps } from "./Subscription.interface";
+import CategoryPicker from "../Category/CategoryPicker";
+import AccountPicker from "../Account/AccountPicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -14,7 +16,10 @@ export default function SubscriptionForm({
 }: SubscriptionFormProps) {
   const router = useRouter();
   const [accounts, setAccounts] = useState<AccountInterface[]>([]);
-  const [categories, setCategories] = useState<CategoryInterface[]>([]);
+  const [grouped, setGrouped] = useState<Record<string, CategoryInterface[]>>({});
+  const [accountId, setAccountId] = useState<string>(
+    initialData?.accountId != null ? String(initialData.accountId) : "",
+  );
   const [categoryId, setCategoryId] = useState<string>(
     initialData?.categoryId != null ? String(initialData.categoryId) : "",
   );
@@ -22,23 +27,21 @@ export default function SubscriptionForm({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setAccountId(
+      initialData?.accountId != null ? String(initialData.accountId) : "",
+    );
     setCategoryId(
       initialData?.categoryId != null ? String(initialData.categoryId) : "",
     );
-  }, [initialData?.categoryId]);
+  }, [initialData?.accountId, initialData?.categoryId]);
 
   useEffect(() => {
-    // Charger comptes et catégories en parallèle
     Promise.all([
       fetch(`${API}/accounts`).then((r) => r.json()),
       fetch(`${API}/categories`).then((r) => r.json()),
     ]).then(([accountsData, categoriesData]) => {
       setAccounts(accountsData.accounts ?? []);
-      // Aplatir les catégories groupées
-      const allCategories: CategoryInterface[] = Object.values(
-        categoriesData.grouped ?? {},
-      ).flat() as CategoryInterface[];
-      setCategories(allCategories);
+      setGrouped(categoriesData.grouped ?? {});
     });
   }, []);
 
@@ -58,7 +61,7 @@ export default function SubscriptionForm({
 
     const body = {
       name: get("name"),
-      accountId: parseInt(get("accountId")),
+      accountId: accountId ? parseInt(accountId) : null,
       categoryId: categoryId ? parseInt(categoryId) : null,
       amount: get("amount"),
       frequency: get("frequency"),
@@ -118,39 +121,22 @@ export default function SubscriptionForm({
                 required
               />
             </div>
-            <div className="row g-3 mb-3">
-              <div className="col-6">
-                <label className="form-label">Compte</label>
-                <select
-                  name="accountId"
-                  className="form-select"
-                  defaultValue={initialData?.accountId ?? ""}
-                  required
-                >
-                  <option value="">Sélectionnez un compte</option>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="mb-3">
+              <label className="form-label">Compte</label>
+              <AccountPicker
+                accounts={accounts}
+                value={accountId}
+                onChange={setAccountId}
+                required
+              />
             </div>
             <div className="mb-3">
               <label className="form-label">Catégorie</label>
-              <ul className="nav nav-tabs mb-0" role="tablist">
-                {categories.map((cat) => (
-                  <li className="nav-item" role="presentation" key={cat.id}>
-                    <button
-                      className={`btn btn-outline-secondary btn-sm ${categoryId === String(cat.id) ? "active" : ""}`}
-                      onClick={() => setCategoryId(String(cat.id))}
-                      type="button"
-                    >
-                      {cat.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <CategoryPicker
+                grouped={grouped}
+                value={categoryId}
+                onChange={setCategoryId}
+              />
             </div>
             <div className="row g-3 mb-3">
               <div className="col-6">

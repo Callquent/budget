@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 #[Route('/budget', name: 'monthly_budget_')]
-class MonthlyBudgetController extends AbstractController
+class BudgetController extends AbstractController
 {
     /**
      * Vue annuelle : affiche les 12 mois d'une année.

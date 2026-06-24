@@ -13,7 +13,6 @@ class Transaction
 {
     public const TYPE_CREDIT   = 'credit';   // entrée d'argent
     public const TYPE_DEBIT    = 'debit';    // sortie d'argent
-    public const TYPE_TRANSFER = 'transfer'; // virement
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -80,21 +79,55 @@ class Transaction
         }
     }
 
-    public function getId(): ?int { return $this->id; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-    public function getAccount(): ?Account { return $this->account; }
-    public function setAccount(?Account $account): static { $this->account = $account; return $this; }
+    public function getAccount(): ?Account
+    {
+        return $this->account;
+    }
+    public function setAccount(?Account $account): static
+    {
+        $this->account = $account;
+        return $this;
+    }
 
-    public function getCategory(): ?Category { return $this->category; }
-    public function setCategory(?Category $category): static { $this->category = $category; return $this; }
+    public function getCategory(): ?Category
+    {
+        return $this->category;
+    }
+    public function setCategory(?Category $category): static
+    {
+        $this->category = $category;
+        return $this;
+    }
 
-    public function getAmount(): string { return $this->amount; }
-    public function setAmount(string $amount): static { $this->amount = $amount; return $this; }
+    public function getAmount(): string
+    {
+        return $this->amount;
+    }
+    public function setAmount(string $amount): static
+    {
+        $this->amount = $amount;
+        return $this;
+    }
 
-    public function getType(): string { return $this->type; }
-    public function setType(string $type): static { $this->type = $type; return $this; }
+    public function getType(): string
+    {
+        return $this->type;
+    }
+    public function setType(string $type): static
+    {
+        $this->type = $type;
+        return $this;
+    }
 
-    public function getTransactionDate(): \DateTimeImmutable { return $this->transactionDate; }
+    public function getTransactionDate(): \DateTimeImmutable
+    {
+        return $this->transactionDate;
+    }
     public function setTransactionDate(\DateTimeImmutable $date): static
     {
         $this->transactionDate = $date;
@@ -103,8 +136,14 @@ class Transaction
         return $this;
     }
 
-    public function getYear(): int { return $this->year; }
-    public function getMonth(): int { return $this->month; }
+    public function getYear(): int
+    {
+        return $this->year;
+    }
+    public function getMonth(): int
+    {
+        return $this->month;
+    }
 
     /** Retourne une clé lisible, ex : "mars 2025" */
     public function getPeriodLabel(): string
@@ -113,16 +152,35 @@ class Transaction
             'fr_FR',
             \IntlDateFormatter::NONE,
             \IntlDateFormatter::NONE,
-            null, null, 'MMMM yyyy'
+            null,
+            null,
+            'MMMM yyyy'
         );
         return $formatter->format($this->transactionDate);
     }
 
-    public function getLabel(): string { return $this->label; }
-    public function setLabel(string $label): static { $this->label = $label; return $this; }
+    public function getLabel(): string
+    {
+        return $this->label;
+    }
+    public function setLabel(string $label): static
+    {
+        $this->label = $label;
+        return $this;
+    }
 
-    public function getNotes(): ?string { return $this->notes; }
-    public function setNotes(?string $notes): static { $this->notes = $notes; return $this; }
+    public function getNotes(): ?string
+    {
+        return $this->notes;
+    }
+    public function setNotes(?string $notes): static
+    {
+        $this->notes = $notes;
+        return $this;
+    }
 
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
 }

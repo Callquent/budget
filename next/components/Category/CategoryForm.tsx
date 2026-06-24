@@ -3,13 +3,36 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CategoryFormProps } from "./Category.interface";
+import OptionPicker, { type PickerOption } from "../Transaction/OptionPicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-export default function CategoryForm({ initialData, title }: CategoryFormProps) {
+const TYPE_OPTIONS: PickerOption[] = [
+  { value: "income", label: "Recette", color: "success" },
+  { value: "expense", label: "Dépense", color: "danger" },
+  { value: "transfer", label: "Virement", color: "primary" },
+];
+
+const FREQUENCY_OPTIONS: PickerOption[] = [
+  { value: "monthly", label: "Mensuelle" },
+  { value: "quarterly", label: "Trimestrielle" },
+  { value: "yearly", label: "Annuelle" },
+  { value: "occasional", label: "Occasionnelle" },
+];
+
+export default function CategoryForm({
+  initialData,
+  title,
+}: CategoryFormProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [transactionType, setTransactionType] = useState<string>(
+    initialData?.transactionType ?? "expense",
+  );
+  const [frequency, setFrequency] = useState<string>(
+    initialData?.frequency ?? "monthly",
+  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -18,10 +41,12 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
 
     const form = e.currentTarget;
     const body = {
-      name:            (form.elements.namedItem("name") as HTMLInputElement).value,
-      transactionType: (form.elements.namedItem("transactionType") as HTMLSelectElement).value,
-      frequency:       (form.elements.namedItem("frequency") as HTMLSelectElement).value,
-      description:     (form.elements.namedItem("description") as HTMLTextAreaElement).value,
+      name: (form.elements.namedItem("name") as HTMLInputElement).value,
+      transactionType,
+      frequency,
+      description: (
+        form.elements.namedItem("description") as HTMLTextAreaElement
+      ).value,
     };
 
     const url = initialData?.id
@@ -47,7 +72,10 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
     <div className="row justify-content-center">
       <div className="col-lg-5">
         <div className="d-flex align-items-center mb-4">
-          <Link href="/categories" className="text-muted text-decoration-none me-3">
+          <Link
+            href="/categories"
+            className="text-muted text-decoration-none me-3"
+          >
             <i className="bi bi-chevron-left"></i>
           </Link>
           <h1 className="h4 mb-0">{title}</h1>
@@ -55,7 +83,8 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
         <div className="card p-4">
           {error && (
             <div className="alert alert-danger mb-3">
-              <i className="bi bi-exclamation-triangle-fill me-2"></i>{error}
+              <i className="bi bi-exclamation-triangle-fill me-2"></i>
+              {error}
             </div>
           )}
           <form onSubmit={handleSubmit}>
@@ -69,32 +98,21 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
                 required
               />
             </div>
-            <div className="row g-3 mb-3">
-              <div className="col-6">
-                <label className="form-label">Type de transaction</label>
-                <select
-                  name="transactionType"
-                  className="form-select"
-                  defaultValue={initialData?.transactionType ?? "expense"}
-                >
-                  <option value="income">Recette</option>
-                  <option value="expense">Dépense</option>
-                  <option value="transfer">Virement</option>
-                </select>
-              </div>
-              <div className="col-6">
-                <label className="form-label">Fréquence</label>
-                <select
-                  name="frequency"
-                  className="form-select"
-                  defaultValue={initialData?.frequency ?? "monthly"}
-                >
-                  <option value="monthly">Mensuelle</option>
-                  <option value="yearly">Annuelle</option>
-                  <option value="quarterly">Trimestrielle</option>
-                  <option value="occasional">Occasionnelle</option>
-                </select>
-              </div>
+            <div className="mb-3">
+              <label className="form-label">Type de transaction</label>
+              <OptionPicker
+                options={TYPE_OPTIONS}
+                value={transactionType}
+                onChange={setTransactionType}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Fréquence</label>
+              <OptionPicker
+                options={FREQUENCY_OPTIONS}
+                value={frequency}
+                onChange={setFrequency}
+              />
             </div>
             <div className="mb-3">
               <label className="form-label">Description</label>
@@ -106,11 +124,21 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
               />
             </div>
             <div className="d-flex gap-2 mt-3">
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving
-                  ? <><span className="spinner-border spinner-border-sm me-1"></span>Enregistrement…</>
-                  : <><i className="bi bi-check-lg me-1"></i>Enregistrer</>
-                }
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-1"></span>
+                    Enregistrement…
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check-lg me-1"></i>Enregistrer
+                  </>
+                )}
               </button>
               <Link href="/categories" className="btn btn-outline-secondary">
                 Annuler

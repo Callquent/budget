@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { CategoryInterface } from "../Category/Category.interface";
+import CategoryPicker from "../Category/CategoryPicker";
+import AccountPicker from "../Account/AccountPicker";
+import OptionPicker, { type PickerOption } from "./OptionPicker";
 
 interface TransactionFormProps {
   initialData?: {
@@ -19,18 +22,16 @@ interface TransactionFormProps {
     month?: number;
   };
   title: string;
-  /** Pré-remplissage pour une nouvelle transaction depuis la vue mois */
   defaultYear?: number;
   defaultMonth?: number;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-const TYPE_LABELS: Record<string, string> = {
-  credit: "Crédit (Entrée)",
-  debit: "Débit (Sortie)",
-  transfer: "Virement",
-};
+const TYPE_OPTIONS: PickerOption[] = [
+  { value: "debit", label: "Débit (Sortie)", color: "danger" },
+  { value: "credit", label: "Crédit (Entrée)", color: "success" },
+];
 
 export default function TransactionForm({
   initialData,
@@ -39,13 +40,13 @@ export default function TransactionForm({
   defaultMonth,
 }: TransactionFormProps) {
   const router = useRouter();
-  const [categories, setCategories] = useState<CategoryInterface[]>([]);
+  const [grouped, setGrouped] = useState<Record<string, CategoryInterface[]>>(
+    {},
+  );
   const [accounts, setAccounts] = useState<AccountInterface[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Selects contrôlés : même raison que BudgetForm — les options arrivent en async
-  // et defaultValue n'est appliqué qu'au montage, avant que les <option> n'existent.
   const [accountId, setAccountId] = useState<string>(
     initialData?.accountId != null ? String(initialData.accountId) : "",
   );
@@ -54,7 +55,6 @@ export default function TransactionForm({
   );
   const [type, setType] = useState<string>(initialData?.type ?? "debit");
 
-  // Resynchroniser si initialData change (navigation client vers un autre id)
   useEffect(() => {
     setAccountId(
       initialData?.accountId != null ? String(initialData.accountId) : "",
@@ -65,21 +65,16 @@ export default function TransactionForm({
     setType(initialData?.type ?? "debit");
   }, [initialData?.accountId, initialData?.categoryId, initialData?.type]);
 
-  // Charger comptes et catégories
   useEffect(() => {
     Promise.all([
       fetch(`${API}/accounts`).then((r) => r.json()),
       fetch(`${API}/categories`).then((r) => r.json()),
     ]).then(([accountsData, categoriesData]) => {
       setAccounts(accountsData.accounts ?? []);
-      const allCategories: CategoryInterface[] = Object.values(
-        categoriesData.grouped ?? {},
-      ).flat() as CategoryInterface[];
-      setCategories(allCategories);
+      setGrouped(categoriesData.grouped ?? {});
     });
   }, []);
 
-  // Date par défaut : si on crée depuis une vue mois → 1er du mois, sinon aujourd'hui
   const defaultDate = (() => {
     if (initialData?.transactionDate) return initialData.transactionDate;
     if (defaultYear && defaultMonth) {
@@ -131,12 +126,6 @@ export default function TransactionForm({
     }
   };
 
-  // Libellé de catégorie dans le select : on affiche le type entre parenthèses
-  const categoryLabel = (cat: CategoryInterface) =>
-    cat.transactionType
-      ? `${cat.name} (${TYPE_LABELS[cat.transactionType] ?? cat.transactionType})`
-      : cat.name;
-
   const backHref =
     initialData?.year && initialData?.month
       ? `/transactions/${initialData.year}/${initialData.month}`
@@ -166,7 +155,6 @@ export default function TransactionForm({
 
         <div className="card p-4">
           <form onSubmit={handleSubmit}>
-            {/* Date */}
             <div className="mb-3">
               <label className="form-label">Date</label>
               <input
@@ -178,61 +166,35 @@ export default function TransactionForm({
               />
             </div>
 
-            {/* Compte — select contrôlé */}
             <div className="mb-3">
               <label className="form-label">Compte</label>
-              <select
-                className="form-select"
+              <AccountPicker
+                accounts={accounts}
                 value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
+                onChange={setAccountId}
                 required
-              >
-                <option value="">Sélectionnez un compte</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                    {acc.type ? ` — ${acc.type}` : ""}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
-            {/* Type — select contrôlé */}
             <div className="mb-3">
               <label className="form-label">Type</label>
-              <select
-                className="form-select"
+              <OptionPicker
+                options={TYPE_OPTIONS}
                 value={type}
-                onChange={(e) => setType(e.target.value)}
+                onChange={setType}
                 required
-              >
-                {Object.entries(TYPE_LABELS).map(([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
-            {/* Catégorie — Boutons dynamiques */}
             <div className="mb-3">
               <label className="form-label">Catégorie</label>
-              <ul className="nav nav-tabs mb-0" role="tablist">
-                {categories.map((cat) => (
-                  <li className="nav-item" role="presentation" key={cat.id}>
-                    <button
-                      className={`btn btn-outline-secondary btn-sm ${categoryId === String(cat.id) ? "active" : ""}`}
-                      onClick={() => setCategoryId(String(cat.id))}
-                      type="button"
-                    >
-                      {cat.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <CategoryPicker
+                grouped={grouped}
+                value={categoryId}
+                onChange={setCategoryId}
+              />
             </div>
 
-            {/* Montant */}
             <div className="mb-3">
               <label className="form-label">Montant</label>
               <div className="input-group">
@@ -249,7 +211,6 @@ export default function TransactionForm({
               </div>
             </div>
 
-            {/* Libellé */}
             <div className="mb-3">
               <label className="form-label">Libellé</label>
               <input
@@ -260,7 +221,6 @@ export default function TransactionForm({
               />
             </div>
 
-            {/* Notes */}
             <div className="mb-3">
               <label className="form-label">Notes</label>
               <textarea
