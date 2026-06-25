@@ -1,28 +1,45 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import Sidebar from "@/components/Sidebar";
+'use client';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Geist, Geist_Mono } from 'next/font/google';
+import Sidebar from '@/components/Sidebar';
+import AISearchDrawer from '@/components/AISearchDrawer';
+import type { AddBudgetLinePayload } from '@/lib/ai-search';
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
+const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
-export const metadata: Metadata = {
-  title: "Budget",
-  description: "Gestion de budget personnel",
-};
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [initialQuery, setInitialQuery] = useState<string | undefined>();
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+  const handleSearch = useCallback((query: string) => {
+    setInitialQuery(query);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleAddBudget = useCallback(
+    async (payload: AddBudgetLinePayload) => {
+      const res = await fetch('/api/monthly-budgets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: `/api/categories/${payload.category}`,
+          plannedAmount: payload.amount.toFixed(2),
+          year: payload.year,
+          month: payload.month,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Failed to create budget line: ${res.statusText}`);
+
+      router.refresh();
+    },
+    [router],
+  );
+
   return (
     <html
       lang="fr"
@@ -44,15 +61,24 @@ export default function RootLayout({
       </head>
       <body
         className="min-h-full"
-        style={{ display: "flex", background: "#f8fafc" }}
+        style={{ display: 'flex', background: '#f8fafc' }}
       >
-        <Sidebar />
+        <Sidebar onSearch={handleSearch} />
+
         <main
           style={{ flexGrow: 1, minWidth: 0 }}
           className="p-4 pb-5 pb-md-4"
         >
           {children}
         </main>
+
+        <AISearchDrawer
+          open={drawerOpen}
+          initialQuery={initialQuery}
+          onClose={() => setDrawerOpen(false)}
+          onAddBudget={handleAddBudget}
+          apiBase="/api"
+        />
       </body>
     </html>
   );

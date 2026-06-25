@@ -1,6 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+
+interface SidebarProps {
+  onSearch?: (query: string) => void;
+}
 
 const NAV_ITEMS = [
   { name: "Tableau de bord", href: "/", icon: "bi-house", exact: true },
@@ -12,8 +17,9 @@ const NAV_ITEMS = [
   { name: "Statistiques",    href: "/statistics",    icon: "bi-graph-up-arrow" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onSearch }: SidebarProps) {
   const pathname = usePathname();
+  const [query, setQuery] = useState("");
 
   const isActive = (item: (typeof NAV_ITEMS)[0]) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -78,6 +84,56 @@ export default function Sidebar() {
             </span>
           </Link>
         </div>
+
+        {/* Search bar */}
+        {onSearch && (
+          <div style={{ padding: "12px 10px 4px" }}>
+            <div style={{ position: "relative" }}>
+              <i
+                className="bi bi-search"
+                style={{
+                  position: "absolute",
+                  left: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#6b7280",
+                  fontSize: ".8rem",
+                  pointerEvents: "none",
+                }}
+              ></i>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && query.trim()) {
+                    onSearch(query.trim());
+                    setQuery("");
+                  }
+                }}
+                placeholder="Recherche IA…"
+                style={{
+                  width: "100%",
+                  background: "rgba(255,255,255,.06)",
+                  border: "1px solid rgba(255,255,255,.1)",
+                  borderRadius: "8px",
+                  padding: "7px 10px 7px 30px",
+                  color: "#e5e7eb",
+                  fontSize: ".8rem",
+                  outline: "none",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = "#3b82f6";
+                  e.currentTarget.style.background = "rgba(59,130,246,.08)";
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,.1)";
+                  e.currentTarget.style.background = "rgba(255,255,255,.06)";
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Nav */}
         <nav style={{ padding: "12px 10px", flexGrow: 1 }}>

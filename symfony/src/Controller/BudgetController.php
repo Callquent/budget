@@ -239,7 +239,7 @@ class BudgetController extends AbstractController
             'txByAccount'   => $txByAccount,
             'subscriptions' => $subscriptions,
             'budgets'       => $budgets,
-        ], 200, [], ['groups' => ['budget:month', 'account:read', 'category:read', 'subscription:read']]);
+        ], 200, [], ['groups' => ['budget:month', 'budget:read', 'account:read', 'category:read', 'subscription:read']]);
     }
 
     // ─── CRUD ─────────────────────────────────────────────────────────────────

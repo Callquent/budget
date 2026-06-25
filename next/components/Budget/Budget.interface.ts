@@ -8,17 +8,23 @@ interface BudgetBase {
 export interface Budget extends BudgetBase {
   id: number;
   approvedAt?: string;
-  account: { name: string } | null;
-  category: { name: string; transactionType: string; frequency: string };
+  account: { id: number; name: string; type: string; balance: string; currency: string } | null;
+  category: { id: number; name: string; transactionType: string; frequency: string };
+  year: number;
+  month: number;
 }
 
 export interface BudgetFormProps {
   initialData?: Partial<BudgetBase> & {
     id?: number;
-    categoryId?: number;
-    accountId?: number;
     year?: number;
     month?: number;
+    // Forme plate (compatibilité)
+    categoryId?: number;
+    accountId?: number;
+    // Forme imbriquée (retournée par l'API)
+    account?: { id: number; name: string; type: string; balance: string; currency: string } | null;
+    category?: { id: number; name: string; transactionType: string; frequency: string };
   };
   title: string;
   currentYear?: number;

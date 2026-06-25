@@ -1,0 +1,251 @@
+/*
+ * ai-search.css
+ * Styles for the AIS (AI Search) chat interface and result cards.
+ * Import once in your layout or in the component that uses AISearchPanel.
+ *
+ * Design: matches the dark sidebar (#111827) with light result cards
+ * using the same Bootstrap Icons already loaded in the project.
+ */
+
+/* ── Tags / badges ─────────────────────────────────────────── */
+
+.ais-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.ais-tag--active   { background: #E1F5EE; color: #0F6E56; }
+.ais-tag--inactive { background: #F1EFE8; color: #5F5E5A; }
+.ais-tag--income   { background: #EAF3DE; color: #3B6D11; }
+.ais-tag--expense  { background: #FCEBEB; color: #A32D2D; }
+.ais-tag--transfer { background: #E6F1FB; color: #185FA5; }
+
+/* ── Result cards ──────────────────────────────────────────── */
+
+.ais-card {
+  background: var(--ais-card-bg, #f9fafb);
+  border: 0.5px solid var(--ais-card-border, #e5e7eb);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 4px;
+}
+
+/* Inside dark bubbles the card should invert */
+.ais-bubble--ai .ais-card {
+  --ais-card-bg: rgba(255, 255, 255, 0.06);
+  --ais-card-border: rgba(255, 255, 255, 0.12);
+}
+
+.ais-card__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.ais-card__value {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--color-text-primary, #111827);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.ais-card__hint {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b7280);
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+.ais-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.ais-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+/* ── Data rows ─────────────────────────────────────────────── */
+
+.ais-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 0.5px solid var(--ais-card-border, #e5e7eb);
+  font-size: 12px;
+  gap: 8px;
+}
+
+.ais-row:last-child {
+  border-bottom: none;
+}
+
+.ais-row--total {
+  padding-top: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  border-top: 0.5px solid var(--ais-card-border, #e5e7eb);
+  border-bottom: none;
+  margin-top: 2px;
+}
+
+.ais-amount { font-weight: 500; white-space: nowrap; }
+.ais-amount--debit  { color: #E24B4A; }
+.ais-amount--credit { color: #1D9E75; }
+
+/* ── Budget line ───────────────────────────────────────────── */
+
+.ais-budget-line { padding: 4px 0; }
+
+.ais-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: #e5e7eb;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.ais-progress__fill {
+  height: 4px;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* ── Inline form (budget-add) ──────────────────────────────── */
+
+.ais-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.ais-form__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+.ais-form__input,
+.ais-form__select {
+  background: var(--color-background-primary, #fff);
+  color: var(--color-text-primary, #111827);
+  border: 0.5px solid var(--color-border-secondary, #d1d5db);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ais-form__input:focus,
+.ais-form__select:focus {
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.ais-form__submit {
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+  margin-top: 2px;
+}
+
+.ais-form__submit:hover { opacity: 0.88; }
+.ais-form__submit:active { transform: scale(0.98); }
+
+/* ── Inline suggestion pill ────────────────────────────────── */
+
+.ais-pill {
+  display: inline-block;
+  background: transparent;
+  border: 0.5px solid var(--color-border-secondary, #d1d5db);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b7280);
+  cursor: pointer;
+  margin-top: 6px;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.ais-pill:hover {
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.06);
+}
+
+/* ── Chat bubbles ──────────────────────────────────────────── */
+
+.ais-bubble {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 360px;
+}
+
+.ais-bubble--user {
+  background: #6366f1;
+  color: #fff;
+  border-radius: 12px 12px 3px 12px;
+}
+
+.ais-bubble--ai {
+  background: var(--color-background-secondary, #f3f4f6);
+  border: 0.5px solid var(--color-border-tertiary, #e5e7eb);
+  color: var(--color-text-primary, #111827);
+  border-radius: 12px 12px 12px 3px;
+}
+
+/* ── Thinking animation ────────────────────────────────────── */
+
+.ais-thinking {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 14px;
+  background: var(--color-background-secondary, #f3f4f6);
+  border: 0.5px solid var(--color-border-tertiary, #e5e7eb);
+  border-radius: 12px;
+}
+
+.ais-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-text-secondary, #9ca3af);
+  animation: ais-blink 1.2s infinite;
+}
+.ais-dot:nth-child(2) { animation-delay: 0.2s; }
+.ais-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes ais-blink {
+  0%, 60%, 100% { opacity: 1; }
+  30%            { opacity: 0.2; }
+}

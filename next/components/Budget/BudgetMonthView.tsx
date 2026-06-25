@@ -734,14 +734,14 @@ export default function BudgetMonthView({
                       <td>
                         {b.isApproved ? (
                           <>
-                            <span className="badge rounded-pill bg-success bg-opacity-15 text-success border border-success border-opacity-25" style={{ fontSize: ".72rem" }}>
-                              <i className="bi bi-check-circle me-1"></i>
+                            <span className="badge rounded-pill bg-success text-white" style={{ fontSize: ".72rem", fontWeight: "600", padding: "4px 8px" }}>
+                              <i className="bi bi-check-circle-fill me-1"></i>
                               Approuvé
                             </span>
                             {b.approvedAt && (
                               <div
                                 className="text-muted"
-                                style={{ fontSize: ".68rem" }}
+                                style={{ fontSize: ".68rem", marginTop: "2px" }}
                               >
                                 {b.approvedAt}
                               </div>
@@ -817,7 +817,7 @@ export default function BudgetMonthView({
                         .filter((b) => b.category.transactionType === "expense")
                         .reduce((s, b) => s + b.actualAmount, 0);
                     return (
-                      <>
+                      <React.Fragment key="tfoot-totals">
                         <td
                           className={`text-end fw-semibold ${netPlanned >= 0 ? "text-success" : "text-danger"}`}
                         >
@@ -836,7 +836,7 @@ export default function BudgetMonthView({
                           {netActual > 0 ? "+" : ""}
                           {fmt(netActual)} €
                         </td>
-                      </>
+                      </React.Fragment>
                     );
                   })()}
                   <td colSpan={2}></td>

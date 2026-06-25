@@ -24,23 +24,10 @@ export default function BudgetForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [categoryId, setCategoryId] = useState<string>(
-    initialData?.categoryId != null ? String(initialData.categoryId) : "",
-  );
-  const [accountId, setAccountId] = useState<string>(
-    initialData?.accountId != null ? String(initialData.accountId) : "",
-  );
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [accountId, setAccountId] = useState<string>("");
 
   const isApproved = initialData?.isApproved ?? false;
-
-  useEffect(() => {
-    setCategoryId(
-      initialData?.categoryId != null ? String(initialData.categoryId) : "",
-    );
-    setAccountId(
-      initialData?.accountId != null ? String(initialData.accountId) : "",
-    );
-  }, [initialData?.categoryId, initialData?.accountId]);
 
   useEffect(() => {
     Promise.all([
@@ -49,8 +36,18 @@ export default function BudgetForm({
     ]).then(([categoriesData, accountsData]) => {
       setGrouped(categoriesData.grouped ?? {});
       setAccounts(accountsData.accounts ?? []);
+      setCategoryId(
+        initialData?.category?.id != null ? String(initialData.category.id)
+        : initialData?.categoryId != null ? String(initialData.categoryId)
+        : "",
+      );
+      setAccountId(
+        initialData?.account?.id != null ? String(initialData.account.id)
+        : initialData?.accountId != null ? String(initialData.accountId)
+        : "",
+      );
     });
-  }, []);
+  }, [initialData?.category?.id, initialData?.account?.id, initialData?.categoryId, initialData?.accountId]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -140,7 +137,7 @@ export default function BudgetForm({
                 onChange={setAccountId}
                 disabled={isApproved}
               />
-              {!initialData?.accountId && (
+              {!initialData?.account?.id && !initialData?.accountId && (
                 <div className="form-text text-warning mt-1">
                   <i className="bi bi-exclamation-triangle me-1"></i>
                   Un compte est requis pour pouvoir approuver cette ligne.

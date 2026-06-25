@@ -47,23 +47,9 @@ export default function TransactionForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [accountId, setAccountId] = useState<string>(
-    initialData?.accountId != null ? String(initialData.accountId) : "",
-  );
-  const [categoryId, setCategoryId] = useState<string>(
-    initialData?.categoryId != null ? String(initialData.categoryId) : "",
-  );
+  const [accountId, setAccountId] = useState<string>("");
+  const [categoryId, setCategoryId] = useState<string>("");
   const [type, setType] = useState<string>(initialData?.type ?? "debit");
-
-  useEffect(() => {
-    setAccountId(
-      initialData?.accountId != null ? String(initialData.accountId) : "",
-    );
-    setCategoryId(
-      initialData?.categoryId != null ? String(initialData.categoryId) : "",
-    );
-    setType(initialData?.type ?? "debit");
-  }, [initialData?.accountId, initialData?.categoryId, initialData?.type]);
 
   useEffect(() => {
     Promise.all([
@@ -72,8 +58,29 @@ export default function TransactionForm({
     ]).then(([accountsData, categoriesData]) => {
       setAccounts(accountsData.accounts ?? []);
       setGrouped(categoriesData.grouped ?? {});
+      setAccountId(
+        initialData?.account?.id != null
+          ? String(initialData.account.id)
+          : initialData?.accountId != null
+            ? String(initialData.accountId)
+            : "",
+      );
+      setCategoryId(
+        initialData?.category?.id != null
+          ? String(initialData.category.id)
+          : initialData?.categoryId != null
+            ? String(initialData.categoryId)
+            : "",
+      );
+      setType(initialData?.type ?? "debit");
     });
-  }, []);
+  }, [
+    initialData?.account?.id,
+    initialData?.category?.id,
+    initialData?.accountId,
+    initialData?.categoryId,
+    initialData?.type,
+  ]);
 
   const defaultDate = (() => {
     if (initialData?.transactionDate) return initialData.transactionDate;
