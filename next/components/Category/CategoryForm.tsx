@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CategoryFormProps } from "./Category.interface";
@@ -7,32 +7,40 @@ import OptionPicker, { type PickerOption } from "../Transaction/OptionPicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-const TYPE_OPTIONS: PickerOption[] = [
-  { value: "income", label: "Recette", color: "success" },
-  { value: "expense", label: "Dépense", color: "danger" },
-  { value: "transfer", label: "Virement", color: "primary" },
-];
-
-const FREQUENCY_OPTIONS: PickerOption[] = [
-  { value: "monthly", label: "Mensuelle" },
-  { value: "quarterly", label: "Trimestrielle" },
-  { value: "yearly", label: "Annuelle" },
-  { value: "occasional", label: "Occasionnelle" },
-];
-
-export default function CategoryForm({
-  initialData,
-  title,
-}: CategoryFormProps) {
+export default function CategoryForm({ initialData, title }: CategoryFormProps) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
+  const [saving,  setSaving]  = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [typeOptions, setTypeOptions] = useState<PickerOption[]>([]);
+  const [freqOptions, setFreqOptions] = useState<PickerOption[]>([]);
+
   const [transactionType, setTransactionType] = useState<string>(
-    initialData?.transactionType ?? "expense",
+    initialData?.transactionType ?? "",
   );
   const [frequency, setFrequency] = useState<string>(
-    initialData?.frequency ?? "monthly",
+    initialData?.frequency ?? "",
   );
+
+  // ── Fetch des options depuis Symfony (/categories/options) ────────────────
+  useEffect(() => {
+    fetch(`${API}/categories/options`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        setTypeOptions(data.transactionTypes);
+        setFreqOptions(data.frequencies);
+        // Valeurs par défaut après chargement si pas d'initialData
+        if (!transactionType) setTransactionType(data.transactionTypes[0]?.value ?? "");
+        if (!frequency)       setFrequency(data.frequencies[0]?.value ?? "");
+      })
+      .catch((e) => setError(`Impossible de charger les options : ${e.message}`))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -41,12 +49,10 @@ export default function CategoryForm({
 
     const form = e.currentTarget;
     const body = {
-      name: (form.elements.namedItem("name") as HTMLInputElement).value,
+      name:            (form.elements.namedItem("name") as HTMLInputElement).value,
       transactionType,
       frequency,
-      description: (
-        form.elements.namedItem("description") as HTMLTextAreaElement
-      ).value,
+      description:     (form.elements.namedItem("description") as HTMLTextAreaElement).value,
     };
 
     const url = initialData?.id
@@ -72,10 +78,7 @@ export default function CategoryForm({
     <div className="row justify-content-center">
       <div className="col-lg-5">
         <div className="d-flex align-items-center mb-4">
-          <Link
-            href="/categories"
-            className="text-muted text-decoration-none me-3"
-          >
+          <Link href="/categories" className="text-muted text-decoration-none me-3">
             <i className="bi bi-chevron-left"></i>
           </Link>
           <h1 className="h4 mb-0">{title}</h1>
@@ -87,64 +90,66 @@ export default function CategoryForm({
               {error}
             </div>
           )}
-          <form onSubmit={handleSubmit}>
-            <div className="mb-3">
-              <label className="form-label">Nom</label>
-              <input
-                type="text"
-                name="name"
-                className="form-control"
-                defaultValue={initialData?.name ?? ""}
-                required
-              />
+          {loading ? (
+            <div className="d-flex justify-content-center py-4">
+              <div className="spinner-border text-primary" role="status"></div>
             </div>
-            <div className="mb-3">
-              <label className="form-label">Type de transaction</label>
-              <OptionPicker
-                options={TYPE_OPTIONS}
-                value={transactionType}
-                onChange={setTransactionType}
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Fréquence</label>
-              <OptionPicker
-                options={FREQUENCY_OPTIONS}
-                value={frequency}
-                onChange={setFrequency}
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Description</label>
-              <textarea
-                name="description"
-                className="form-control"
-                rows={3}
-                defaultValue={initialData?.description ?? ""}
-              />
-            </div>
-            <div className="d-flex gap-2 mt-3">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving}
-              >
-                {saving ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-1"></span>
-                    Enregistrement…
-                  </>
-                ) : (
-                  <>
-                    <i className="bi bi-check-lg me-1"></i>Enregistrer
-                  </>
-                )}
-              </button>
-              <Link href="/categories" className="btn btn-outline-secondary">
-                Annuler
-              </Link>
-            </div>
-          </form>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <div className="mb-3">
+                <label className="form-label">Nom</label>
+                <input
+                  type="text"
+                  name="name"
+                  className="form-control"
+                  defaultValue={initialData?.name ?? ""}
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Type de transaction</label>
+                <OptionPicker
+                  options={typeOptions}
+                  value={transactionType}
+                  onChange={setTransactionType}
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Fréquence</label>
+                <OptionPicker
+                  options={freqOptions}
+                  value={frequency}
+                  onChange={setFrequency}
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Description</label>
+                <textarea
+                  name="description"
+                  className="form-control"
+                  rows={3}
+                  defaultValue={initialData?.description ?? ""}
+                />
+              </div>
+              <div className="d-flex gap-2 mt-3">
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1"></span>
+                      Enregistrement…
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-check-lg me-1"></i>Enregistrer
+                    </>
+                  )}
+                </button>
+                <Link href="/categories" className="btn btn-outline-secondary">
+                  Annuler
+                </Link>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

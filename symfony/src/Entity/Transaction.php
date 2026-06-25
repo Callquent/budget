@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\TransactionRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: TransactionRepository::class)]
 #[ORM\Table(name: 'transaction')]
@@ -11,64 +12,58 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['transaction_date'], name: 'idx_date')]
 class Transaction
 {
-    public const TYPE_CREDIT   = 'credit';   // entrée d'argent
-    public const TYPE_DEBIT    = 'debit';    // sortie d'argent
+    public const TYPE_CREDIT = 'credit';
+    public const TYPE_DEBIT  = 'debit';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['transaction:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'transactions')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['transaction:read'])]
     private ?Account $account = null;
 
     #[ORM\ManyToOne(targetEntity: Category::class, inversedBy: 'transactions')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['transaction:read'])]
     private ?Category $category = null;
 
-    /** Montant positif (le type credit/debit porte le sens) */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
+    #[Groups(['transaction:read'])]
     private string $amount;
 
-    /** 'credit' ou 'debit' */
     #[ORM\Column(length: 20)]
+    #[Groups(['transaction:read'])]
     private string $type;
 
-    /** Date effective de l'opération */
     #[ORM\Column(type: 'date_immutable')]
+    #[Groups(['transaction:read'])]
     private \DateTimeImmutable $transactionDate;
 
-    /**
-     * Année dénormalisée pour faciliter les requêtes par période.
-     * Exemple : 2025, 2026
-     */
     #[ORM\Column(type: 'smallint')]
+    #[Groups(['transaction:read'])]
     private int $year;
 
-    /**
-     * Mois dénormalisé (1-12).
-     * Permet de filtrer mars 2025 avec WHERE year=2025 AND month=3
-     */
     #[ORM\Column(type: 'smallint')]
+    #[Groups(['transaction:read'])]
     private int $month;
 
-    /** Libellé libre (ex: "Salaire mars 2025") */
     #[ORM\Column(length: 255)]
+    #[Groups(['transaction:read'])]
     private string $label;
 
     #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['transaction:read'])]
     private ?string $notes = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
-    public function __construct()
-    {
-        $this->createdAt = new \DateTimeImmutable();
-    }
+    public function __construct() { $this->createdAt = new \DateTimeImmutable(); }
 
-    // Synchronise year/month à partir de transactionDate
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
     public function syncPeriod(): void
@@ -79,55 +74,21 @@ class Transaction
         }
     }
 
-    public function getId(): ?int
-    {
-        return $this->id;
-    }
+    public function getId(): ?int { return $this->id; }
 
-    public function getAccount(): ?Account
-    {
-        return $this->account;
-    }
-    public function setAccount(?Account $account): static
-    {
-        $this->account = $account;
-        return $this;
-    }
+    public function getAccount(): ?Account { return $this->account; }
+    public function setAccount(?Account $account): static { $this->account = $account; return $this; }
 
-    public function getCategory(): ?Category
-    {
-        return $this->category;
-    }
-    public function setCategory(?Category $category): static
-    {
-        $this->category = $category;
-        return $this;
-    }
+    public function getCategory(): ?Category { return $this->category; }
+    public function setCategory(?Category $category): static { $this->category = $category; return $this; }
 
-    public function getAmount(): string
-    {
-        return $this->amount;
-    }
-    public function setAmount(string $amount): static
-    {
-        $this->amount = $amount;
-        return $this;
-    }
+    public function getAmount(): string { return $this->amount; }
+    public function setAmount(string $amount): static { $this->amount = $amount; return $this; }
 
-    public function getType(): string
-    {
-        return $this->type;
-    }
-    public function setType(string $type): static
-    {
-        $this->type = $type;
-        return $this;
-    }
+    public function getType(): string { return $this->type; }
+    public function setType(string $type): static { $this->type = $type; return $this; }
 
-    public function getTransactionDate(): \DateTimeImmutable
-    {
-        return $this->transactionDate;
-    }
+    public function getTransactionDate(): \DateTimeImmutable { return $this->transactionDate; }
     public function setTransactionDate(\DateTimeImmutable $date): static
     {
         $this->transactionDate = $date;
@@ -136,51 +97,20 @@ class Transaction
         return $this;
     }
 
-    public function getYear(): int
-    {
-        return $this->year;
-    }
-    public function getMonth(): int
-    {
-        return $this->month;
-    }
+    public function getYear(): int { return $this->year; }
+    public function getMonth(): int { return $this->month; }
 
-    /** Retourne une clé lisible, ex : "mars 2025" */
+    public function getLabel(): string { return $this->label; }
+    public function setLabel(string $label): static { $this->label = $label; return $this; }
+
+    public function getNotes(): ?string { return $this->notes; }
+    public function setNotes(?string $notes): static { $this->notes = $notes; return $this; }
+
+    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+
     public function getPeriodLabel(): string
     {
-        $formatter = new \IntlDateFormatter(
-            'fr_FR',
-            \IntlDateFormatter::NONE,
-            \IntlDateFormatter::NONE,
-            null,
-            null,
-            'MMMM yyyy'
-        );
+        $formatter = new \IntlDateFormatter('fr_FR', \IntlDateFormatter::NONE, \IntlDateFormatter::NONE, null, null, 'MMMM yyyy');
         return $formatter->format($this->transactionDate);
-    }
-
-    public function getLabel(): string
-    {
-        return $this->label;
-    }
-    public function setLabel(string $label): static
-    {
-        $this->label = $label;
-        return $this;
-    }
-
-    public function getNotes(): ?string
-    {
-        return $this->notes;
-    }
-    public function setNotes(?string $notes): static
-    {
-        $this->notes = $notes;
-        return $this;
-    }
-
-    public function getCreatedAt(): \DateTimeImmutable
-    {
-        return $this->createdAt;
     }
 }

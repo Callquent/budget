@@ -3,28 +3,49 @@
 namespace App\Controller;
 
 use App\Entity\Category;
+use App\Form\CategoryType;
 use App\Repository\CategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/categories', name: 'category_')]
 class CategoryController extends AbstractController
 {
+    public function __construct(private SerializerInterface $serializer) {}
+
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(CategoryRepository $repo): Response
     {
         $categories = $repo->findBy([], ['transactionType' => 'ASC', 'name' => 'ASC']);
 
-        // Regrouper par type, en sérialisant chaque catégorie
         $grouped = [];
         foreach ($categories as $cat) {
-            $grouped[$cat->getTransactionType()][] = $this->serialize($cat);
+            $grouped[$cat->getTransactionType()][] = $cat;
         }
 
-        return $this->json(['grouped' => $grouped]);
+        return $this->json(['grouped' => $grouped], 200, [], ['groups' => ['category:read']]);
+    }
+
+    #[Route('/options', name: 'options', methods: ['GET'])]
+    public function options(): Response
+    {
+        $transactionTypes = array_map(
+            fn($label, $value) => ['value' => $value, 'label' => $label],
+            array_keys(CategoryType::getTransactionTypeChoices()),
+            CategoryType::getTransactionTypeChoices()
+        );
+
+        $frequencies = array_map(
+            fn($label, $value) => ['value' => $value, 'label' => $label],
+            array_keys(CategoryType::getFrequencyChoices()),
+            CategoryType::getFrequencyChoices()
+        );
+
+        return $this->json(compact('transactionTypes', 'frequencies'));
     }
 
     #[Route('/new', name: 'new', methods: ['POST'])]
@@ -41,13 +62,13 @@ class CategoryController extends AbstractController
         $em->persist($category);
         $em->flush();
 
-        return $this->json($this->serialize($category), 201);
+        return $this->json($category, 201, [], ['groups' => ['category:read']]);
     }
 
     #[Route('/{id}', name: 'show', methods: ['GET'])]
     public function show(Category $category): Response
     {
-        return $this->json($this->serialize($category));
+        return $this->json($category, 200, [], ['groups' => ['category:read']]);
     }
 
     #[Route('/{id}/edit', name: 'edit', methods: ['POST'])]
@@ -62,7 +83,7 @@ class CategoryController extends AbstractController
 
         $em->flush();
 
-        return $this->json($this->serialize($category));
+        return $this->json($category, 200, [], ['groups' => ['category:read']]);
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['DELETE'])]
@@ -72,16 +93,5 @@ class CategoryController extends AbstractController
         $em->flush();
 
         return $this->json(['deleted' => true]);
-    }
-
-    private function serialize(Category $c): array
-    {
-        return [
-            'id'              => $c->getId(),
-            'name'            => $c->getName(),
-            'transactionType' => $c->getTransactionType(),
-            'frequency'       => $c->getFrequency(),
-            'description'     => $c->getDescription(),
-        ];
     }
 }

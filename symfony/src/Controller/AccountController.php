@@ -3,28 +3,28 @@
 namespace App\Controller;
 
 use App\Entity\Account;
-use App\Form\AccountType;
 use App\Repository\AccountRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/accounts', name: 'account_')]
 class AccountController extends AbstractController
 {
+    public function __construct(private SerializerInterface $serializer) {}
+
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(AccountRepository $repo): Response
     {
-        $accounts = $repo->findAllOrderedByName();
-
-        return $this->json([
-            'accounts' => array_map(
-                fn(Account $a) => $this->serialize($a),
-                $accounts
-            ),
-        ]);
+        return $this->json(
+            ['accounts' => $repo->findAllOrderedByName()],
+            200,
+            [],
+            ['groups' => ['account:read']]
+        );
     }
 
     #[Route('/new', name: 'new', methods: ['POST'])]
@@ -41,13 +41,13 @@ class AccountController extends AbstractController
         $em->persist($account);
         $em->flush();
 
-        return $this->json($this->serialize($account), 201);
+        return $this->json($account, 201, [], ['groups' => ['account:read']]);
     }
 
     #[Route('/{id}', name: 'show', methods: ['GET'])]
     public function show(Account $account): Response
     {
-        return $this->json($this->serialize($account));
+        return $this->json($account, 200, [], ['groups' => ['account:read']]);
     }
 
     #[Route('/{id}/edit', name: 'edit', methods: ['POST'])]
@@ -62,7 +62,7 @@ class AccountController extends AbstractController
 
         $em->flush();
 
-        return $this->json($this->serialize($account));
+        return $this->json($account, 200, [], ['groups' => ['account:read']]);
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['DELETE'])]
@@ -72,16 +72,5 @@ class AccountController extends AbstractController
         $em->flush();
 
         return $this->json(['deleted' => true]);
-    }
-
-    private function serialize(Account $a): array
-    {
-        return [
-            'id'       => $a->getId(),
-            'name'     => $a->getName(),
-            'type'     => $a->getType(),
-            'currency' => $a->getCurrency(),
-            'balance'  => $a->getBalance(),
-        ];
     }
 }

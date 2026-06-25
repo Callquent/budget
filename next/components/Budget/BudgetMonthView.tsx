@@ -165,25 +165,28 @@ export default function BudgetMonthView({
   // ── États communs ─────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center py-5">
-        <div className="spinner-border text-primary me-3" role="status"></div>
-        <span className="text-muted">Chargement…</span>
+      <div className="d-flex flex-column justify-content-center align-items-center py-5 gap-3">
+        <div className="spinner-border text-primary" style={{ width: "2rem", height: "2rem" }} role="status"></div>
+        <span className="text-muted small">Chargement des données…</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="alert alert-danger d-flex align-items-center gap-2">
-        <i className="bi bi-exclamation-triangle-fill"></i>
-        <span>Impossible de charger les données : {error}</span>
+      <div className="alert alert-danger border-0 shadow-sm d-flex align-items-center gap-3 rounded-3">
+        <i className="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+        <div className="flex-grow-1">
+          <div className="fw-semibold">Impossible de charger les données</div>
+          <div className="small text-danger-emphasis">{error}</div>
+        </div>
         <button
-          className="btn btn-sm btn-outline-danger ms-auto"
+          className="btn btn-sm btn-danger ms-auto"
           onClick={() =>
             isMonthView ? fetchMonth(urlYear!, urlMonth!) : fetchYear(yearState)
           }
         >
-          Réessayer
+          <i className="bi bi-arrow-clockwise me-1"></i>Réessayer
         </button>
       </div>
     );
@@ -203,25 +206,25 @@ export default function BudgetMonthView({
     return (
       <>
         <div className="d-flex align-items-center justify-content-between mb-4">
-          <h1 className="h3 mb-0">
+          <h1 className="h3 mb-0 fw-bold">
             <i className="bi bi-calendar3 me-2 text-primary"></i>Budget{" "}
             {yearState}
           </h1>
         </div>
 
-        <div className="card mb-4 p-3">
+        <div className="card mb-4 border-0 shadow-sm rounded-3 p-3">
           <div className="d-flex align-items-center gap-2 flex-wrap">
-            <span className="text-muted me-2 small fw-semibold">ANNÉE</span>
+            <span className="text-uppercase text-muted me-1" style={{ fontSize: ".7rem", letterSpacing: ".08em", fontWeight: 600 }}>Année</span>
             {availableYears.map((y) => (
               <button
                 key={y}
                 onClick={() => fetchYear(y)}
-                className={`btn btn-sm ${y === yearState ? "btn-dark" : "btn-outline-secondary"}`}
+                className={`btn btn-sm rounded-pill px-3 ${y === yearState ? "btn-primary" : "btn-outline-secondary"}`}
               >
                 {y}
                 {y === currentYear && (
                   <span
-                    className="badge bg-primary ms-1"
+                    className={`badge ms-1 ${y === yearState ? "bg-white text-primary" : "bg-primary text-white"}`}
                     style={{ fontSize: ".6rem" }}
                   >
                     en cours
@@ -232,13 +235,13 @@ export default function BudgetMonthView({
           </div>
         </div>
 
-        <div className="card mb-4">
-          <div className="card-header bg-white d-flex justify-content-between align-items-center">
+        <div className="card mb-4 border-0 shadow-sm rounded-3">
+          <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 rounded-top-3" style={{ borderLeft: "4px solid var(--bs-primary)" }}>
             <span className="fw-semibold">
               Récapitulatif annuel {yearState}
             </span>
             <span className="text-muted small">
-              Solde fin de mois par compte
+              <i className="bi bi-info-circle me-1"></i>Solde fin de mois par compte
             </span>
           </div>
           <div className="table-responsive">
@@ -288,7 +291,7 @@ export default function BudgetMonthView({
                           {MONTH_NAMES[m]}
                           {yearState === currentYear && m === currentMonth && (
                             <span
-                              className="badge bg-primary ms-1"
+                              className="badge bg-primary bg-opacity-10 text-primary ms-1 rounded-pill"
                               style={{ fontSize: ".6rem" }}
                             >
                               en cours
@@ -418,24 +421,24 @@ export default function BudgetMonthView({
         <div>
           <Link
             href={`/budget/${year}`}
-            className="text-muted text-decoration-none small"
+            className="text-muted text-decoration-none small d-inline-flex align-items-center gap-1 mb-1"
           >
             <i className="bi bi-chevron-left"></i> Budget {year}
           </Link>
-          <h1 className="h3 mb-0 mt-1">
-            Budget prévisionnel —{" "}
-            {periodLabel.charAt(0).toUpperCase() + periodLabel.slice(1)}
+          <h1 className="h3 mb-0 fw-bold">
+            Budget —{" "}
+            <span className="text-primary">{periodLabel.charAt(0).toUpperCase() + periodLabel.slice(1)}</span>
           </h1>
         </div>
         <div className="d-flex gap-2">
           <Link
             href={`/budget/${year}/${month}/new`}
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-sm rounded-pill px-3"
           >
             <i className="bi bi-plus-lg me-1"></i>Nouvelle ligne
           </Link>
           <button
-            className="btn btn-outline-secondary btn-sm"
+            className="btn btn-outline-secondary btn-sm rounded-pill px-3"
             onClick={handleDuplicate}
           >
             <i className="bi bi-copy me-1"></i>Dupliquer →
@@ -444,12 +447,12 @@ export default function BudgetMonthView({
       </div>
 
       {/* Navigation */}
-      <div className="card mb-4 p-3">
+      <div className="card mb-4 border-0 shadow-sm rounded-3 p-3">
         <div className="d-flex align-items-center gap-3 flex-wrap">
           <div className="d-flex align-items-center gap-2">
-            <label className="text-muted small fw-semibold mb-0">MOIS</label>
+            <label className="text-uppercase text-muted mb-0" style={{ fontSize: ".7rem", letterSpacing: ".08em", fontWeight: 600 }}>Mois</label>
             <select
-              className="form-select form-select-sm"
+              className="form-select form-select-sm rounded-pill border-0 bg-light"
               style={{ width: "auto" }}
               value={month}
               onChange={(e) =>
@@ -464,9 +467,9 @@ export default function BudgetMonthView({
             </select>
           </div>
           <div className="d-flex align-items-center gap-2">
-            <label className="text-muted small fw-semibold mb-0">ANNÉE</label>
+            <label className="text-uppercase text-muted mb-0" style={{ fontSize: ".7rem", letterSpacing: ".08em", fontWeight: 600 }}>Année</label>
             <select
-              className="form-select form-select-sm"
+              className="form-select form-select-sm rounded-pill border-0 bg-light"
               style={{ width: "auto" }}
               value={year}
               onChange={(e) =>
@@ -483,19 +486,21 @@ export default function BudgetMonthView({
           <div className="ms-auto d-flex gap-2">
             <Link
               href={`/budget/${prevYear}/${prevMonth}`}
-              className="btn btn-outline-secondary btn-sm"
+              className="btn btn-outline-secondary btn-sm rounded-circle"
+              style={{ width: "32px", height: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
             >
               <i className="bi bi-chevron-left"></i>
             </Link>
             <Link
               href={`/budget/${nowYear}/${nowMonth}`}
-              className="btn btn-outline-secondary btn-sm"
+              className="btn btn-outline-primary btn-sm rounded-pill px-3"
             >
               Aujourd'hui
             </Link>
             <Link
               href={`/budget/${nextYear}/${nextMonth}`}
-              className="btn btn-outline-secondary btn-sm"
+              className="btn btn-outline-secondary btn-sm rounded-circle"
+              style={{ width: "32px", height: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
             >
               <i className="bi bi-chevron-right"></i>
             </Link>
@@ -512,77 +517,65 @@ export default function BudgetMonthView({
             subs: 0,
           };
           const net = tx.credit - tx.debit;
+          const isCredit = account.type === "credit";
           return (
             <div className="col-md-4 col-sm-6" key={account.id}>
-              <div className="card h-100 border-0 shadow-sm">
-                <div className="card-body">
+              <div className="card h-100 border-0 shadow-sm rounded-3" style={{ overflow: "hidden" }}>
+                <div style={{ height: "4px", background: isCredit ? "var(--bs-success)" : "var(--bs-danger)" }}></div>
+                <div className="card-body pt-3">
                   <div className="d-flex align-items-center gap-3 mb-3">
                     <div
                       className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
                       style={{
-                        width: "40px",
-                        height: "40px",
-                        background:
-                          account.type === "credit" ? "#d1fae5" : "#fee2e2",
+                        width: "42px",
+                        height: "42px",
+                        background: isCredit ? "#dcfce7" : "#fef2f2",
                       }}
                     >
-                      <i
-                        className={`bi ${account.type === "credit" ? "bi-piggy-bank text-success" : "bi-wallet2 text-danger"} fs-5`}
-                      ></i>
+                      <i className={`bi ${isCredit ? "bi-piggy-bank text-success" : "bi-wallet2 text-danger"} fs-5`}></i>
                     </div>
-                    <div>
-                      <div className="fw-semibold">{account.name}</div>
+                    <div className="min-w-0">
+                      <div className="fw-semibold text-truncate">{account.name}</div>
                       <div className="small text-muted">
-                        Solde actuel :{" "}
-                        <strong>
+                        Solde :{" "}
+                        <span className={`fw-semibold ${account.balance < 0 ? "text-danger" : "text-dark"}`}>
                           {fmt(account.balance)} {account.currency ?? "€"}
-                        </strong>
+                        </span>
                       </div>
                     </div>
                   </div>
                   {tx.credit > 0 || tx.debit > 0 ? (
                     <>
                       <div className="d-flex justify-content-between small mb-1">
-                        <span className="text-success">
-                          <i className="bi bi-arrow-down-circle me-1"></i>
-                          Entrées
+                        <span className="text-success d-flex align-items-center gap-1">
+                          <i className="bi bi-arrow-down-circle-fill"></i>Entrées
                         </span>
-                        <span className="fw-medium text-success">
-                          +{fmt(tx.credit)} €
-                        </span>
+                        <span className="fw-semibold text-success">+{fmt(tx.credit)} €</span>
                       </div>
                       <div className="d-flex justify-content-between small mb-1">
-                        <span className="text-danger">
-                          <i className="bi bi-arrow-up-circle me-1"></i>Sorties
+                        <span className="text-danger d-flex align-items-center gap-1">
+                          <i className="bi bi-arrow-up-circle-fill"></i>Sorties
                         </span>
-                        <span className="fw-medium text-danger">
-                          -{fmt(tx.debit - tx.subs)} €
-                        </span>
+                        <span className="fw-semibold text-danger">−{fmt(tx.debit - tx.subs)} €</span>
                       </div>
                       {tx.subs > 0 && (
                         <div className="d-flex justify-content-between small mb-1">
-                          <span className="text-warning">
-                            <i className="bi bi-arrow-repeat me-1"></i>
-                            Abonnements
+                          <span className="text-warning d-flex align-items-center gap-1">
+                            <i className="bi bi-arrow-repeat"></i>Abonnements
                           </span>
-                          <span className="fw-medium text-warning">
-                            -{fmt(tx.subs)} €
-                          </span>
+                          <span className="fw-semibold text-warning">−{fmt(tx.subs)} €</span>
                         </div>
                       )}
-                      <div className="border-top pt-2 mt-1 d-flex justify-content-between small fw-semibold">
-                        <span>Net du mois</span>
-                        <span
-                          className={net >= 0 ? "text-success" : "text-danger"}
-                        >
-                          {net > 0 ? "+" : ""}
-                          {fmt(net)} €
+                      <div className="border-top pt-2 mt-2 d-flex justify-content-between small">
+                        <span className="text-muted fw-medium">Net du mois</span>
+                        <span className={`fw-bold ${net >= 0 ? "text-success" : "text-danger"}`}>
+                          {net > 0 ? "+" : ""}{fmt(net)} €
                         </span>
                       </div>
                     </>
                   ) : (
-                    <div className="text-muted small text-center py-1">
-                      Aucun mouvement ce mois
+                    <div className="text-muted small text-center py-2 bg-light rounded-2">
+                      <i className="bi bi-dash-circle me-1"></i>Aucun mouvement ce mois
                     </div>
                   )}
                 </div>
@@ -594,13 +587,13 @@ export default function BudgetMonthView({
 
       {/* Abonnements */}
       {subscriptions.length > 0 && (
-        <div className="card mb-4">
-          <div className="card-header bg-white d-flex justify-content-between align-items-center">
+        <div className="card mb-4 border-0 shadow-sm rounded-3">
+          <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 rounded-top-3" style={{ borderLeft: "4px solid var(--bs-warning)" }}>
             <span className="fw-semibold">
-              <i className="bi bi-arrow-repeat me-2 text-primary"></i>
+              <i className="bi bi-arrow-repeat me-2 text-warning"></i>
               Abonnements actifs ce mois
             </span>
-            <span className="badge bg-primary">{subscriptions.length}</span>
+            <span className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25">{subscriptions.length}</span>
           </div>
           <div className="table-responsive">
             <table className="table table-sm table-hover mb-0">
@@ -650,10 +643,10 @@ export default function BudgetMonthView({
 
       {/* Tableau budget */}
       {budgets.length > 0 && (
-        <div className="card">
-          <div className="card-header bg-white fw-semibold">
-            <i className="bi bi-clipboard-check me-2 text-primary"></i>Budget
-            prévisionnel
+        <div className="card border-0 shadow-sm rounded-3">
+          <div className="card-header bg-white border-bottom d-flex align-items-center py-3 rounded-top-3" style={{ borderLeft: "4px solid var(--bs-primary)" }}>
+            <i className="bi bi-clipboard-check me-2 text-primary"></i>
+            <span className="fw-semibold">Budget prévisionnel</span>
           </div>
           <div className="table-responsive">
             <table className="table table-hover mb-0">
@@ -680,9 +673,8 @@ export default function BudgetMonthView({
                   return (
                     <tr
                       key={b.id}
-                      className={
-                        b.isApproved ? "table-success bg-opacity-50" : ""
-                      }
+                      className={b.isApproved ? "table-success" : ""}
+                      style={{ verticalAlign: "middle" }}
                     >
                       <td>
                         <span className="fw-medium">{b.category.name}</span>
@@ -690,7 +682,8 @@ export default function BudgetMonthView({
                           <span className="text-muted small"> — {b.label}</span>
                         )}
                         <span
-                          className={`badge ms-1 ${b.category.transactionType === "income" ? "badge-income" : b.category.transactionType === "expense" ? "badge-expense" : "badge-transfer"}`}
+                          className={`badge ms-1 rounded-pill ${b.category.transactionType === "income" ? "bg-success bg-opacity-10 text-success" : b.category.transactionType === "expense" ? "bg-danger bg-opacity-10 text-danger" : "bg-primary bg-opacity-10 text-primary"}`}
+                          style={{ fontSize: ".7rem" }}
                         >
                           {b.category.transactionType === "income"
                             ? "recette"
@@ -700,7 +693,7 @@ export default function BudgetMonthView({
                         </span>
                       </td>
                       <td>
-                        <span className={`badge badge-${b.category.frequency}`}>
+                        <span className={`badge rounded-pill badge-${b.category.frequency}`} style={{ fontSize: ".72rem" }}>
                           {FREQ_LABELS[b.category.frequency] ??
                             b.category.frequency}
                         </span>
@@ -719,43 +712,43 @@ export default function BudgetMonthView({
                         {fmt(b.plannedAmount)} €
                       </td>
                       <td
-                        className={`text-end ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : ""}`}
+                        className={`text-end fw-medium ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : "text-muted"}`}
                       >
                         {variance > 0 ? "+" : ""}
                         {fmt(variance)} €
                       </td>
-                      <td className="text-end">{fmt(b.actualAmount)} €</td>
-                      <td>
+                      <td className="text-end fw-semibold">{fmt(b.actualAmount)} €</td>
+                      <td style={{ minWidth: "120px" }}>
                         {b.plannedAmount > 0 && (
-                          <>
-                            <div className="progress">
+                          <div>
+                            <div className="progress rounded-pill" style={{ height: "6px" }}>
                               <div
-                                className={`progress-bar ${pct > 100 ? "bg-danger" : pct > 80 ? "bg-warning" : "bg-success"}`}
+                                className={`progress-bar rounded-pill ${pct > 100 ? "bg-danger" : pct > 80 ? "bg-warning" : "bg-success"}`}
                                 style={{ width: `${Math.min(pct, 100)}%` }}
                               ></div>
                             </div>
-                            <small className="text-muted">{pct} %</small>
-                          </>
+                            <small className={`mt-1 d-block ${pct > 100 ? "text-danger" : "text-muted"}`} style={{ fontSize: ".7rem" }}>{pct} %</small>
+                          </div>
                         )}
                       </td>
                       <td>
                         {b.isApproved ? (
                           <>
-                            <span className="badge bg-success">
+                            <span className="badge rounded-pill bg-success bg-opacity-15 text-success border border-success border-opacity-25" style={{ fontSize: ".72rem" }}>
                               <i className="bi bi-check-circle me-1"></i>
                               Approuvé
                             </span>
                             {b.approvedAt && (
                               <div
                                 className="text-muted"
-                                style={{ fontSize: ".7rem" }}
+                                style={{ fontSize: ".68rem" }}
                               >
                                 {b.approvedAt}
                               </div>
                             )}
                           </>
                         ) : (
-                          <span className="badge bg-secondary bg-opacity-25 text-secondary">
+                          <span className="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style={{ fontSize: ".72rem" }}>
                             En attente
                           </span>
                         )}
@@ -763,31 +756,35 @@ export default function BudgetMonthView({
                       <td className="text-end" style={{ whiteSpace: "nowrap" }}>
                         {!b.isApproved ? (
                           <button
-                            className="btn btn-success btn-action me-1"
+                            className="btn btn-success btn-action me-1 rounded-circle"
                             title="Approuver → créer transaction"
                             onClick={() => handleApprove(b)}
+                            style={{ width: "30px", height: "30px", padding: 0 }}
                           >
                             <i className="bi bi-check-lg"></i>
                           </button>
                         ) : (
                           <button
-                            className="btn btn-outline-warning btn-action me-1"
+                            className="btn btn-outline-warning btn-action me-1 rounded-circle"
                             title="Annuler l'approbation"
                             onClick={() => handleUnapprove(b)}
+                            style={{ width: "30px", height: "30px", padding: 0 }}
                           >
                             <i className="bi bi-x-lg"></i>
                           </button>
                         )}
                         <Link
                           href={`/budget/${year}/${month}/edit/${b.id}`}
-                          className="btn btn-outline-primary btn-action me-1"
+                          className="btn btn-outline-primary btn-action me-1 rounded-circle"
+                          style={{ width: "30px", height: "30px", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                         >
                           <i className="bi bi-pencil"></i>
                         </Link>
                         {!b.isApproved && (
                           <button
-                            className="btn btn-outline-danger btn-action"
+                            className="btn btn-outline-danger btn-action rounded-circle"
                             onClick={() => handleDelete(b)}
+                            style={{ width: "30px", height: "30px", padding: 0 }}
                           >
                             <i className="bi bi-trash"></i>
                           </button>

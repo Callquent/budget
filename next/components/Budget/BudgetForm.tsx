@@ -17,7 +17,9 @@ export default function BudgetForm({
   currentMonth = new Date().getMonth() + 1,
 }: BudgetFormProps) {
   const router = useRouter();
-  const [grouped, setGrouped] = useState<Record<string, CategoryInterface[]>>({});
+  const [grouped, setGrouped] = useState<Record<string, CategoryInterface[]>>(
+    {},
+  );
   const [accounts, setAccounts] = useState<AccountInterface[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -131,16 +133,6 @@ export default function BudgetForm({
             </div>
 
             <div className="mb-3">
-              <label className="form-label">Catégorie</label>
-              <CategoryPicker
-                grouped={grouped}
-                value={categoryId}
-                onChange={setCategoryId}
-                disabled={isApproved}
-              />
-            </div>
-
-            <div className="mb-3">
               <label className="form-label">Compte</label>
               <AccountPicker
                 accounts={accounts}
@@ -154,6 +146,16 @@ export default function BudgetForm({
                   Un compte est requis pour pouvoir approuver cette ligne.
                 </div>
               )}
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">Catégorie</label>
+              <CategoryPicker
+                grouped={grouped}
+                value={categoryId}
+                onChange={setCategoryId}
+                disabled={isApproved}
+              />
             </div>
 
             <div className="row g-3 mb-3">
