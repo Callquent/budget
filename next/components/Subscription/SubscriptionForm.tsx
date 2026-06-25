@@ -23,6 +23,7 @@ export default function SubscriptionForm({
   const [categoryId, setCategoryId] = useState<string>(
     initialData?.categoryId != null ? String(initialData.categoryId) : "",
   );
+  const [status, setStatus] = useState<string>(initialData?.status ?? "active");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -33,7 +34,8 @@ export default function SubscriptionForm({
     setCategoryId(
       initialData?.categoryId != null ? String(initialData.categoryId) : "",
     );
-  }, [initialData?.accountId, initialData?.categoryId]);
+    setStatus(initialData?.status ?? "active");
+  }, [initialData?.accountId, initialData?.categoryId, initialData?.status]);
 
   useEffect(() => {
     Promise.all([
@@ -68,7 +70,7 @@ export default function SubscriptionForm({
       startDate: get("startDate"),
       endDate: get("endDate") || null,
       dayOfMonth: get("dayOfMonth") ? parseInt(get("dayOfMonth")) : null,
-      status: get("status"),
+      status,
       notes: get("notes") || null,
     };
 
@@ -204,15 +206,24 @@ export default function SubscriptionForm({
                 />
               </div>
               <div className="col-6">
-                <label className="form-label">Statut</label>
-                <select
-                  name="status"
-                  className="form-select"
-                  defaultValue={initialData?.status ?? "active"}
-                >
-                  <option value="active">Actif</option>
-                  <option value="inactive">Inactif</option>
-                </select>
+                <label className="form-label d-block">Statut</label>
+                <div className="form-check form-switch mt-1">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="statusSwitch"
+                    checked={status === "active"}
+                    onChange={(e) => setStatus(e.target.checked ? "active" : "inactive")}
+                    style={{ width: "2.5em", height: "1.25em", cursor: "pointer" }}
+                  />
+                  <label
+                    className={`form-check-label fw-semibold ms-2 ${status === "active" ? "text-success" : "text-secondary"}`}
+                    htmlFor="statusSwitch"
+                  >
+                    {status === "active" ? "Actif" : "Inactif"}
+                  </label>
+                </div>
               </div>
             </div>
             <div className="mb-3">
