@@ -29,11 +29,11 @@ const FREQ_LABELS: Record<string, string> = {
   occasional: "occasionnel",
 };
 
-function fmt(num: number, decimals = 2) {
+function fmt(num: number | string, decimals = 2) {
   return new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(num);
+  }).format(parseFloat(String(num)) || 0);
 }
 
 // ─── Composant unifié ─────────────────────────────────────────────────────────
@@ -631,7 +631,7 @@ export default function BudgetMonthView({
                 <tr>
                   <td colSpan={4}>Total abonnements</td>
                   <td className="text-end text-danger">
-                    -{fmt(subscriptions.reduce((s, sub) => s + sub.amount, 0))}{" "}
+                    -{fmt(subscriptions.reduce((s, sub) => s + parseFloat(String(sub.amount)), 0))}{" "}
                     €
                   </td>
                 </tr>
@@ -801,21 +801,21 @@ export default function BudgetMonthView({
                     const netPlanned =
                       budgets
                         .filter((b) => b.category.transactionType === "income")
-                        .reduce((s, b) => s + b.plannedAmount, 0) -
+                        .reduce((s, b) => s + parseFloat(String(b.plannedAmount)), 0) -
                       budgets
                         .filter((b) => b.category.transactionType === "expense")
-                        .reduce((s, b) => s + b.plannedAmount, 0);
+                        .reduce((s, b) => s + parseFloat(String(b.plannedAmount)), 0);
                     const variance = budgets.reduce(
-                      (s, b) => s + (b.plannedAmount - b.actualAmount),
+                      (s, b) => s + (parseFloat(String(b.plannedAmount)) - parseFloat(String(b.actualAmount))),
                       0,
                     );
                     const netActual =
                       budgets
                         .filter((b) => b.category.transactionType === "income")
-                        .reduce((s, b) => s + b.actualAmount, 0) -
+                        .reduce((s, b) => s + parseFloat(String(b.actualAmount)), 0) -
                       budgets
                         .filter((b) => b.category.transactionType === "expense")
-                        .reduce((s, b) => s + b.actualAmount, 0);
+                        .reduce((s, b) => s + parseFloat(String(b.actualAmount)), 0);
                     return (
                       <React.Fragment key="tfoot-totals">
                         <td
