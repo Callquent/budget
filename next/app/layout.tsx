@@ -20,21 +20,45 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     setDrawerOpen(true);
   }, []);
 
+  /**
+   * Crée une ligne budget via l'endpoint dédié à l'assistant IA.
+   * POST /api/ai-search/budget
+   *
+   * Le payload.category contient le NOM de la catégorie (ex: "Alimentation").
+   * On doit d'abord résoudre l'ID via /api/ai-search/context ou le passer directement.
+   * Ici on envoie le nom et laisse Symfony faire la résolution.
+   */
   const handleAddBudget = useCallback(
     async (payload: AddBudgetLinePayload) => {
-      const res = await fetch('/api/monthly-budgets', {
+      // 1. Résoudre l'ID de la catégorie depuis son nom
+      const ctxRes = await fetch('/api/ai-search/context');
+      const ctx = await ctxRes.json();
+      const cat = (ctx.categories as { id: number; name: string }[]).find(
+        (c) => c.name === payload.category,
+      );
+
+      if (!cat) {
+        throw new Error(`Catégorie introuvable : ${payload.category}`);
+      }
+
+      // 2. Créer la ligne budget
+      const res = await fetch('/api/ai-search/budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          category: `/api/categories/${payload.category}`,
+          categoryId:    cat.id,
+          year:          payload.year,
+          month:         payload.month,
           plannedAmount: payload.amount.toFixed(2),
-          year: payload.year,
-          month: payload.month,
         }),
       });
 
-      if (!res.ok) throw new Error(`Failed to create budget line: ${res.statusText}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Erreur ${res.status}`);
+      }
 
+      // 3. Invalider le cache Next.js
       router.refresh();
     },
     [router],
@@ -65,10 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <Sidebar onSearch={handleSearch} />
 
-        <main
-          style={{ flexGrow: 1, minWidth: 0 }}
-          className="p-4 pb-5 pb-md-4"
-        >
+        <main style={{ flexGrow: 1, minWidth: 0 }} className="p-4 pb-5 pb-md-4">
           {children}
         </main>
 

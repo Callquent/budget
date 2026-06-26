@@ -94,8 +94,11 @@ class MonthlyBudget
 
     public function getPeriodLabel(): string
     {
-        $date = \DateTimeImmutable::createFromFormat('Y-n', "{$this->year}-{$this->month}");
-        $formatter = new \IntlDateFormatter('fr_FR', \IntlDateFormatter::NONE, \IntlDateFormatter::NONE, null, null, 'MMMM yyyy');
-        return $formatter->format($date);
+        $months = [
+            1 => 'janvier', 2 => 'février', 3 => 'mars', 4 => 'avril',
+            5 => 'mai', 6 => 'juin', 7 => 'juillet', 8 => 'août',
+            9 => 'septembre', 10 => 'octobre', 11 => 'novembre', 12 => 'décembre',
+        ];
+        return ($months[$this->month] ?? '') . ' ' . $this->year;
     }
 }

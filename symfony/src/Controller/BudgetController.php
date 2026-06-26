@@ -254,13 +254,13 @@ class BudgetController extends AbstractController
         $em->persist($budget);
         $em->flush();
 
-        return $this->json($budget, 201, [], ['groups' => ['budget:read', 'account:read', 'category:read']]);
+        return $this->json($budget, 201, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
     }
 
     #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(MonthlyBudget $budget): Response
     {
-        return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read']]);
+        return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
     }
 
     #[Route('/{id}/edit', name: 'edit', methods: ['POST'])]
@@ -274,7 +274,7 @@ class BudgetController extends AbstractController
         $this->hydrate($budget, $data, $em);
         $em->flush();
 
-        return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read']]);
+        return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
     }
 
     #[Route('/{id}/approve', name: 'approve', methods: ['POST'])]
@@ -308,7 +308,7 @@ class BudgetController extends AbstractController
         $budget->setApprovedTransaction($transaction);
         $em->flush();
 
-        return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read']]);
+        return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
     }
 
     #[Route('/{id}/unapprove', name: 'unapprove', methods: ['POST'])]
@@ -321,7 +321,7 @@ class BudgetController extends AbstractController
         $budget->setApprovedTransaction(null);
         $em->flush();
 
-        return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read']]);
+        return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]

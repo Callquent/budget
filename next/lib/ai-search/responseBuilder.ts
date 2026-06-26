@@ -45,18 +45,22 @@ function handleTransactionsCategory(
   ctx: BudgetContext,
 ): string {
   const { category, month: mo, year: yr } = intent;
+  const hints: string[] = (intent as any).categoryHints ?? [category];
 
   const txs = ctx.transactions.filter(
     (t) =>
-      t.category.name === category &&
+      hints.some((h) => t.category.name.toLowerCase() === h.toLowerCase()) &&
       (mo == null || t.month === mo) &&
       (yr == null || t.year === yr),
   );
 
+  // Nom réel de la catégorie trouvée dans les données
+  const resolvedCategory = txs[0]?.category.name ?? category;
+
   const periodLabel = monthLabel(mo, yr);
 
   if (!txs.length) {
-    return `Aucune transaction <em>${category.toLowerCase()}</em> trouvée${periodLabel ? ` en ${periodLabel}` : ''}.`;
+    return `Aucune transaction <em>${hints.join(' / ').toLowerCase()}</em> trouvée${periodLabel ? ` en ${periodLabel}` : ''}.`;
   }
 
   const total = txs.reduce((s, t) => s + parseFloat(t.amount), 0);
@@ -72,7 +76,7 @@ function handleTransactionsCategory(
     .join('');
 
   return `
-    Transactions <strong>${category}</strong>${periodLabel ? ` en ${periodLabel}` : ''} :
+    Transactions <strong>${resolvedCategory}</strong>${periodLabel ? ` en ${periodLabel}` : ''} :
     <div class="ais-card" style="margin-top:8px">
       ${rows}
       <div class="ais-row ais-row--total">

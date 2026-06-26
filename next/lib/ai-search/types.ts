@@ -85,6 +85,8 @@ export interface BaseIntent {
 export interface TransactionsCategoryIntent extends BaseIntent {
   intent: 'transactions_category';
   category: string;
+  /** Noms alternatifs de catégorie à tester (insensible à la casse) */
+  categoryHints?: string[];
 }
 
 export interface SubscriptionStatusIntent extends BaseIntent {
