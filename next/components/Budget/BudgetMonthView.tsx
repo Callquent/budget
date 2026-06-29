@@ -3,7 +3,14 @@ import React, { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { SubscriptionInterface } from "../Subscription/Subscription.interface";
-import type { Budget, TxByAccount, SummaryRow, AccountBalance, MonthData, YearData } from "./Budget.interface";
+import type {
+  Budget,
+  TxByAccount,
+  SummaryRow,
+  AccountBalance,
+  MonthData,
+  YearData,
+} from "./Budget.interface";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -166,7 +173,11 @@ export default function BudgetMonthView({
   if (loading) {
     return (
       <div className="d-flex flex-column justify-content-center align-items-center py-5 gap-3">
-        <div className="spinner-border text-primary" style={{ width: "2rem", height: "2rem" }} role="status"></div>
+        <div
+          className="spinner-border text-primary"
+          style={{ width: "2rem", height: "2rem" }}
+          role="status"
+        ></div>
         <span className="text-muted small">Chargement des données…</span>
       </div>
     );
@@ -214,7 +225,16 @@ export default function BudgetMonthView({
 
         <div className="card mb-4 border-0 shadow-sm rounded-3 p-3">
           <div className="d-flex align-items-center gap-2 flex-wrap">
-            <span className="text-uppercase text-muted me-1" style={{ fontSize: ".7rem", letterSpacing: ".08em", fontWeight: 600 }}>Année</span>
+            <span
+              className="text-uppercase text-muted me-1"
+              style={{
+                fontSize: ".7rem",
+                letterSpacing: ".08em",
+                fontWeight: 600,
+              }}
+            >
+              Année
+            </span>
             {availableYears.map((y) => (
               <button
                 key={y}
@@ -236,12 +256,16 @@ export default function BudgetMonthView({
         </div>
 
         <div className="card mb-4 border-0 shadow-sm rounded-3">
-          <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 rounded-top-3" style={{ borderLeft: "4px solid var(--bs-primary)" }}>
+          <div
+            className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 rounded-top-3"
+            style={{ borderLeft: "4px solid var(--bs-primary)" }}
+          >
             <span className="fw-semibold">
               Récapitulatif annuel {yearState}
             </span>
             <span className="text-muted small">
-              <i className="bi bi-info-circle me-1"></i>Solde fin de mois par compte
+              <i className="bi bi-info-circle me-1"></i>Solde fin de mois par
+              compte
             </span>
           </div>
           <div className="table-responsive">
@@ -302,59 +326,127 @@ export default function BudgetMonthView({
                       {accounts.map((a) => {
                         const ab = accountBalances[a.id]?.[m];
                         const bal = ab?.balance ?? a.balance;
+                        const colorRef =
+                          (ab?.planned_net ?? 0) !== 0 &&
+                          ab?.balance_projected != null
+                            ? ab.balance_projected
+                            : bal;
                         return (
-                          <td key={a.id} className="text-end">
+                          <td
+                            key={a.id}
+                            className="text-end"
+                            style={{
+                              background:
+                                colorRef < 0
+                                  ? "rgba(220,53,69,.08)"
+                                  : "rgba(25,135,84,.07)",
+                              borderLeft:
+                                colorRef < 0
+                                  ? "3px solid rgba(220,53,69,.35)"
+                                  : "3px solid rgba(25,135,84,.35)",
+                            }}
+                          >
+                            {/* Solde principal */}
                             <div
-                              className={`fw-semibold ${bal < 0 ? "text-danger" : ""}`}
+                              style={{
+                                fontWeight: 700,
+                                fontSize: ".95rem",
+                                color: colorRef < 0 ? "#842029" : "#0a3622",
+                              }}
                             >
                               {fmt(bal)} €
                             </div>
-                            {(ab?.credit ?? 0) > 0 || (ab?.debit ?? 0) > 0 ? (
-                              <div
-                                className="text-muted"
-                                style={{
-                                  fontSize: ".72rem",
-                                  lineHeight: "1.3",
-                                }}
-                              >
+
+                            {/* Badges crédit / débit */}
+                            {((ab?.credit ?? 0) > 0 ||
+                              (ab?.debit ?? 0) > 0) && (
+                              <div className="d-flex gap-1 justify-content-end mt-1">
                                 {(ab?.credit ?? 0) > 0 && (
-                                  <span className="text-success">
+                                  <span
+                                    style={{
+                                      fontSize: ".78rem",
+                                      fontWeight: 600,
+                                      color: "#146c43",
+                                      background: "#d1e7dd",
+                                      borderRadius: "4px",
+                                      padding: "1px 5px",
+                                    }}
+                                  >
                                     +{fmt(ab!.credit, 0)}
                                   </span>
                                 )}
                                 {(ab?.debit ?? 0) > 0 && (
-                                  <span className="text-danger ms-1">
+                                  <span
+                                    style={{
+                                      fontSize: ".78rem",
+                                      fontWeight: 600,
+                                      color: "#842029",
+                                      background: "#f8d7da",
+                                      borderRadius: "4px",
+                                      padding: "1px 5px",
+                                    }}
+                                  >
                                     −{fmt(ab!.debit, 0)}
                                   </span>
                                 )}
                               </div>
-                            ) : null}
+                            )}
+
+                            {/* Solde projeté */}
                             {(ab?.planned_net ?? 0) !== 0 && (
                               <div
-                                className="text-muted fst-italic"
                                 style={{
-                                  fontSize: ".72rem",
-                                  lineHeight: "1.4",
-                                }}
-                                title="Solde projeté avec budget prévu"
-                              >
-                                →{" "}
-                                <span
-                                  className={
+                                  marginTop:
                                     (ab!.balance_projected ?? 0) < 0
-                                      ? "text-danger"
-                                      : "text-info"
-                                  }
+                                      ? "8px"
+                                      : "4px",
+                                  paddingTop: "4px",
+                                  borderTop: "1px solid rgba(0,0,0,.10)",
+                                }}
+                                title="Estimation avec budget prévu"
+                              >
+                                <div
+                                  style={{
+                                    fontSize: ".68rem",
+                                    color: "#adb5bd",
+                                    marginBottom: "1px",
+                                    textAlign: "right",
+                                  }}
+                                >
+                                  Estimation prévue du solde en fin de mois
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: ".82rem",
+                                    fontWeight: 600,
+                                    color:
+                                      (ab!.balance_projected ?? 0) < 0
+                                        ? "#842029"
+                                        : "#055160",
+                                    textAlign: "right",
+                                  }}
                                 >
                                   {fmt(ab!.balance_projected)} €
-                                </span>
+                                </div>
                               </div>
                             )}
                           </td>
                         );
                       })}
                       <td
-                        className={`text-end fw-bold ${totalBalance < 0 ? "text-danger" : "text-primary"}`}
+                        className="text-end fw-bold"
+                        style={{
+                          color: totalBalance < 0 ? "#842029" : "#0a3622",
+                          background:
+                            totalBalance < 0
+                              ? "rgba(220,53,69,.1)"
+                              : "rgba(25,135,84,.09)",
+                          borderLeft:
+                            totalBalance < 0
+                              ? "3px solid rgba(220,53,69,.45)"
+                              : "3px solid rgba(25,135,84,.45)",
+                          fontSize: "1rem",
+                        }}
                       >
                         {fmt(totalBalance)} €
                       </td>
@@ -427,7 +519,9 @@ export default function BudgetMonthView({
           </Link>
           <h1 className="h3 mb-0 fw-bold">
             Budget —{" "}
-            <span className="text-primary">{periodLabel.charAt(0).toUpperCase() + periodLabel.slice(1)}</span>
+            <span className="text-primary">
+              {periodLabel.charAt(0).toUpperCase() + periodLabel.slice(1)}
+            </span>
           </h1>
         </div>
         <div className="d-flex gap-2">
@@ -450,7 +544,16 @@ export default function BudgetMonthView({
       <div className="card mb-4 border-0 shadow-sm rounded-3 p-3">
         <div className="d-flex align-items-center gap-3 flex-wrap">
           <div className="d-flex align-items-center gap-2">
-            <label className="text-uppercase text-muted mb-0" style={{ fontSize: ".7rem", letterSpacing: ".08em", fontWeight: 600 }}>Mois</label>
+            <label
+              className="text-uppercase text-muted mb-0"
+              style={{
+                fontSize: ".7rem",
+                letterSpacing: ".08em",
+                fontWeight: 600,
+              }}
+            >
+              Mois
+            </label>
             <select
               className="form-select form-select-sm rounded-pill border-0 bg-light"
               style={{ width: "auto" }}
@@ -467,7 +570,16 @@ export default function BudgetMonthView({
             </select>
           </div>
           <div className="d-flex align-items-center gap-2">
-            <label className="text-uppercase text-muted mb-0" style={{ fontSize: ".7rem", letterSpacing: ".08em", fontWeight: 600 }}>Année</label>
+            <label
+              className="text-uppercase text-muted mb-0"
+              style={{
+                fontSize: ".7rem",
+                letterSpacing: ".08em",
+                fontWeight: 600,
+              }}
+            >
+              Année
+            </label>
             <select
               className="form-select form-select-sm rounded-pill border-0 bg-light"
               style={{ width: "auto" }}
@@ -487,7 +599,14 @@ export default function BudgetMonthView({
             <Link
               href={`/budget/${prevYear}/${prevMonth}`}
               className="btn btn-outline-secondary btn-sm rounded-circle"
-              style={{ width: "32px", height: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+              style={{
+                width: "32px",
+                height: "32px",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <i className="bi bi-chevron-left"></i>
             </Link>
@@ -500,7 +619,14 @@ export default function BudgetMonthView({
             <Link
               href={`/budget/${nextYear}/${nextMonth}`}
               className="btn btn-outline-secondary btn-sm rounded-circle"
-              style={{ width: "32px", height: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+              style={{
+                width: "32px",
+                height: "32px",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <i className="bi bi-chevron-right"></i>
             </Link>
@@ -520,8 +646,18 @@ export default function BudgetMonthView({
           const isCredit = account.type === "credit";
           return (
             <div className="col-md-4 col-sm-6" key={account.id}>
-              <div className="card h-100 border-0 shadow-sm rounded-3" style={{ overflow: "hidden" }}>
-                <div style={{ height: "4px", background: isCredit ? "var(--bs-success)" : "var(--bs-danger)" }}></div>
+              <div
+                className="card h-100 border-0 shadow-sm rounded-3"
+                style={{ overflow: "hidden" }}
+              >
+                <div
+                  style={{
+                    height: "4px",
+                    background: isCredit
+                      ? "var(--bs-success)"
+                      : "var(--bs-danger)",
+                  }}
+                ></div>
                 <div className="card-body pt-3">
                   <div className="d-flex align-items-center gap-3 mb-3">
                     <div
@@ -532,13 +668,19 @@ export default function BudgetMonthView({
                         background: isCredit ? "#dcfce7" : "#fef2f2",
                       }}
                     >
-                      <i className={`bi ${isCredit ? "bi-piggy-bank text-success" : "bi-wallet2 text-danger"} fs-5`}></i>
+                      <i
+                        className={`bi ${isCredit ? "bi-piggy-bank text-success" : "bi-wallet2 text-danger"} fs-5`}
+                      ></i>
                     </div>
                     <div className="min-w-0">
-                      <div className="fw-semibold text-truncate">{account.name}</div>
+                      <div className="fw-semibold text-truncate">
+                        {account.name}
+                      </div>
                       <div className="small text-muted">
                         Solde :{" "}
-                        <span className={`fw-semibold ${account.balance < 0 ? "text-danger" : "text-dark"}`}>
+                        <span
+                          className={`fw-semibold ${account.balance < 0 ? "text-danger" : "text-dark"}`}
+                        >
                           {fmt(account.balance)} {account.currency ?? "€"}
                         </span>
                       </div>
@@ -548,34 +690,47 @@ export default function BudgetMonthView({
                     <>
                       <div className="d-flex justify-content-between small mb-1">
                         <span className="text-success d-flex align-items-center gap-1">
-                          <i className="bi bi-arrow-down-circle-fill"></i>Entrées
+                          <i className="bi bi-arrow-down-circle-fill"></i>
+                          Entrées
                         </span>
-                        <span className="fw-semibold text-success">+{fmt(tx.credit)} €</span>
+                        <span className="fw-semibold text-success">
+                          +{fmt(tx.credit)} €
+                        </span>
                       </div>
                       <div className="d-flex justify-content-between small mb-1">
                         <span className="text-danger d-flex align-items-center gap-1">
                           <i className="bi bi-arrow-up-circle-fill"></i>Sorties
                         </span>
-                        <span className="fw-semibold text-danger">−{fmt(tx.debit - tx.subs)} €</span>
+                        <span className="fw-semibold text-danger">
+                          −{fmt(tx.debit - tx.subs)} €
+                        </span>
                       </div>
                       {tx.subs > 0 && (
                         <div className="d-flex justify-content-between small mb-1">
                           <span className="text-warning d-flex align-items-center gap-1">
                             <i className="bi bi-arrow-repeat"></i>Abonnements
                           </span>
-                          <span className="fw-semibold text-warning">−{fmt(tx.subs)} €</span>
+                          <span className="fw-semibold text-warning">
+                            −{fmt(tx.subs)} €
+                          </span>
                         </div>
                       )}
                       <div className="border-top pt-2 mt-2 d-flex justify-content-between small">
-                        <span className="text-muted fw-medium">Net du mois</span>
-                        <span className={`fw-bold ${net >= 0 ? "text-success" : "text-danger"}`}>
-                          {net > 0 ? "+" : ""}{fmt(net)} €
+                        <span className="text-muted fw-medium">
+                          Net du mois
+                        </span>
+                        <span
+                          className={`fw-bold ${net >= 0 ? "text-success" : "text-danger"}`}
+                        >
+                          {net > 0 ? "+" : ""}
+                          {fmt(net)} €
                         </span>
                       </div>
                     </>
                   ) : (
                     <div className="text-muted small text-center py-2 bg-light rounded-2">
-                      <i className="bi bi-dash-circle me-1"></i>Aucun mouvement ce mois
+                      <i className="bi bi-dash-circle me-1"></i>Aucun mouvement
+                      ce mois
                     </div>
                   )}
                 </div>
@@ -588,12 +743,17 @@ export default function BudgetMonthView({
       {/* Abonnements */}
       {subscriptions.length > 0 && (
         <div className="card mb-4 border-0 shadow-sm rounded-3">
-          <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 rounded-top-3" style={{ borderLeft: "4px solid var(--bs-warning)" }}>
+          <div
+            className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 rounded-top-3"
+            style={{ borderLeft: "4px solid var(--bs-warning)" }}
+          >
             <span className="fw-semibold">
               <i className="bi bi-arrow-repeat me-2 text-warning"></i>
               Abonnements actifs ce mois
             </span>
-            <span className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25">{subscriptions.length}</span>
+            <span className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25">
+              {subscriptions.length}
+            </span>
           </div>
           <div className="table-responsive">
             <table className="table table-sm table-hover mb-0">
@@ -631,7 +791,13 @@ export default function BudgetMonthView({
                 <tr>
                   <td colSpan={4}>Total abonnements</td>
                   <td className="text-end text-danger">
-                    -{fmt(subscriptions.reduce((s, sub) => s + parseFloat(String(sub.amount)), 0))}{" "}
+                    -
+                    {fmt(
+                      subscriptions.reduce(
+                        (s, sub) => s + parseFloat(String(sub.amount)),
+                        0,
+                      ),
+                    )}{" "}
                     €
                   </td>
                 </tr>
@@ -644,7 +810,10 @@ export default function BudgetMonthView({
       {/* Tableau budget */}
       {budgets.length > 0 && (
         <div className="card border-0 shadow-sm rounded-3">
-          <div className="card-header bg-white border-bottom d-flex align-items-center py-3 rounded-top-3" style={{ borderLeft: "4px solid var(--bs-primary)" }}>
+          <div
+            className="card-header bg-white border-bottom d-flex align-items-center py-3 rounded-top-3"
+            style={{ borderLeft: "4px solid var(--bs-primary)" }}
+          >
             <i className="bi bi-clipboard-check me-2 text-primary"></i>
             <span className="fw-semibold">Budget prévisionnel</span>
           </div>
@@ -693,7 +862,10 @@ export default function BudgetMonthView({
                         </span>
                       </td>
                       <td>
-                        <span className={`badge rounded-pill badge-${b.category.frequency}`} style={{ fontSize: ".72rem" }}>
+                        <span
+                          className={`badge rounded-pill badge-${b.category.frequency}`}
+                          style={{ fontSize: ".72rem" }}
+                        >
                           {FREQ_LABELS[b.category.frequency] ??
                             b.category.frequency}
                         </span>
@@ -717,24 +889,41 @@ export default function BudgetMonthView({
                         {variance > 0 ? "+" : ""}
                         {fmt(variance)} €
                       </td>
-                      <td className="text-end fw-semibold">{fmt(b.actualAmount)} €</td>
+                      <td className="text-end fw-semibold">
+                        {fmt(b.actualAmount)} €
+                      </td>
                       <td style={{ minWidth: "120px" }}>
                         {b.plannedAmount > 0 && (
                           <div>
-                            <div className="progress rounded-pill" style={{ height: "6px" }}>
+                            <div
+                              className="progress rounded-pill"
+                              style={{ height: "6px" }}
+                            >
                               <div
                                 className={`progress-bar rounded-pill ${pct > 100 ? "bg-danger" : pct > 80 ? "bg-warning" : "bg-success"}`}
                                 style={{ width: `${Math.min(pct, 100)}%` }}
                               ></div>
                             </div>
-                            <small className={`mt-1 d-block ${pct > 100 ? "text-danger" : "text-muted"}`} style={{ fontSize: ".7rem" }}>{pct} %</small>
+                            <small
+                              className={`mt-1 d-block ${pct > 100 ? "text-danger" : "text-muted"}`}
+                              style={{ fontSize: ".7rem" }}
+                            >
+                              {pct} %
+                            </small>
                           </div>
                         )}
                       </td>
                       <td>
                         {b.isApproved ? (
                           <>
-                            <span className="badge rounded-pill bg-success text-white" style={{ fontSize: ".72rem", fontWeight: "600", padding: "4px 8px" }}>
+                            <span
+                              className="badge rounded-pill bg-success text-white"
+                              style={{
+                                fontSize: ".72rem",
+                                fontWeight: "600",
+                                padding: "4px 8px",
+                              }}
+                            >
                               <i className="bi bi-check-circle-fill me-1"></i>
                               Approuvé
                             </span>
@@ -748,7 +937,10 @@ export default function BudgetMonthView({
                             )}
                           </>
                         ) : (
-                          <span className="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style={{ fontSize: ".72rem" }}>
+                          <span
+                            className="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25"
+                            style={{ fontSize: ".72rem" }}
+                          >
                             En attente
                           </span>
                         )}
@@ -759,7 +951,11 @@ export default function BudgetMonthView({
                             className="btn btn-success btn-action me-1 rounded-circle"
                             title="Approuver → créer transaction"
                             onClick={() => handleApprove(b)}
-                            style={{ width: "30px", height: "30px", padding: 0 }}
+                            style={{
+                              width: "30px",
+                              height: "30px",
+                              padding: 0,
+                            }}
                           >
                             <i className="bi bi-check-lg"></i>
                           </button>
@@ -768,7 +964,11 @@ export default function BudgetMonthView({
                             className="btn btn-outline-warning btn-action me-1 rounded-circle"
                             title="Annuler l'approbation"
                             onClick={() => handleUnapprove(b)}
-                            style={{ width: "30px", height: "30px", padding: 0 }}
+                            style={{
+                              width: "30px",
+                              height: "30px",
+                              padding: 0,
+                            }}
                           >
                             <i className="bi bi-x-lg"></i>
                           </button>
@@ -776,7 +976,14 @@ export default function BudgetMonthView({
                         <Link
                           href={`/budget/${year}/${month}/edit/${b.id}`}
                           className="btn btn-outline-primary btn-action me-1 rounded-circle"
-                          style={{ width: "30px", height: "30px", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                          style={{
+                            width: "30px",
+                            height: "30px",
+                            padding: 0,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
                         >
                           <i className="bi bi-pencil"></i>
                         </Link>
@@ -784,7 +991,11 @@ export default function BudgetMonthView({
                           <button
                             className="btn btn-outline-danger btn-action rounded-circle"
                             onClick={() => handleDelete(b)}
-                            style={{ width: "30px", height: "30px", padding: 0 }}
+                            style={{
+                              width: "30px",
+                              height: "30px",
+                              padding: 0,
+                            }}
                           >
                             <i className="bi bi-trash"></i>
                           </button>
@@ -801,21 +1012,36 @@ export default function BudgetMonthView({
                     const netPlanned =
                       budgets
                         .filter((b) => b.category.transactionType === "income")
-                        .reduce((s, b) => s + parseFloat(String(b.plannedAmount)), 0) -
+                        .reduce(
+                          (s, b) => s + parseFloat(String(b.plannedAmount)),
+                          0,
+                        ) -
                       budgets
                         .filter((b) => b.category.transactionType === "expense")
-                        .reduce((s, b) => s + parseFloat(String(b.plannedAmount)), 0);
+                        .reduce(
+                          (s, b) => s + parseFloat(String(b.plannedAmount)),
+                          0,
+                        );
                     const variance = budgets.reduce(
-                      (s, b) => s + (parseFloat(String(b.plannedAmount)) - parseFloat(String(b.actualAmount))),
+                      (s, b) =>
+                        s +
+                        (parseFloat(String(b.plannedAmount)) -
+                          parseFloat(String(b.actualAmount))),
                       0,
                     );
                     const netActual =
                       budgets
                         .filter((b) => b.category.transactionType === "income")
-                        .reduce((s, b) => s + parseFloat(String(b.actualAmount)), 0) -
+                        .reduce(
+                          (s, b) => s + parseFloat(String(b.actualAmount)),
+                          0,
+                        ) -
                       budgets
                         .filter((b) => b.category.transactionType === "expense")
-                        .reduce((s, b) => s + parseFloat(String(b.actualAmount)), 0);
+                        .reduce(
+                          (s, b) => s + parseFloat(String(b.actualAmount)),
+                          0,
+                        );
                     return (
                       <React.Fragment key="tfoot-totals">
                         <td
