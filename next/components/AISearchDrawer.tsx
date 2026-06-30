@@ -2,7 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import type { AddBudgetLinePayload } from '../lib/ai-search';
+import type {
+  AddBudgetLinePayload,
+  AddCategoryPayload,
+  AddSubscriptionPayload,
+  AddTransactionPayload,
+} from '../lib/ai-search';
 
 // Lazy-load the panel so it doesn't bloat the initial JS bundle
 const AISearchPanel = dynamic(() => import('./AISearchPanel'), { ssr: false });
@@ -12,6 +17,9 @@ interface AISearchDrawerProps {
   initialQuery?: string;
   onClose: () => void;
   onAddBudget?: (payload: AddBudgetLinePayload) => Promise<void>;
+  onAddTransaction?: (payload: AddTransactionPayload) => Promise<void>;
+  onAddSubscription?: (payload: AddSubscriptionPayload) => Promise<void>;
+  onAddCategory?: (payload: AddCategoryPayload) => Promise<void>;
   apiBase?: string;
 }
 
@@ -20,6 +28,9 @@ export default function AISearchDrawer({
   initialQuery,
   onClose,
   onAddBudget,
+  onAddTransaction,
+  onAddSubscription,
+  onAddCategory,
   apiBase,
 }: AISearchDrawerProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -131,6 +142,9 @@ export default function AISearchDrawer({
           <AISearchPanel
             apiBase={apiBase}
             onAddBudget={onAddBudget}
+            onAddTransaction={onAddTransaction}
+            onAddSubscription={onAddSubscription}
+            onAddCategory={onAddCategory}
             initialQuery={initialQuery}
           />
         </div>

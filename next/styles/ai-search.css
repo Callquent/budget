@@ -7,6 +7,161 @@
  * using the same Bootstrap Icons already loaded in the project.
  */
 
+/* ── Panel Container ───────────────────────────────────────── */
+
+.ais-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  background: var(--color-background-primary, #fff);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ── Panel Header ──────────────────────────────────────────── */
+
+.ais-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 0.5px solid var(--color-border-tertiary, #e5e7eb);
+  flex-shrink: 0;
+  background: var(--color-background-primary, #fff);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.ais-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+}
+
+/* ── Suggestions Area ──────────────────────────────────────── */
+
+.ais-panel__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 0.5px solid var(--color-border-tertiary, #e5e7eb);
+  overflow-x: hidden;
+}
+
+/* ── Chat Area (Scrollable) ─────────────────────────────────── */
+
+.ais-panel__chat {
+  flex: 1;
+  min-height: 0; /* Important for flex children to scroll */
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-behavior: smooth;
+}
+
+.ais-panel__chat::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ais-panel__chat::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ais-panel__chat::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 3px;
+}
+
+.ais-panel__chat::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* ── Input Row ──────────────────────────────────────────────── */
+
+.ais-panel__input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 0.5px solid var(--color-border-tertiary, #e5e7eb);
+  background: var(--color-background-primary, #fff);
+  flex-shrink: 0;
+}
+
+.ais-panel__input {
+  flex: 1;
+  min-width: 0; /* Allows input to shrink */
+  background: var(--color-background-secondary, #f9fafb);
+  color: var(--color-text-primary, #111827);
+  border: 0.5px solid var(--color-border-secondary, #d1d5db);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.15s ease;
+  resize: none;
+}
+
+.ais-panel__input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background: #fff;
+}
+
+.ais-panel__input::placeholder {
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+.ais-panel__input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ais-panel__send {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ais-panel__send:hover:not(:disabled) {
+  background: #5558e3;
+  transform: translateY(-1px);
+}
+
+.ais-panel__send:active:not(:disabled) {
+  background: #4749d1;
+  transform: translateY(0);
+}
+
+.ais-panel__send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ais-panel__send i {
+  font-size: 14px;
+}
+
 /* ── Tags / badges ─────────────────────────────────────────── */
 
 .ais-tag {
@@ -27,33 +182,35 @@
 /* ── Result cards ──────────────────────────────────────────── */
 
 .ais-card {
-  background: var(--ais-card-bg, #f9fafb);
-  border: 0.5px solid var(--ais-card-border, #e5e7eb);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-top: 4px;
+  background: var(--ais-card-bg, #fff);
+  border: 1px solid var(--ais-card-border, #e5e7eb);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
 /* Inside dark bubbles the card should invert */
 .ais-bubble--ai .ais-card {
-  --ais-card-bg: rgba(255, 255, 255, 0.06);
-  --ais-card-border: rgba(255, 255, 255, 0.12);
+  --ais-card-bg: rgba(255, 255, 255, 0.08);
+  --ais-card-border: rgba(255, 255, 255, 0.15);
+  box-shadow: none;
 }
 
 .ais-card__label {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-text-secondary, #6b7280);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 4px;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
 }
 
 .ais-card__value {
-  font-size: 22px;
-  font-weight: 500;
+  font-size: 20px;
+  font-weight: 600;
   color: var(--color-text-primary, #111827);
-  line-height: 1.2;
+  line-height: 1.3;
   margin-bottom: 4px;
 }
 
@@ -85,9 +242,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 0;
-  border-bottom: 0.5px solid var(--ais-card-border, #e5e7eb);
-  font-size: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ais-card-border, #f3f4f6);
+  font-size: 13px;
   gap: 8px;
 }
 
@@ -96,49 +253,55 @@
 }
 
 .ais-row--total {
-  padding-top: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  border-top: 0.5px solid var(--ais-card-border, #e5e7eb);
+  padding-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border-top: 1px solid var(--ais-card-border, #e5e7eb);
   border-bottom: none;
-  margin-top: 2px;
+  margin-top: 4px;
+  padding-bottom: 4px;
 }
 
-.ais-amount { font-weight: 500; white-space: nowrap; }
+.ais-amount { 
+  font-weight: 600; 
+  white-space: nowrap;
+  font-size: inherit;
+}
 .ais-amount--debit  { color: #E24B4A; }
 .ais-amount--credit { color: #1D9E75; }
+.ais-amount--transfer { color: #3b82f6; }
 
 /* ── Budget line ───────────────────────────────────────────── */
 
-.ais-budget-line { padding: 4px 0; }
+.ais-budget-line { padding: 6px 0; }
 
 .ais-progress {
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   background: #e5e7eb;
-  margin-top: 4px;
+  margin-top: 6px;
   overflow: hidden;
 }
 
 .ais-progress__fill {
-  height: 4px;
-  border-radius: 2px;
-  transition: width 0.3s ease;
+  height: 6px;
+  border-radius: 3px;
+  transition: width 0.3s ease, background-color 0.2s ease;
 }
 
 /* ── Inline form (budget-add) ──────────────────────────────── */
 
 .ais-form {
   display: grid;
-  gap: 10px;
-  margin-top: 4px;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .ais-form__label {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-secondary, #6b7280);
   font-weight: 500;
 }
@@ -147,80 +310,168 @@
 .ais-form__select {
   background: var(--color-background-primary, #fff);
   color: var(--color-text-primary, #111827);
-  border: 0.5px solid var(--color-border-secondary, #d1d5db);
-  border-radius: 6px;
-  padding: 7px 10px;
+  border: 1px solid var(--color-border-secondary, #d1d5db);
+  border-radius: 8px;
+  padding: 9px 12px;
   font-size: 13px;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s;
+  transition: all 0.15s ease;
 }
 
 .ais-form__input:focus,
 .ais-form__select:focus {
-  border-color: rgba(99, 102, 241, 0.6);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.ais-form__input::placeholder {
+  color: var(--color-text-tertiary, #9ca3af);
 }
 
 .ais-form__submit {
   background: #6366f1;
   color: #fff;
   border: none;
-  border-radius: 7px;
-  padding: 9px 14px;
+  border-radius: 8px;
+  padding: 10px 16px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   font-family: inherit;
-  transition: opacity 0.15s;
-  margin-top: 2px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.ais-form__submit:hover { opacity: 0.88; }
-.ais-form__submit:active { transform: scale(0.98); }
+.ais-form__submit:hover:not(:disabled) {
+  background: #5558e3;
+  transform: translateY(-1px);
+}
+
+.ais-form__submit:active:not(:disabled) {
+  background: #4749d1;
+  transform: translateY(0);
+}
+
+.ais-form__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ais-form__submit i {
+  font-size: 14px;
+}
 
 /* ── Inline suggestion pill ────────────────────────────────── */
 
 .ais-pill {
   display: inline-block;
-  background: transparent;
-  border: 0.5px solid var(--color-border-secondary, #d1d5db);
+  background: var(--color-background-secondary, #f9fafb);
+  border: 0.5px solid var(--color-border-secondary, #e5e7eb);
   border-radius: 20px;
-  padding: 4px 12px;
+  padding: 6px 12px;
   font-size: 12px;
   color: var(--color-text-secondary, #6b7280);
   cursor: pointer;
-  margin-top: 6px;
   font-family: inherit;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
+  font-weight: 400;
 }
 
 .ais-pill:hover {
-  border-color: rgba(99, 102, 241, 0.5);
+  border-color: #6366f1;
   color: #6366f1;
-  background: rgba(99, 102, 241, 0.06);
+  background: rgba(99, 102, 241, 0.08);
+  transform: translateY(-1px);
+}
+
+.ais-pill:active {
+  transform: translateY(0);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+/* ── Avatars ───────────────────────────────────────────────── */
+
+.ais-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.ais-avatar--user {
+  background: #6366f1;
+  color: #fff;
+}
+
+.ais-avatar--ai {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
 }
 
 /* ── Chat bubbles ──────────────────────────────────────────── */
 
 .ais-bubble {
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 13px;
-  line-height: 1.55;
-  max-width: 360px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 100%;
+  word-wrap: break-word;
 }
 
 .ais-bubble--user {
-  background: #6366f1;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
   color: #fff;
-  border-radius: 12px 12px 3px 12px;
+  border-radius: 16px 16px 4px 16px;
+  margin-left: 40px;
 }
 
 .ais-bubble--ai {
   background: var(--color-background-secondary, #f3f4f6);
   border: 0.5px solid var(--color-border-tertiary, #e5e7eb);
   color: var(--color-text-primary, #111827);
-  border-radius: 12px 12px 12px 3px;
+  border-radius: 16px 16px 16px 4px;
+  margin-right: 40px;
+}
+
+/* Makes bubbles appear in chat containers */
+.ais-bubble p {
+  margin: 0;
+}
+
+.ais-bubble em {
+  font-style: italic;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.ais-bubble strong {
+  font-weight: 600;
+}
+
+.ais-bubble code {
+  background: rgba(0,0,0,0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.ais-bubble a {
+  color: #6366f1;
+  text-decoration: none;
+}
+
+.ais-bubble a:hover {
+  text-decoration: underline;
 }
 
 /* ── Thinking animation ────────────────────────────────────── */

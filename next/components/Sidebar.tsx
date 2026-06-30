@@ -19,7 +19,6 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ onSearch }: SidebarProps) {
   const pathname = usePathname();
-  const [query, setQuery] = useState("");
 
   const isActive = (item: (typeof NAV_ITEMS)[0]) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -85,55 +84,42 @@ export default function Sidebar({ onSearch }: SidebarProps) {
           </Link>
         </div>
 
-        {/* Search bar */}
-        {onSearch && (
-          <div style={{ padding: "12px 10px 4px" }}>
-            <div style={{ position: "relative" }}>
-              <i
-                className="bi bi-search"
-                style={{
-                  position: "absolute",
-                  left: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "#6b7280",
-                  fontSize: ".8rem",
-                  pointerEvents: "none",
-                }}
-              ></i>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && query.trim()) {
-                    onSearch(query.trim());
-                    setQuery("");
-                  }
-                }}
-                placeholder="Recherche IA…"
-                style={{
-                  width: "100%",
-                  background: "rgba(255,255,255,.06)",
-                  border: "1px solid rgba(255,255,255,.1)",
-                  borderRadius: "8px",
-                  padding: "7px 10px 7px 30px",
-                  color: "#e5e7eb",
-                  fontSize: ".8rem",
-                  outline: "none",
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = "#3b82f6";
-                  e.currentTarget.style.background = "rgba(59,130,246,.08)";
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = "rgba(255,255,255,.1)";
-                  e.currentTarget.style.background = "rgba(255,255,255,.06)";
-                }}
-              />
-            </div>
-          </div>
-        )}
+        {/* AI Assistant Button */}
+        <div style={{ padding: "8px 10px" }}>
+          <button
+            onClick={() => onSearch?.("")}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              background: "linear-gradient(135deg, rgba(99,102,241,.2) 0%, rgba(139,92,246,.15) 100%)",
+              border: "1px solid rgba(99,102,241,.3)",
+              borderRadius: "8px",
+              padding: "10px 12px",
+              color: "#e5e7eb",
+              fontSize: ".85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              outline: "none",
+              transition: "all .2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "linear-gradient(135deg, rgba(99,102,241,.3) 0%, rgba(139,92,246,.25) 100%)";
+              e.currentTarget.style.borderColor = "rgba(99,102,241,.5)";
+              e.currentTarget.style.color = "#fff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "linear-gradient(135deg, rgba(99,102,241,.2) 0%, rgba(139,92,246,.15) 100%)";
+              e.currentTarget.style.borderColor = "rgba(99,102,241,.3)";
+              e.currentTarget.style.color = "#e5e7eb";
+            }}
+          >
+            <i className="bi bi-stars" style={{ fontSize: ".9rem" }}></i>
+            <span>Assistant IA</span>
+          </button>
+        </div>
 
         {/* Nav */}
         <nav style={{ padding: "12px 10px", flexGrow: 1 }}>

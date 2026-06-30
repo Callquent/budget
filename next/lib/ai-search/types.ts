@@ -64,6 +64,8 @@ export interface BudgetContext {
 
 // ── Intent types ──────────────────────────────────────────────
 
+export type AddEntityType = 'transaction' | 'subscription' | 'budget' | 'category';
+
 export type IntentType =
   | 'transactions_category'
   | 'subscription_status'
@@ -74,6 +76,8 @@ export type IntentType =
   | 'budget_add'
   | 'expenses_summary'
   | 'categories_summary'
+  | 'category_data'
+  | 'add_menu'
   | 'unknown';
 
 export interface BaseIntent {
@@ -85,8 +89,6 @@ export interface BaseIntent {
 export interface TransactionsCategoryIntent extends BaseIntent {
   intent: 'transactions_category';
   category: string;
-  /** Noms alternatifs de catégorie à tester (insensible à la casse) */
-  categoryHints?: string[];
 }
 
 export interface SubscriptionStatusIntent extends BaseIntent {
@@ -110,6 +112,22 @@ export interface BudgetAddIntent extends BaseIntent {
   intent: 'budget_add';
 }
 
+export interface CategoryDataIntent extends BaseIntent {
+  intent: 'category_data';
+  category: string;
+}
+
+/**
+ * Generic "add" intent. When the entity type can be determined directly
+ * from the query (e.g. "ajouter un abonnement"), `entity` is set and the
+ * UI jumps straight to that form. Otherwise `entity` is null and the UI
+ * shows the 4-card chooser menu.
+ */
+export interface AddMenuIntent extends BaseIntent {
+  intent: 'add_menu';
+  entity: AddEntityType | null;
+}
+
 export interface UnknownIntent extends BaseIntent {
   intent: 'unknown';
   query: string;
@@ -121,6 +139,8 @@ export type ParsedIntent =
   | SubscriptionsListIntent
   | BalanceForecastIntent
   | BudgetAddIntent
+  | CategoryDataIntent
+  | AddMenuIntent
   | ({ intent: 'balance_current' | 'budget_month' | 'expenses_summary' | 'categories_summary' } & BaseIntent)
   | UnknownIntent;
 
@@ -139,4 +159,40 @@ export interface AddBudgetLinePayload {
   amount: number;
   month: number;
   year: number;
+  label?: string;
+}
+
+export interface AddTransactionPayload {
+  label: string;
+  amount: number;
+  type: 'credit' | 'debit';
+  date: string; // YYYY-MM-DD
+  category: string;
+  account: string;
+}
+
+export interface AddSubscriptionPayload {
+  name: string;
+  amount: number;
+  frequency: Frequency;
+  dayOfMonth?: number;
+  startDate: string;
+  endDate?: string;
+  category: string;
+  account: string;
+}
+
+export interface AddCategoryPayload {
+  name: string;
+  transactionType: TransactionType;
+  frequency: Frequency;
+  description?: string;
+}
+
+/** Callbacks the response builder can invoke when a form is submitted. */
+export interface AddEntityHandlers {
+  onAddBudget?: (payload: AddBudgetLinePayload) => Promise<void>;
+  onAddTransaction?: (payload: AddTransactionPayload) => Promise<void>;
+  onAddSubscription?: (payload: AddSubscriptionPayload) => Promise<void>;
+  onAddCategory?: (payload: AddCategoryPayload) => Promise<void>;
 }

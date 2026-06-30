@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { classify } from './parser';
-import { buildResponse } from './responseBuilder';
+import { buildResponse, renderAddForm } from './responseBuilder';
 import type {
   AddBudgetLinePayload,
+  AddCategoryPayload,
+  AddEntityType,
+  AddSubscriptionPayload,
+  AddTransactionPayload,
   BudgetContext,
   CategoryData,
   ChatMessage,
@@ -19,18 +23,10 @@ const EMPTY_CONTEXT: BudgetContext = {
 };
 
 // ── API fetch ───────────────────────────────────────────────────
-// Un seul endpoint Symfony retourne tout le contexte d'un coup :
-//   GET /api/ai-search/context
-//
-// Le contrôleur AiSearchContextController.php sérialise les entités
-// en JSON plat (pas d'IRIs, pas de hydra:member).
 
 async function fetchBudgetContext(apiBase = '/api'): Promise<BudgetContext> {
   const res = await fetch(`${apiBase}/ai-search/context`, {
     headers: { Accept: 'application/json' },
-    // next.js cache : revalidate toutes les 60 s en production
-    // @ts-ignore
-    next: { revalidate: 60 },
   });
 
   if (!res.ok) {
@@ -39,8 +35,6 @@ async function fetchBudgetContext(apiBase = '/api'): Promise<BudgetContext> {
 
   const data = await res.json();
 
-  // Le contrôleur retourne directement { transactions, subscriptions, … }
-  // On accepte aussi l'ancien format hydra:member au cas où
   const unwrap = <T>(v: T[] | { 'hydra:member': T[] } | undefined): T[] => {
     if (!v) return [];
     if (Array.isArray(v)) return v;
@@ -56,30 +50,71 @@ async function fetchBudgetContext(apiBase = '/api'): Promise<BudgetContext> {
   };
 }
 
-// ── Types ───────────────────────────────────────────────────────
+// ── Options & return type ────────────────────────────────────────
 
 export interface UseAISearchOptions {
   apiBase?: string;
   onAddBudget?: (payload: AddBudgetLinePayload) => Promise<void>;
+  onAddTransaction?: (payload: AddTransactionPayload) => Promise<void>;
+  onAddSubscription?: (payload: AddSubscriptionPayload) => Promise<void>;
+  onAddCategory?: (payload: AddCategoryPayload) => Promise<void>;
 }
 
 export interface UseAISearchReturn {
   messages: ChatMessage[];
   isLoading: boolean;
   contextReady: boolean;
-  /** Debug : retourne le contexte chargé (utile en dev) */
   getContext: () => BudgetContext;
   sendMessage: (query: string) => void;
   clearChat: () => void;
-  handleFill: (text: string) => void;
-  handleFormSubmit: (form: HTMLElement) => void;
+  /** L'utilisateur a cliqué sur une carte du menu "ajouter" → affiche le bon formulaire. */
+  handleAddEntityClick: (entity: AddEntityType, messageId: string) => void;
+  /** L'utilisateur clique sur "← Retour" dans un formulaire → réaffiche le menu. */
+  handleBackToMenu: (messageId: string) => void;
+  /** Soumission de n'importe lequel des 4 formulaires inline. */
+  handleFormSubmit: (form: HTMLElement, messageId: string) => void;
 }
+
+// ── Helpers de mise à jour de message ────────────────────────────
+
+const MONTH_NAMES_FR: Record<number, string> = {
+  1:'janvier',2:'février',3:'mars',4:'avril',5:'mai',6:'juin',
+  7:'juillet',8:'août',9:'septembre',10:'octobre',11:'novembre',12:'décembre',
+};
+
+const ADD_MENU_HTML = `
+  Que souhaitez-vous ajouter ?
+  <div class="ais-add-menu">
+    <button class="ais-add-card" data-add-entity="transaction">
+      <i class="ais-add-card__icon" data-icon="arrows-exchange"></i>
+      <div class="ais-add-card__name">Transaction</div>
+      <div class="ais-add-card__desc">Crédit ou débit</div>
+    </button>
+    <button class="ais-add-card" data-add-entity="subscription">
+      <i class="ais-add-card__icon" data-icon="refresh"></i>
+      <div class="ais-add-card__name">Abonnement</div>
+      <div class="ais-add-card__desc">Récurrent mensuel/annuel</div>
+    </button>
+    <button class="ais-add-card" data-add-entity="budget">
+      <i class="ais-add-card__icon" data-icon="calendar-stats"></i>
+      <div class="ais-add-card__name">Ligne budget</div>
+      <div class="ais-add-card__desc">Prévu pour un mois</div>
+    </button>
+    <button class="ais-add-card" data-add-entity="category">
+      <i class="ais-add-card__icon" data-icon="tags"></i>
+      <div class="ais-add-card__name">Catégorie</div>
+      <div class="ais-add-card__desc">Classer les opérations</div>
+    </button>
+  </div>`;
 
 // ── Hook ────────────────────────────────────────────────────────
 
 export function useAISearch({
   apiBase = '/api',
   onAddBudget,
+  onAddTransaction,
+  onAddSubscription,
+  onAddCategory,
 }: UseAISearchOptions = {}): UseAISearchReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,7 +128,7 @@ export function useAISearch({
       role: 'ai',
       html: `Bonjour ! Posez-moi une question en langage naturel :<br>
              <em>« Les courses en février 2026 »</em>, <em>« Mon abonnement TER »</em>,
-             <em>« Ajouter budget juillet »</em>…`,
+             <em>« Ajouter… »</em>…`,
       timestamp: new Date(),
     }]);
   }, []);
@@ -104,32 +139,16 @@ export function useAISearch({
       .then((ctx) => {
         contextRef.current = ctx;
         setContextReady(true);
-
-        // En développement : log le contexte pour faciliter le débogage
-        if (process.env.NODE_ENV === 'development') {
-          console.group('[useAISearch] Contexte chargé');
-          console.log('Transactions :', ctx.transactions.length);
-          console.log('Subscriptions :', ctx.subscriptions.length);
-          console.log('Accounts :', ctx.accounts.length);
-          console.log('Budgets :', ctx.monthlyBudgets.length);
-          console.log('Catégories :', ctx.categories.length);
-          console.log('Sample transaction :', ctx.transactions[0]);
-          console.log('Sample subscription :', ctx.subscriptions[0]);
-          console.groupEnd();
-        }
       })
       .catch((err) => {
         console.error('[useAISearch] Impossible de charger le contexte :', err);
-        // On reste opérationnel avec un contexte vide
         setContextReady(true);
-
         setMessages((prev) => [
           ...prev,
           {
-            id: 'ctx-error',
+            id: `ctx-error-${Date.now()}`,
             role: 'ai',
-            html: `⚠️ Impossible de charger les données depuis <code>${apiBase}/ai-search/context</code>.<br>
-                   Vérifiez que le contrôleur Symfony <code>AiSearchContextController</code> est bien enregistré.`,
+            html: `⚠️ Impossible de charger les données depuis <code>${apiBase}/ai-search/context</code>.`,
             timestamp: new Date(),
           },
         ]);
@@ -157,13 +176,106 @@ export function useAISearch({
         console.log('[useAISearch] Intent:', intent);
       }
 
-      const html = buildResponse(intent, ctx, async (payload) => {
-        try {
+      const html = buildResponse(intent, ctx);
+
+      setMessages((prev) => [...prev, {
+        id: `ai-${Date.now()}`,
+        role: 'ai',
+        html,
+        timestamp: new Date(),
+      }]);
+      setIsLoading(false);
+    }, 480);
+  }, []);
+
+  // ── Clic sur une carte du menu "ajouter" ────────────────────────
+  const handleAddEntityClick = useCallback((entity: AddEntityType, messageId: string) => {
+    const ctx = contextRef.current;
+    const html = renderAddForm(entity, ctx);
+
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, html } : m)),
+    );
+  }, []);
+
+  // ── Bouton "Retour" dans un formulaire ──────────────────────────
+  const handleBackToMenu = useCallback((messageId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, html: ADD_MENU_HTML } : m)),
+    );
+  }, []);
+
+  // ── Soumission de formulaire (les 4 types) ──────────────────────
+  const handleFormSubmit = useCallback(
+    async (form: HTMLElement, messageId: string) => {
+      const type = form.dataset.type as 'transaction' | 'subscription' | 'budget' | 'category' | undefined;
+      if (!type) return;
+
+      const vals: Record<string, string> = {};
+      form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[name]').forEach((el) => {
+        vals[el.name] = el.value;
+      });
+
+      const setMsg = (html: string) => {
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, html } : m)));
+      };
+
+      try {
+        if (type === 'transaction') {
+          if (!vals.label || !vals.amount || parseFloat(vals.amount) <= 0) {
+            setMsg('⚠️ Libellé et montant sont requis.');
+            return;
+          }
+          const payload: AddTransactionPayload = {
+            label: vals.label,
+            amount: parseFloat(vals.amount),
+            type: vals.type as 'credit' | 'debit',
+            date: vals.date,
+            category: vals.category,
+            account: vals.account,
+          };
+          await onAddTransaction?.(payload);
+          const sign = payload.type === 'debit' ? '−' : '+';
+          setMsg(`✅ Transaction créée : <strong>${payload.label}</strong> · ${sign}${payload.amount.toFixed(2)} € · ${payload.category} · ${payload.account}`);
+
+        } else if (type === 'subscription') {
+          if (!vals.name || !vals.amount || parseFloat(vals.amount) <= 0) {
+            setMsg('⚠️ Nom et montant sont requis.');
+            return;
+          }
+          const payload: AddSubscriptionPayload = {
+            name: vals.name,
+            amount: parseFloat(vals.amount),
+            frequency: vals.frequency as AddSubscriptionPayload['frequency'],
+            dayOfMonth: vals.dayOfMonth ? parseInt(vals.dayOfMonth, 10) : undefined,
+            startDate: vals.startDate,
+            endDate: vals.endDate || undefined,
+            category: vals.category,
+            account: vals.account,
+          };
+          await onAddSubscription?.(payload);
+          const freqLabel = { monthly: 'mensuel', yearly: 'annuel', quarterly: 'trimestriel', occasional: 'occasionnel' }[payload.frequency] ?? payload.frequency;
+          setMsg(`✅ Abonnement créé : <strong>${payload.name}</strong> · ${payload.amount.toFixed(2)} €/${freqLabel} · ${payload.category}`);
+
+        } else if (type === 'budget') {
+          if (!vals.amount || parseFloat(vals.amount) <= 0) {
+            setMsg('⚠️ Le montant prévu est requis.');
+            return;
+          }
+          const month = parseInt(vals.month, 10);
+          const year = parseInt(vals.year, 10);
+          const payload: AddBudgetLinePayload = {
+            category: vals.category,
+            amount: parseFloat(vals.amount),
+            month,
+            year,
+            label: vals.label || undefined,
+          };
           await onAddBudget?.(payload);
+
           // Mise à jour optimiste du contexte local
-          const cat: CategoryData | undefined = ctx.categories.find(
-            (c) => c.name === payload.category,
-          );
+          const ctx = contextRef.current;
+          const cat = ctx.categories.find((c) => c.name === payload.category);
           contextRef.current = {
             ...ctx,
             monthlyBudgets: [
@@ -175,92 +287,44 @@ export function useAISearch({
                 month: payload.month,
                 plannedAmount: payload.amount.toFixed(2),
                 actualAmount: '0.00',
+                label: payload.label,
               },
             ],
           };
-        } catch (err) {
-          console.error('[useAISearch] onAddBudget failed:', err);
+
+          setMsg(`✅ Ligne budget créée : <strong>${payload.category}</strong> · ${payload.amount.toFixed(2)} € prévu pour <strong>${MONTH_NAMES_FR[month]} ${year}</strong>`);
+
+        } else if (type === 'category') {
+          if (!vals.name) {
+            setMsg('⚠️ Le nom de la catégorie est requis.');
+            return;
+          }
+          const payload: AddCategoryPayload = {
+            name: vals.name,
+            transactionType: vals.transactionType as AddCategoryPayload['transactionType'],
+            frequency: vals.frequency as AddCategoryPayload['frequency'],
+            description: vals.description || undefined,
+          };
+          await onAddCategory?.(payload);
+
+          const ctx = contextRef.current;
+          contextRef.current = {
+            ...ctx,
+            categories: [
+              ...ctx.categories,
+              { id: Date.now(), name: payload.name, transactionType: payload.transactionType, frequency: payload.frequency },
+            ],
+          };
+
+          const typeLabel = { expense: 'Dépense', income: 'Revenu', transfer: 'Virement' }[payload.transactionType];
+          setMsg(`✅ Catégorie créée : <strong>${payload.name}</strong> · ${typeLabel}`);
         }
-      });
-
-      setMessages((prev) => [...prev, {
-        id: `ai-${Date.now()}`,
-        role: 'ai',
-        html,
-        timestamp: new Date(),
-      }]);
-      setIsLoading(false);
-    }, 480);
-  }, [onAddBudget]);
-
-  // ── Fill handler ──────────────────────────────────────────────
-  const handleFill = useCallback((_text: string) => {
-    // Géré par le composant parent via l'état de l'input
-  }, []);
-
-  // ── Form submit (budget add inline) ──────────────────────────
-  const handleFormSubmit = useCallback(
-    async (form: HTMLElement) => {
-      const month = parseInt(form.dataset.month ?? '7', 10);
-      const year  = parseInt(form.dataset.year  ?? String(new Date().getFullYear()), 10);
-      const category = form.querySelector<HTMLSelectElement>('[name="category"]')?.value ?? '';
-      const label    = form.querySelector<HTMLInputElement>('[name="label"]')?.value ?? '';
-      const amountRaw = form.querySelector<HTMLInputElement>('[name="amount"]')?.value ?? '0';
-      const amount = parseFloat(amountRaw);
-
-      if (!category || isNaN(amount) || amount <= 0) {
-        setMessages((prev) => [...prev, {
-          id: `err-${Date.now()}`,
-          role: 'ai',
-          html: '⚠️ Veuillez remplir la catégorie et un montant valide.',
-          timestamp: new Date(),
-        }]);
-        return;
-      }
-
-      const payload: AddBudgetLinePayload = { category, amount, month, year };
-
-      try {
-        await onAddBudget?.(payload);
-
-        const ctx = contextRef.current;
-        const cat = ctx.categories.find((c) => c.name === category);
-        contextRef.current = {
-          ...ctx,
-          monthlyBudgets: [
-            ...ctx.monthlyBudgets,
-            {
-              id: Date.now(),
-              category: cat ?? { name: category, transactionType: 'expense' },
-              year, month,
-              plannedAmount: amount.toFixed(2),
-              actualAmount: '0.00',
-              label: label || undefined,
-            },
-          ],
-        };
-
-        const moNames: Record<number, string> = {
-          1:'janvier',2:'février',3:'mars',4:'avril',5:'mai',6:'juin',
-          7:'juillet',8:'août',9:'septembre',10:'octobre',11:'novembre',12:'décembre',
-        };
-        setMessages((prev) => [...prev, {
-          id: `ai-budget-${Date.now()}`,
-          role: 'ai',
-          html: `✅ Ligne budget créée : <strong>${category}</strong> — ${amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} prévu pour <strong>${moNames[month]} ${year}</strong>.`,
-          timestamp: new Date(),
-        }]);
       } catch (err) {
         console.error('[useAISearch] handleFormSubmit failed:', err);
-        setMessages((prev) => [...prev, {
-          id: `err-${Date.now()}`,
-          role: 'ai',
-          html: `⚠️ Erreur lors de la création du budget : ${err instanceof Error ? err.message : 'erreur inconnue'}`,
-          timestamp: new Date(),
-        }]);
+        setMsg(`⚠️ Erreur lors de la création : ${err instanceof Error ? err.message : 'erreur inconnue'}`);
       }
     },
-    [onAddBudget],
+    [onAddBudget, onAddTransaction, onAddSubscription, onAddCategory],
   );
 
   const clearChat = useCallback(() => {
@@ -279,7 +343,8 @@ export function useAISearch({
     getContext: () => contextRef.current,
     sendMessage,
     clearChat,
-    handleFill,
+    handleAddEntityClick,
+    handleBackToMenu,
     handleFormSubmit,
   };
 }

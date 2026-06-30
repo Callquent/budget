@@ -1,6 +1,11 @@
 import { MONTH_NAMES } from './parser';
 import type {
   AddBudgetLinePayload,
+  AddCategoryPayload,
+  AddEntityHandlers,
+  AddEntityType,
+  AddSubscriptionPayload,
+  AddTransactionPayload,
   BudgetContext,
   CategoryData,
   ParsedIntent,
@@ -38,29 +43,29 @@ function progressBar(actual: number, planned: number): string {
     </div>`;
 }
 
-// ── Intent handlers ────────────────────────────────────────────
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ── Intent handlers : lecture ──────────────────────────────────
 
 function handleTransactionsCategory(
   intent: Extract<ParsedIntent, { intent: 'transactions_category' }>,
   ctx: BudgetContext,
 ): string {
   const { category, month: mo, year: yr } = intent;
-  const hints: string[] = (intent as any).categoryHints ?? [category];
 
   const txs = ctx.transactions.filter(
     (t) =>
-      hints.some((h) => t.category.name.toLowerCase() === h.toLowerCase()) &&
+      t.category.name === category &&
       (mo == null || t.month === mo) &&
       (yr == null || t.year === yr),
   );
 
-  // Nom réel de la catégorie trouvée dans les données
-  const resolvedCategory = txs[0]?.category.name ?? category;
-
   const periodLabel = monthLabel(mo, yr);
 
   if (!txs.length) {
-    return `Aucune transaction <em>${hints.join(' / ').toLowerCase()}</em> trouvée${periodLabel ? ` en ${periodLabel}` : ''}.`;
+    return `Aucune transaction <em>${category.toLowerCase()}</em> trouvée${periodLabel ? ` en ${periodLabel}` : ''}.`;
   }
 
   const total = txs.reduce((s, t) => s + parseFloat(t.amount), 0);
@@ -76,7 +81,7 @@ function handleTransactionsCategory(
     .join('');
 
   return `
-    Transactions <strong>${resolvedCategory}</strong>${periodLabel ? ` en ${periodLabel}` : ''} :
+    Transactions <strong>${category}</strong>${periodLabel ? ` en ${periodLabel}` : ''} :
     <div class="ais-card" style="margin-top:8px">
       ${rows}
       <div class="ais-row ais-row--total">
@@ -90,7 +95,6 @@ function handleSubscriptionStatus(
   intent: Extract<ParsedIntent, { intent: 'subscription_status' }>,
   ctx: BudgetContext,
 ): string {
-  // Try the pre-matched sub first, then do a fuzzy search on the raw query
   const sub: SubscriptionData | undefined =
     intent.sub ??
     ctx.subscriptions.find((s) =>
@@ -125,29 +129,60 @@ function handleSubscriptionsList(
   intent: Extract<ParsedIntent, { intent: 'subscriptions_list' }>,
   ctx: BudgetContext,
 ): string {
-  const list = intent.filter
-    ? ctx.subscriptions.filter((s) => s.status === intent.filter)
-    : ctx.subscriptions;
+  const { filter, month: mo, year: yr } = intent;
+  const label = monthLabel(mo, yr);
+  
+  // Filter subscriptions
+  let list = ctx.subscriptions;
+  
+  if (filter) {
+    list = list.filter((s) => s.status === filter);
+  }
+  
+  // Si mois/année spécifiés, filtrer les abonnements actifs à cette période
+  if (mo && yr) {
+    list = list.filter((s) => {
+      const start = new Date(s.startDate);
+      const end = s.endDate ? new Date(s.endDate) : null;
+      const targetDate = new Date(yr, mo - 1, 1);
+      
+      // Abonnement actif si :
+      // - date de début <= période ciblée
+      // - (pas de date de fin) OU (date de fin >= période ciblée)
+      // - statut est actif
+      return s.status === 'active' && 
+             start <= targetDate && 
+             (end === null || end >= targetDate);
+    });
+  }
 
-  const monthlyTotal = ctx.subscriptions
-    .filter((s) => s.status === 'active' && s.frequency === 'monthly')
+  // Calculer le total mensuel parmi les abonnements filtrés
+  const monthlyTotal = list
+    .filter((s) => s.frequency === 'monthly')
     .reduce((s, a) => s + parseFloat(a.amount), 0);
+
+  const periodLabel = label ? ` ${label}` : '';
+  
+  if (list.length === 0) {
+    return `Aucun abonnement${filter ? ` ${filter}` : ''}${periodLabel} trouvé.`;
+  }
 
   const rows = list
     .map(
       (s) => `
       <div class="ais-row">
         <span>${s.name} ${badge(s.status)}</span>
-        <span class="ais-amount ais-amount--debit">${fmt(s.amount)}/${s.frequency === 'monthly' ? 'm' : 'an'}</span>
+        <span class="ais-amount ais-amount--debit">${fmt(s.amount)}/${s.frequency === 'monthly' ? 'm' : s.frequency === 'yearly' ? 'an' : s.frequency}</span>
       </div>`,
     )
     .join('');
 
   return `
     <div class="ais-card">
+      <div class="ais-card__label">Abonnements${periodLabel}${filter ? ` (${filter})` : ''} (${list.length})</div>
       ${rows}
       ${
-        intent.filter !== 'inactive'
+        list.length > 0 && filter !== 'inactive'
           ? `<div class="ais-row ais-row--total">
               <span>Total mensuel</span>
               <span class="ais-amount ais-amount--debit">−${fmt(monthlyTotal)}/mois</span>
@@ -190,7 +225,6 @@ function handleBalanceForecast(
 
   const currentTotal = ctx.accounts.reduce((s, a) => s + parseFloat(a.balance), 0);
 
-  // Very simple linear projection: current balance + n months × estimated net
   const now = new Date();
   const target = new Date(yr, mo - 1, 1);
   const diffMonths = Math.max(
@@ -198,19 +232,17 @@ function handleBalanceForecast(
     Math.round((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30)),
   );
 
-  // Sum income categories from past transactions (average of last 3 months)
   const recentIncome = ctx.transactions
     .filter((t) => t.category.transactionType === 'income')
     .slice(-90)
     .reduce((s, t) => s + parseFloat(t.amount), 0);
   const avgMonthlyIncome = recentIncome / 3 || 2400;
 
-  // Sum active monthly subscriptions + recurring expenses
   const monthlyExpenses = ctx.subscriptions
     .filter((s) => s.status === 'active' && s.frequency === 'monthly')
     .reduce((s, a) => s + parseFloat(a.amount), 0);
 
-  const estimatedMonthlyExpenses = monthlyExpenses + 200 + 750; // add avg food + rent
+  const estimatedMonthlyExpenses = monthlyExpenses + 200 + 750;
   const netPerMonth = avgMonthlyIncome - estimatedMonthlyExpenses;
   const projected = currentTotal + netPerMonth * diffMonths;
 
@@ -227,10 +259,7 @@ function handleBalanceForecast(
     </div>`;
 }
 
-function handleBudgetMonth(
-  intent: BaseIntentWithPeriod,
-  ctx: BudgetContext,
-): string {
+function handleBudgetMonth(intent: BaseIntentWithPeriod, ctx: BudgetContext): string {
   const { month: mo, year: yr } = intent;
 
   const budgets = ctx.monthlyBudgets.filter(
@@ -240,10 +269,9 @@ function handleBudgetMonth(
   const label = monthLabel(mo, yr);
 
   if (!budgets.length) {
-    const fillText = `Ajouter budget ${mo ? MONTH_NAMES[mo] : 'juillet'} ${yr ?? 2026}`;
     return `
       Aucun budget trouvé${label ? ` pour ${label}` : ''}.
-      <button class="ais-pill" data-fill="${fillText}">➕ Créer un budget →</button>`;
+      <button class="ais-pill" data-fill="Ajouter budget">➕ Créer un budget →</button>`;
   }
 
   const rows = budgets
@@ -264,53 +292,7 @@ function handleBudgetMonth(
   return `Budget <strong>${label}</strong> :<div class="ais-card" style="margin-top:8px">${rows}</div>`;
 }
 
-function handleBudgetAdd(
-  intent: BaseIntentWithPeriod,
-  ctx: BudgetContext,
-  onAddBudget?: (payload: AddBudgetLinePayload) => void,
-): string {
-  const mo = intent.month ?? 7;
-  const yr = intent.year ?? new Date().getFullYear();
-  const moName = MONTH_NAMES[mo];
-
-  const exists = ctx.monthlyBudgets.find((b) => b.month === mo && b.year === yr);
-  if (exists) {
-    return `Un budget existe déjà pour <strong>${moName} ${yr}</strong> (${exists.category.name} — prévu ${fmt(exists.plannedAmount)}). Souhaitez-vous en créer un nouveau pour une autre catégorie ?`;
-  }
-
-  const expenseCategories = ctx.categories
-    .filter((c: CategoryData) => c.transactionType === 'expense')
-    .map((c: CategoryData) => `<option value="${c.name}">${c.name}</option>`)
-    .join('');
-
-  // The form uses data attributes so the host component can wire up the submit
-  return `
-    <div class="ais-card">
-      <div class="ais-card__label">Nouvelle ligne budget</div>
-      <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px">
-        Période : <strong style="color:var(--color-text-primary)">${moName} ${yr}</strong>
-      </p>
-      <div class="ais-form" data-month="${mo}" data-year="${yr}">
-        <label class="ais-form__label">Catégorie
-          <select class="ais-form__select" name="category">${expenseCategories}</select>
-        </label>
-        <label class="ais-form__label">Libellé (optionnel)
-          <input class="ais-form__input" type="text" name="label" placeholder="Ex : Vacances été" />
-        </label>
-        <label class="ais-form__label">Montant prévu (€)
-          <input class="ais-form__input" type="number" name="amount" step="0.01" min="0" placeholder="200.00" />
-        </label>
-        <button class="ais-form__submit" data-action="add-budget">
-          ✚ Créer la ligne budget
-        </button>
-      </div>
-    </div>`;
-}
-
-function handleExpensesSummary(
-  intent: BaseIntentWithPeriod,
-  ctx: BudgetContext,
-): string {
+function handleExpensesSummary(intent: BaseIntentWithPeriod, ctx: BudgetContext): string {
   const { month: mo, year: yr } = intent;
 
   const txs = ctx.transactions.filter(
@@ -374,16 +356,376 @@ function handleCategoriesSummary(ctx: BudgetContext): string {
     </div>`;
 }
 
-// ── Workaround for shared period type ─────────────────────────
+// ── Category Data Handler ───────────────────────────────────────
+
+function handleCategoryData(
+  intent: Extract<ParsedIntent, { intent: 'category_data' }>,
+  ctx: BudgetContext,
+): string {
+  const { category, month: mo, year: yr } = intent;
+  const label = monthLabel(mo, yr);
+  
+  // Find the actual category object
+  const cat = ctx.categories.find(c => c.name.toLowerCase() === category.toLowerCase());
+  const catName = cat?.name ?? category;
+  
+  let htmlParts: string[] = [];
+  const period = label ? ` ${label}` : '';
+
+  // 1. Transactions for this category
+  const txs = ctx.transactions.filter(
+    (t) => 
+      t.category.name.toLowerCase() === category.toLowerCase() &&
+      (mo == null || t.month === mo) &&
+      (yr == null || t.year === yr),
+  );
+
+  if (txs.length > 0) {
+    const txTotal = txs.reduce((s, t) => s + parseFloat(t.amount), 0);
+    const rows = txs
+      .map((t) => `
+        <div class="ais-row">
+          <span>${t.label}</span>
+          <span class="ais-amount ais-amount--${t.type}">${fmt(t.amount)}</span>
+        </div>`)
+      .join('');
+    
+    htmlParts.push(`
+      <div class="ais-card">
+        <div class="ais-card__label">Transactions${period} (${txs.length})</div>
+        ${rows}
+        <div class="ais-row ais-row--total">
+          <span>Total</span>
+          <span class="ais-amount">${fmt(txTotal)}</span>
+        </div>
+      </div>`);
+  }
+
+  // 2. Budgets for this category
+  const budgets = ctx.monthlyBudgets.filter(
+    (b) => 
+      b.category.name.toLowerCase() === category.toLowerCase() &&
+      (mo == null || b.month === mo) &&
+      (yr == null || b.year === yr),
+  );
+
+  if (budgets.length > 0) {
+    const rows = budgets
+      .map((b) => {
+        const planned = parseFloat(b.plannedAmount);
+        const actual = parseFloat(b.actualAmount);
+        const pct = planned > 0 ? Math.min(Math.round((actual / planned) * 100), 100) : 0;
+        const color = pct > 100 ? '#E24B4A' : pct > 75 ? '#EF9F27' : '#1D9E75';
+        return `
+          <div class="ais-budget-line">
+            <div class="ais-row">
+              <span>${b.label || catName}</span>
+              <span class="ais-amount">${fmt(actual)} / ${fmt(planned)}</span>
+            </div>
+            <div class="ais-progress">
+              <div class="ais-progress__fill" style="width:${pct}%;background:${color}"></div>
+            </div>
+          </div>`;
+      })
+      .join('');
+    
+    htmlParts.push(`
+      <div class="ais-card">
+        <div class="ais-card__label">Budget${period}</div>
+        ${rows}
+      </div>`);
+  }
+
+  // 3. Subscriptions for this category
+  const subs = ctx.subscriptions.filter(
+    (s) => 
+      s.category.name.toLowerCase() === category.toLowerCase() &&
+      s.status === 'active'
+  );
+
+  if (subs.length > 0) {
+    const subTotal = subs.reduce((s, sub) => s + parseFloat(sub.amount), 0);
+    const rows = subs
+      .map((s) => `
+        <div class="ais-row">
+          <span>${s.name}</span>
+          <span class="ais-amount ais-amount--debit">${fmt(s.amount)}/${s.frequency === 'monthly' ? 'mois' : s.frequency === 'yearly' ? 'an' : s.frequency}</span>
+        </div>`)
+      .join('');
+    
+    htmlParts.push(`
+      <div class="ais-card">
+        <div class="ais-card__label">Abonnements actifs (${subs.length})</div>
+        ${rows}
+        <div class="ais-row ais-row--total">
+          <span>Total</span>
+          <span class="ais-amount ais-amount--debit">${fmt(subTotal)}/mois</span>
+        </div>
+      </div>`);
+  }
+
+  // If no data found
+  if (htmlParts.length === 0) {
+    return `Aucune donnée trouvée pour <strong>${catName}</strong>${period}.`;
+  }
+
+  return htmlParts.join('\n');
+}
+
+// ── Intent handlers : ajout (menu + 4 formulaires) ──────────────
+
+/**
+ * Carte cliquable pour le menu "Que souhaitez-vous ajouter ?".
+ * Chaque carte déclenche un data-action que le composant host écoute
+ * pour rafficher le bon formulaire dans la même bulle.
+ */
+function addMenuCard(entity: AddEntityType, icon: string, name: string, desc: string): string {
+  return `
+    <button class="ais-add-card" data-add-entity="${entity}">
+      <i class="ais-add-card__icon" data-icon="${icon}"></i>
+      <div class="ais-add-card__name">${name}</div>
+      <div class="ais-add-card__desc">${desc}</div>
+    </button>`;
+}
+
+function handleAddMenu(
+  intent: Extract<ParsedIntent, { intent: 'add_menu' }>,
+  ctx: BudgetContext,
+): string {
+  // Si l'entité est déjà déterminée par le NLP (ex: "ajouter un abonnement"),
+  // on saute directement au formulaire correspondant.
+  if (intent.entity) {
+    return renderAddForm(intent.entity, ctx, intent.month, intent.year);
+  }
+
+  return `
+    Que souhaitez-vous ajouter ?
+    <div class="ais-add-menu">
+      ${addMenuCard('transaction', 'arrows-exchange', 'Transaction', 'Crédit ou débit')}
+      ${addMenuCard('subscription', 'refresh', 'Abonnement', 'Récurrent mensuel/annuel')}
+      ${addMenuCard('budget', 'calendar-stats', 'Ligne budget', 'Prévu pour un mois')}
+      ${addMenuCard('category', 'tags', 'Catégorie', 'Classer les opérations')}
+    </div>`;
+}
+
+/**
+ * Affiche le formulaire de création pour une entité donnée.
+ * Exporté pour que le composant host puisse l'appeler quand l'utilisateur
+ * clique sur une carte du menu (sans repasser par le NLP).
+ */
+export function renderAddForm(
+  entity: AddEntityType,
+  ctx: BudgetContext,
+  mo?: number | null,
+  yr?: number | null,
+): string {
+  switch (entity) {
+    case 'transaction':
+      return formTransaction(ctx, mo, yr);
+    case 'subscription':
+      return formSubscription(ctx);
+    case 'budget':
+      return formBudget(ctx, mo, yr);
+    case 'category':
+      return formCategory();
+    default:
+      return '';
+  }
+}
+
+function formTransaction(ctx: BudgetContext, mo?: number | null, yr?: number | null): string {
+  const now = new Date();
+  const defDate = mo && yr
+    ? `${yr}-${String(mo).padStart(2, '0')}-${String(Math.min(now.getDate(), 28)).padStart(2, '0')}`
+    : todayISO();
+
+  const categoryOptions = ctx.categories
+    .map((c) => `<option value="${c.name}">${c.name}</option>`)
+    .join('');
+  const accountOptions = ctx.accounts
+    .map((a) => `<option value="${a.name}">${a.name}</option>`)
+    .join('');
+
+  return `
+    <div class="ais-card">
+      <div class="ais-card__label">Nouvelle transaction</div>
+      <div class="ais-form" data-type="transaction">
+        <div class="ais-form__row2">
+          <label class="ais-form__label">Libellé
+            <input class="ais-form__input" name="label" placeholder="Ex : Courses Carrefour" />
+          </label>
+          <label class="ais-form__label">Montant (€)
+            <input class="ais-form__input" type="number" name="amount" step="0.01" min="0" placeholder="0.00" />
+          </label>
+        </div>
+        <div class="ais-form__row2">
+          <label class="ais-form__label">Type
+            <select class="ais-form__select" name="type">
+              <option value="debit">Débit (dépense)</option>
+              <option value="credit">Crédit (revenu)</option>
+            </select>
+          </label>
+          <label class="ais-form__label">Date
+            <input class="ais-form__input" type="date" name="date" value="${defDate}" />
+          </label>
+        </div>
+        <label class="ais-form__label">Catégorie
+          <select class="ais-form__select" name="category">${categoryOptions}</select>
+        </label>
+        <label class="ais-form__label">Compte
+          <select class="ais-form__select" name="account">${accountOptions}</select>
+        </label>
+        <button class="ais-form__submit" data-action="add-transaction">
+          ✚ Créer la transaction
+        </button>
+        <button class="ais-form__back" data-action="back-to-menu">← Retour</button>
+      </div>
+    </div>`;
+}
+
+function formSubscription(ctx: BudgetContext): string {
+  const categoryOptions = ctx.categories
+    .filter((c) => c.transactionType === 'expense')
+    .map((c) => `<option value="${c.name}">${c.name}</option>`)
+    .join('');
+  const accountOptions = ctx.accounts
+    .map((a) => `<option value="${a.name}">${a.name}</option>`)
+    .join('');
+
+  return `
+    <div class="ais-card">
+      <div class="ais-card__label">Nouvel abonnement</div>
+      <div class="ais-form" data-type="subscription">
+        <div class="ais-form__row2">
+          <label class="ais-form__label">Nom
+            <input class="ais-form__input" name="name" placeholder="Ex : Netflix" />
+          </label>
+          <label class="ais-form__label">Montant (€)
+            <input class="ais-form__input" type="number" name="amount" step="0.01" min="0" placeholder="0.00" />
+          </label>
+        </div>
+        <div class="ais-form__row2">
+          <label class="ais-form__label">Fréquence
+            <select class="ais-form__select" name="frequency">
+              <option value="monthly">Mensuel</option>
+              <option value="yearly">Annuel</option>
+              <option value="quarterly">Trimestriel</option>
+            </select>
+          </label>
+          <label class="ais-form__label">Jour du mois
+            <input class="ais-form__input" type="number" name="dayOfMonth" min="1" max="31" placeholder="Ex : 5" />
+          </label>
+        </div>
+        <div class="ais-form__row2">
+          <label class="ais-form__label">Date début
+            <input class="ais-form__input" type="date" name="startDate" value="${todayISO()}" />
+          </label>
+          <label class="ais-form__label">Date fin (optionnel)
+            <input class="ais-form__input" type="date" name="endDate" />
+          </label>
+        </div>
+        <label class="ais-form__label">Catégorie
+          <select class="ais-form__select" name="category">${categoryOptions}</select>
+        </label>
+        <label class="ais-form__label">Compte
+          <select class="ais-form__select" name="account">${accountOptions}</select>
+        </label>
+        <button class="ais-form__submit" data-action="add-subscription">
+          ✚ Créer l'abonnement
+        </button>
+        <button class="ais-form__back" data-action="back-to-menu">← Retour</button>
+      </div>
+    </div>`;
+}
+
+function formBudget(ctx: BudgetContext, mo?: number | null, yr?: number | null): string {
+  const now = new Date();
+  const defMonth = mo ?? now.getMonth() + 1;
+  const defYear = yr ?? now.getFullYear();
+
+  const monthOptions = Object.entries(MONTH_NAMES)
+    .map(([k, v]) => `<option value="${k}"${parseInt(k) === defMonth ? ' selected' : ''}>${v}</option>`)
+    .join('');
+  const categoryOptions = ctx.categories
+    .filter((c) => c.transactionType === 'expense')
+    .map((c) => `<option value="${c.name}">${c.name}</option>`)
+    .join('');
+
+  return `
+    <div class="ais-card">
+      <div class="ais-card__label">Nouvelle ligne budget</div>
+      <div class="ais-form" data-type="budget">
+        <div class="ais-form__row2">
+          <label class="ais-form__label">Mois
+            <select class="ais-form__select" name="month">${monthOptions}</select>
+          </label>
+          <label class="ais-form__label">Année
+            <input class="ais-form__input" type="number" name="year" value="${defYear}" min="2020" max="2035" />
+          </label>
+        </div>
+        <label class="ais-form__label">Catégorie
+          <select class="ais-form__select" name="category">${categoryOptions}</select>
+        </label>
+        <label class="ais-form__label">Libellé (optionnel)
+          <input class="ais-form__input" name="label" placeholder="Ex : Vacances été" />
+        </label>
+        <label class="ais-form__label">Montant prévu (€)
+          <input class="ais-form__input" type="number" name="amount" step="0.01" min="0" placeholder="200.00" />
+        </label>
+        <button class="ais-form__submit" data-action="add-budget">
+          ✚ Créer la ligne budget
+        </button>
+        <button class="ais-form__back" data-action="back-to-menu">← Retour</button>
+      </div>
+    </div>`;
+}
+
+function formCategory(): string {
+  return `
+    <div class="ais-card">
+      <div class="ais-card__label">Nouvelle catégorie</div>
+      <div class="ais-form" data-type="category">
+        <label class="ais-form__label">Nom
+          <input class="ais-form__input" name="name" placeholder="Ex : Santé" />
+        </label>
+        <div class="ais-form__row2">
+          <label class="ais-form__label">Type d'opération
+            <select class="ais-form__select" name="transactionType">
+              <option value="expense">Dépense</option>
+              <option value="income">Revenu</option>
+              <option value="transfer">Virement</option>
+            </select>
+          </label>
+          <label class="ais-form__label">Fréquence
+            <select class="ais-form__select" name="frequency">
+              <option value="monthly">Mensuelle</option>
+              <option value="occasional">Occasionnelle</option>
+              <option value="yearly">Annuelle</option>
+              <option value="quarterly">Trimestrielle</option>
+            </select>
+          </label>
+        </div>
+        <label class="ais-form__label">Description (optionnel)
+          <input class="ais-form__input" name="description" placeholder="Ex : Médecin, pharmacie…" />
+        </label>
+        <button class="ais-form__submit" data-action="add-category">
+          ✚ Créer la catégorie
+        </button>
+        <button class="ais-form__back" data-action="back-to-menu">← Retour</button>
+      </div>
+    </div>`;
+}
+
+// ── Workaround pour le type de période partagé ─────────────────
 
 type BaseIntentWithPeriod = { month?: number | null; year?: number | null };
 
-// ── Main dispatcher ────────────────────────────────────────────
+// ── Dispatcher principal ────────────────────────────────────────
 
 export function buildResponse(
   intent: ParsedIntent,
   ctx: BudgetContext,
-  onAddBudget?: (payload: AddBudgetLinePayload) => void,
+  handlers?: AddEntityHandlers,
 ): string {
   switch (intent.intent) {
     case 'transactions_category':
@@ -398,8 +740,12 @@ export function buildResponse(
       return handleBalanceForecast(intent, ctx);
     case 'budget_month':
       return handleBudgetMonth(intent, ctx);
+    case 'category_data':
+      return handleCategoryData(intent, ctx);
     case 'budget_add':
-      return handleBudgetAdd(intent, ctx, onAddBudget);
+      return renderAddForm('budget', ctx, intent.month, intent.year);
+    case 'add_menu':
+      return handleAddMenu(intent, ctx);
     case 'expenses_summary':
       return handleExpensesSummary(intent, ctx);
     case 'categories_summary':
@@ -408,9 +754,11 @@ export function buildResponse(
     default:
       return `
         Je ne comprends pas encore cette question. Essayez par exemple :<br>
-        • <em>« Les courses en février 2026 »</em><br>
+        • <em>« Course juin 2026 »</em> (affiche les transactions/budgets)<br>
+        • <em>« Vacances juillet 2026 »</em><br>
+        • <em>« Abonnement janvier 2027 »</em><br>
         • <em>« Mon abonnement TER est-il actif ? »</em><br>
         • <em>« Solde restant en décembre 2026 »</em><br>
-        • <em>« Ajouter budget juillet 2026 »</em>`;
+        • <em>« Ajouter une transaction »</em>`;
   }
 }
