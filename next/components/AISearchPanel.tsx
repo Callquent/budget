@@ -108,6 +108,7 @@ function Bubble({
       if (submitBtn) {
         const form = submitBtn.closest<HTMLElement>('.ais-form');
         if (form) onFormSubmit(form, message.id);
+        return;
       }
     };
 
@@ -159,10 +160,6 @@ export default function AISearchPanel({
   onAddCategory,
 }: AISearchPanelProps) {
   const [inputValue, setInputValue] = useState('');
-  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedMonth, setSelectedMonth] = useState<number | ''>('');
-  const [selectedYear, setSelectedYear] = useState<number | ''>('');
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -184,6 +181,7 @@ export default function AISearchPanel({
     handleBackToMenu,
     handleFormSubmit,
     getContext,
+    addMessage,
   } = useAISearch({ apiBase, onAddBudget, onAddTransaction, onAddSubscription, onAddCategory });
 
   // Charger les catégories disponibles
@@ -218,90 +216,130 @@ export default function AISearchPanel({
     inputRef.current?.focus();
   }, []);
 
-  const handleCategorySuggestionClick = useCallback(() => {
-    setShowCategorySuggestions(true);
-    setSelectedCategory('');
-    setSelectedMonth('');
-    setSelectedYear('');
-  }, []);
-
-  const handleCategorySelect = useCallback((category: string) => {
-    setSelectedCategory(category);
-  }, []);
-
-  const handleMonthSelect = useCallback((month: number | '') => {
-    setSelectedMonth(month);
-  }, []);
-
-  const handleYearSelect = useCallback((year: number | '') => {
-    setSelectedYear(year);
-  }, []);
-
-  const handleApplySuggestion = useCallback(() => {
-    let query = '';
+  // Gère le clic sur "Proposer catégorie" - affiche les catégories dans le chat
+  const handleShowCategories = useCallback(() => {
+    // Ajouter un message AI avec les boutons de catégories
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
     
-    if (selectedCategory) {
-      query = selectedCategory;
-      
-      if (selectedMonth) {
-        query += ` ${MONTH_NAMES[selectedMonth]}`;
-      }
-      
-      if (selectedYear) {
-        query += ` ${selectedYear}`;
-      }
+    const categoryButtons = availableCategories.map(cat => 
+      `<button class="ais-pill" data-select-category="${cat}" style="margin: 4px;">${cat}</button>`
+    ).join('');
+    
+    const html = `
+      <div style="margin-bottom: 8px;">
+        <strong>Sélectionnez une catégorie :</strong>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+        ${categoryButtons}
+      </div>
+      <div style="font-size: 12px; color: #666;">
+        Puis choisissez un mois et/ou une année
+      </div>
+    `;
+    
+    addMessage({
+      id: `category-selector-${Date.now()}`,
+      role: 'ai',
+      html,
+      timestamp: new Date(),
+    });
+  }, [availableCategories]);
+
+  // Gère la sélection d'une catégorie - affiche les mois/années
+  const handleCategorySelected = useCallback((category: string) => {
+    
+    // Générer les boutons pour les mois
+    const monthButtons = Object.entries(MONTH_NAMES).map(([num, name]) => {
+      const monthNum = parseInt(num);
+      return `<button class="ais-pill" data-select-period="${category}|${monthNum}|month" style="margin: 4px;">${name}</button>`;
+    }).join('');
+    
+    // Générer les boutons pour les années
+    const yearButtons = getAvailableYears().map(year => {
+      return `<button class="ais-pill" data-select-period="${category}|${year}|year" style="margin: 4px;">${year}</button>`;
+    }).join('');
+    
+    const html = `
+      <div style="margin-bottom: 8px;">
+        <strong>Catégorie : ${category}</strong>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <strong>Sélectionnez un mois :</strong>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+        ${monthButtons}
+      </div>
+      <div style="margin-bottom: 8px;">
+        <strong>Ou une année :</strong>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+        ${yearButtons}
+      </div>
+      <div style="font-size: 12px; color: #666;">
+        Cliquez sur un mois et/ou une année pour voir les résultats
+      </div>
+    `;
+    
+    addMessage({
+      id: `period-selector-${category}-${Date.now()}`,
+      role: 'ai',
+      html,
+      timestamp: new Date(),
+    });
+  }, []);
+
+  // Gère la sélection d'une période (mois ou année)
+  const handlePeriodSelected = useCallback((category: string, value: number, type: 'month' | 'year') => {
+    // Construire la requête
+    let query = category;
+    
+    if (type === 'month') {
+      query += ` ${MONTH_NAMES[value]}`;
     } else {
-      // Si aucune catégorie sélectionnée, proposer toutes les catégories
-      if (selectedMonth || selectedYear) {
-        query = 'Budget';
-        
-        if (selectedMonth) {
-          query += ` ${MONTH_NAMES[selectedMonth]}`;
-        }
-        
-        if (selectedYear) {
-          query += ` ${selectedYear}`;
-        }
-      } else {
-        // Si vraiment rien n'est sélectionné, on affiche toutes les catégories pour le mois courant
-        const now = new Date();
-        query = `Budget ${MONTH_NAMES[now.getMonth() + 1]} ${now.getFullYear()}`;
-      }
+      query += ` ${value}`;
     }
     
-    if (query) {
-      handleFillAndFocus(query);
+    // Envoyer la requête
+    sendMessage(query);
+  }, [sendMessage]);
+
+  // Gère le clic sur les boutons dans les messages
+  const handleMessageButtonClick = useCallback((e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    
+    // Sélection de catégorie
+    const categoryBtn = target.closest<HTMLElement>('[data-select-category]');
+    if (categoryBtn?.dataset.selectCategory) {
+      handleCategorySelected(categoryBtn.dataset.selectCategory);
+      return;
     }
     
-    setShowCategorySuggestions(false);
-    setSelectedCategory('');
-    setSelectedMonth('');
-    setSelectedYear('');
-  }, [selectedCategory, selectedMonth, selectedYear, handleFillAndFocus]);
+    // Sélection de période (mois ou année)
+    const periodBtn = target.closest<HTMLElement>('[data-select-period]');
+    if (periodBtn?.dataset.selectPeriod) {
+      const [category, valueStr, type] = periodBtn.dataset.selectPeriod.split('|');
+      const value = parseInt(valueStr);
+      handlePeriodSelected(category, value, type as 'month' | 'year');
+      return;
+    }
+  }, [handleCategorySelected, handlePeriodSelected]);
 
-  const handleCancelSuggestion = useCallback(() => {
-    setShowCategorySuggestions(false);
-    setSelectedCategory('');
-    setSelectedMonth('');
-    setSelectedYear('');
-  }, []);
-
-  // Close modal on Escape key
+  // Ajouter un gestionnaire global pour les clics dans les messages
+  const messageContainerRef = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showCategorySuggestions) {
-        handleCancelSuggestion();
-      }
-    };
+    const container = messageContainerRef.current;
+    if (!container) return;
     
-    if (showCategorySuggestions) {
-      document.addEventListener('keydown', handleEscape);
-    }
+    const handleClick = (e: MouseEvent) => handleMessageButtonClick(e);
+    container.addEventListener('click', handleClick);
     
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      container.removeEventListener('click', handleClick);
     };
-  }, [showCategorySuggestions, handleCancelSuggestion]);
+  }, [handleMessageButtonClick]);
 
   return (
     <div className="ais-panel">
@@ -332,7 +370,7 @@ export default function AISearchPanel({
         ))}
         <button
           className="ais-pill"
-          onClick={handleCategorySuggestionClick}
+          onClick={handleShowCategories}
           disabled={!contextReady || availableCategories.length === 0}
           title={!contextReady ? 'Chargement des données...' : availableCategories.length === 0 ? 'Aucune catégorie disponible' : 'Proposer une catégorie, un mois et/ou une année'}
         >
@@ -341,7 +379,13 @@ export default function AISearchPanel({
       </div>
 
       {/* Chat area */}
-      <div className="ais-panel__chat" role="log" aria-live="polite" aria-label="Conversation avec l'assistant budget">
+      <div 
+        ref={messageContainerRef}
+        className="ais-panel__chat" 
+        role="log" 
+        aria-live="polite" 
+        aria-label="Conversation avec l'assistant budget"
+      >
         {messages.map((msg) => (
           <Bubble
             key={msg.id}
@@ -368,165 +412,6 @@ export default function AISearchPanel({
 
         <div ref={chatEndRef} />
       </div>
-
-      {/* Category Suggestion Modal */}
-      {showCategorySuggestions && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              handleCancelSuggestion();
-            }
-          }}
-        >
-          <div
-            style={{
-              background: 'white',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '90%',
-              maxWidth: '500px',
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
-            }}
-          >
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 600 }}>
-              Proposer une recherche
-            </h3>
-
-            {/* Category Selection */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: 500 }}>
-                Catégorie
-              </label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => handleCategorySelect(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                }}
-              >
-                <option value="">Toutes les catégories</option>
-                {availableCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Month and Year Selection */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: 500 }}>
-                  Mois (optionnel)
-                </label>
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => handleMonthSelect(e.target.value ? parseInt(e.target.value) : '')}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                  }}
-                >
-                  <option value="">Tous les mois</option>
-                  {Object.entries(MONTH_NAMES).map(([num, name]) => (
-                    <option key={num} value={num}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: 500 }}>
-                  Année (optionnel)
-                </label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => handleYearSelect(e.target.value ? parseInt(e.target.value) : '')}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                  }}
-                >
-                  <option value="">Toutes les années</option>
-                  {getAvailableYears().map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Preview */}
-            {selectedCategory || selectedMonth || selectedYear ? (
-              <div style={{ marginBottom: '20px', padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>
-                <strong style={{ fontSize: '14px' }}>Prévisualisation : </strong>
-                <span style={{ color: '#6366f1' }}>
-                  {selectedCategory || 'toutes les catégories'}
-                  {selectedMonth ? ` ${MONTH_NAMES[selectedMonth]}` : ''}
-                  {selectedYear ? ` ${selectedYear}` : ''}
-                </span>
-              </div>
-            ) : null}
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={handleCancelSuggestion}
-                style={{
-                  padding: '10px 20px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  background: 'white',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                }}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleApplySuggestion}
-                style={{
-                  padding: '10px 20px',
-                  border: 'none',
-                  borderRadius: '8px',
-                  background: '#6366f1',
-                  color: 'white',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                }}
-              >
-                Appliquer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Input row */}
       <div className="ais-panel__input-row">

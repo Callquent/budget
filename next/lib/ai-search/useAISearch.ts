@@ -67,6 +67,8 @@ export interface UseAISearchReturn {
   getContext: () => BudgetContext;
   sendMessage: (query: string) => void;
   clearChat: () => void;
+  /** Ajoute un message directement (pour les sélecteurs interactifs) */
+  addMessage: (message: ChatMessage) => void;
   /** L'utilisateur a cliqué sur une carte du menu "ajouter" → affiche le bon formulaire. */
   handleAddEntityClick: (entity: AddEntityType, messageId: string) => void;
   /** L'utilisateur clique sur "← Retour" dans un formulaire → réaffiche le menu. */
@@ -336,6 +338,10 @@ export function useAISearch({
     }]);
   }, []);
 
+  const addMessage = useCallback((message: ChatMessage) => {
+    setMessages((prev) => [...prev, message]);
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -343,6 +349,7 @@ export function useAISearch({
     getContext: () => contextRef.current,
     sendMessage,
     clearChat,
+    addMessage,
     handleAddEntityClick,
     handleBackToMenu,
     handleFormSubmit,
