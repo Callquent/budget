@@ -372,9 +372,9 @@ export default function AISearchPanel({
           className="ais-pill"
           onClick={handleShowCategories}
           disabled={!contextReady || availableCategories.length === 0}
-          title={!contextReady ? 'Chargement des données...' : availableCategories.length === 0 ? 'Aucune catégorie disponible' : 'Proposer une catégorie, un mois et/ou une année'}
+          title={!contextReady ? 'Chargement des données...' : availableCategories.length === 0 ? 'Aucune catégorie disponible' : 'Filtrer par catégorie, mois et/ou année'}
         >
-          🎯 Proposer catégorie...
+          🎯 Filtrer par catégorie et période
         </button>
       </div>
 
