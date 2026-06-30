@@ -161,6 +161,7 @@ export default function AISearchPanel({
 }: AISearchPanelProps) {
   const [inputValue, setInputValue] = useState('');
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [categorySelectors, setCategorySelectors] = useState<Record<string, { messageId: string; originalHtml: string; category?: string }>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -182,6 +183,7 @@ export default function AISearchPanel({
     handleFormSubmit,
     getContext,
     addMessage,
+    updateMessage,
   } = useAISearch({ apiBase, onAddBudget, onAddTransaction, onAddSubscription, onAddCategory });
 
   // Charger les catégories disponibles
@@ -216,15 +218,12 @@ export default function AISearchPanel({
     inputRef.current?.focus();
   }, []);
 
-  // Gère le clic sur "Proposer catégorie" - affiche les catégories dans le chat
+  // Gère le clic sur "Filtrer par catégorie et période" - affiche les catégories dans le chat
   const handleShowCategories = useCallback(() => {
     // Ajouter un message AI avec les boutons de catégories
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    
+    const messageId = `category-selector-${Date.now()}`;
     const categoryButtons = availableCategories.map(cat => 
-      `<button class="ais-pill" data-select-category="${cat}" style="margin: 4px;">${cat}</button>`
+      `<button class="ais-pill" data-select-category="${cat}" data-message-id="${messageId}" style="margin: 4px;">${cat}</button>`
     ).join('');
     
     const html = `
@@ -239,40 +238,53 @@ export default function AISearchPanel({
       </div>
     `;
     
+    // Stocker l'ID et le HTML original pour pouvoir revenir en arrière
+    setCategorySelectors((prev) => ({
+      ...prev,
+      [messageId]: { messageId, originalHtml: html }
+    }));
+    
     addMessage({
-      id: `category-selector-${Date.now()}`,
+      id: messageId,
       role: 'ai',
       html,
       timestamp: new Date(),
     });
-  }, [availableCategories]);
+  }, [availableCategories, setCategorySelectors]);
 
-  // Gère la sélection d'une catégorie - affiche les mois/années
-  const handleCategorySelected = useCallback((category: string) => {
+  // Gère la sélection d'une catégorie - remplace le message pour afficher les mois/années
+  const handleCategorySelected = useCallback((category: string, messageId: string) => {
+    // Trouver le sélecteur de catégories correspondant
+    const selector = categorySelectors[messageId];
+    if (!selector) return;
     
     // Générer les boutons pour les mois
     const monthButtons = Object.entries(MONTH_NAMES).map(([num, name]) => {
       const monthNum = parseInt(num);
-      return `<button class="ais-pill" data-select-period="${category}|${monthNum}|month" style="margin: 4px;">${name}</button>`;
+      return `<button class="ais-pill" data-select-period="${category}|${monthNum}|month" data-message-id="${messageId}" style="margin: 4px;">${name}</button>`;
     }).join('');
     
     // Générer les boutons pour les années
     const yearButtons = getAvailableYears().map(year => {
-      return `<button class="ais-pill" data-select-period="${category}|${year}|year" style="margin: 4px;">${year}</button>`;
+      return `<button class="ais-pill" data-select-period="${category}|${year}|year" data-message-id="${messageId}" style="margin: 4px;">${year}</button>`;
     }).join('');
     
     const html = `
-      <div style="margin-bottom: 8px;">
+      <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
         <strong>Catégorie : ${category}</strong>
+        <button class="ais-pill" data-action="back-to-categories" data-message-id="${messageId}" style="margin: 0;">← Retour</button>
       </div>
       <div style="margin-bottom: 8px;">
-        <strong>Sélectionnez un mois :</strong>
+        <strong>Sélectionnez un mois et/ou une année :</strong>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <strong>Mois :</strong>
       </div>
       <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
         ${monthButtons}
       </div>
       <div style="margin-bottom: 8px;">
-        <strong>Ou une année :</strong>
+        <strong>Année :</strong>
       </div>
       <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
         ${yearButtons}
@@ -282,13 +294,30 @@ export default function AISearchPanel({
       </div>
     `;
     
-    addMessage({
-      id: `period-selector-${category}-${Date.now()}`,
-      role: 'ai',
-      html,
-      timestamp: new Date(),
-    });
-  }, []);
+    // Mettre à jour le message existant
+    updateMessage(messageId, html);
+    
+    // Mettre à jour le state pour stocker la catégorie sélectionnée
+    setCategorySelectors((prev) => ({
+      ...prev,
+      [messageId]: { ...prev[messageId], category }
+    }));
+  }, [categorySelectors, updateMessage]);
+
+  // Gère le retour aux catégories
+  const handleBackToCategories = useCallback((messageId: string) => {
+    const selector = categorySelectors[messageId];
+    if (selector && selector.originalHtml) {
+      // Rétablir le HTML original
+      updateMessage(messageId, selector.originalHtml);
+      
+      // Réinitialiser la catégorie
+      setCategorySelectors((prev) => ({
+        ...prev,
+        [messageId]: { ...prev[messageId], category: undefined }
+      }));
+    }
+  }, [categorySelectors, updateMessage]);
 
   // Gère la sélection d'une période (mois ou année)
   const handlePeriodSelected = useCallback((category: string, value: number, type: 'month' | 'year') => {
@@ -311,20 +340,27 @@ export default function AISearchPanel({
     
     // Sélection de catégorie
     const categoryBtn = target.closest<HTMLElement>('[data-select-category]');
-    if (categoryBtn?.dataset.selectCategory) {
-      handleCategorySelected(categoryBtn.dataset.selectCategory);
+    if (categoryBtn?.dataset.selectCategory && categoryBtn.dataset.messageId) {
+      handleCategorySelected(categoryBtn.dataset.selectCategory, categoryBtn.dataset.messageId);
       return;
     }
     
     // Sélection de période (mois ou année)
     const periodBtn = target.closest<HTMLElement>('[data-select-period]');
-    if (periodBtn?.dataset.selectPeriod) {
+    if (periodBtn?.dataset.selectPeriod && periodBtn.dataset.messageId) {
       const [category, valueStr, type] = periodBtn.dataset.selectPeriod.split('|');
       const value = parseInt(valueStr);
       handlePeriodSelected(category, value, type as 'month' | 'year');
       return;
     }
-  }, [handleCategorySelected, handlePeriodSelected]);
+    
+    // Bouton Retour vers les catégories
+    const backBtn = target.closest<HTMLElement>('[data-action="back-to-categories"]');
+    if (backBtn?.dataset.messageId) {
+      handleBackToCategories(backBtn.dataset.messageId);
+      return;
+    }
+  }, [handleCategorySelected, handlePeriodSelected, handleBackToCategories]);
 
   // Ajouter un gestionnaire global pour les clics dans les messages
   const messageContainerRef = useRef<HTMLDivElement>(null);

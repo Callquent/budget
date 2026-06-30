@@ -69,6 +69,8 @@ export interface UseAISearchReturn {
   clearChat: () => void;
   /** Ajoute un message directement (pour les sélecteurs interactifs) */
   addMessage: (message: ChatMessage) => void;
+  /** Met à jour un message existant */
+  updateMessage: (messageId: string, newHtml: string) => void;
   /** L'utilisateur a cliqué sur une carte du menu "ajouter" → affiche le bon formulaire. */
   handleAddEntityClick: (entity: AddEntityType, messageId: string) => void;
   /** L'utilisateur clique sur "← Retour" dans un formulaire → réaffiche le menu. */
@@ -342,6 +344,12 @@ export function useAISearch({
     setMessages((prev) => [...prev, message]);
   }, []);
 
+  const updateMessage = useCallback((messageId: string, newHtml: string) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, html: newHtml } : msg))
+    );
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -350,6 +358,7 @@ export function useAISearch({
     sendMessage,
     clearChat,
     addMessage,
+    updateMessage,
     handleAddEntityClick,
     handleBackToMenu,
     handleFormSubmit,
