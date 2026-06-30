@@ -9,9 +9,9 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { name: "Tableau de bord", href: "/", icon: "bi-house", exact: true },
+  { name: "Budget",          href: "/budget",        icon: "bi-calendar3" },
   { name: "Transactions",    href: "/transactions",  icon: "bi-list-ul" },
   { name: "Abonnements",     href: "/subscriptions", icon: "bi-arrow-repeat" },
-  { name: "Budget",          href: "/budget",        icon: "bi-calendar3" },
   { name: "Comptes",         href: "/accounts",      icon: "bi-bank" },
   { name: "Catégories",      href: "/categories",    icon: "bi-tags" },
   { name: "Statistiques",    href: "/statistics",    icon: "bi-graph-up-arrow" },

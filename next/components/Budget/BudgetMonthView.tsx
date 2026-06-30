@@ -512,10 +512,10 @@ export default function BudgetMonthView({
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div>
           <Link
-            href={`/budget/${year}`}
+            href="/budget"
             className="text-muted text-decoration-none small d-inline-flex align-items-center gap-1 mb-1"
           >
-            <i className="bi bi-chevron-left"></i> Budget {year}
+            <i className="bi bi-chevron-left"></i> Retour Budget {year}
           </Link>
           <h1 className="h3 mb-0 fw-bold">
             Budget —{" "}
