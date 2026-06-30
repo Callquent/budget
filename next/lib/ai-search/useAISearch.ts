@@ -85,7 +85,7 @@ const MONTH_NAMES_FR: Record<number, string> = {
 };
 
 const ADD_MENU_HTML = `
-  Que souhaitez-vous ajouter ?
+  <div style="font-weight: 600; margin-bottom: 8px; color: var(--color-text-primary, #111827);">Que souhaitez-vous ajouter ?</div>
   <div class="ais-add-menu">
     <button class="ais-add-card" data-add-entity="transaction">
       <i class="ais-add-card__icon" data-icon="arrows-exchange"></i>

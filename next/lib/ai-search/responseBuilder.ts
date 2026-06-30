@@ -499,7 +499,7 @@ function handleAddMenu(
   }
 
   return `
-    Que souhaitez-vous ajouter ?
+    <div style="font-weight: 600; margin-bottom: 8px; color: var(--color-text-primary, #111827);">Que souhaitez-vous ajouter ?</div>
     <div class="ais-add-menu">
       ${addMenuCard('transaction', 'arrows-exchange', 'Transaction', 'Crédit ou débit')}
       ${addMenuCard('subscription', 'refresh', 'Abonnement', 'Récurrent mensuel/annuel')}
