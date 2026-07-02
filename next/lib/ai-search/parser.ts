@@ -42,6 +42,34 @@ export function parseYear(text: string): number | null {
   return m ? parseInt(m[1], 10) : null;
 }
 
+// Parse le nom du compte à partir d'une requête
+// Ex: "solde CCP juin 2026" -> "CCP"
+// Ex: "solde de mon compte courant en janvier 2025" -> "compte courant"
+export function parseAccount(text: string, accounts: {id: number, name: string}[]): string | null {
+  const n = normalize(text);
+  
+  // Si aucun compte n'est disponible, on ne peut pas matcher
+  if (!accounts || accounts.length === 0) return null;
+  
+  // Essayons de trouver un nom de compte dans la requête
+  for (const account of accounts) {
+    const accountNorm = normalize(account.name);
+    // Vérifier si le nom du compte (ou une partie significative) est dans la requête
+    if (n.includes(accountNorm)) {
+      return account.name;
+    }
+    // Essayons avec des variantes (sans accents, singulier/pluriel simple)
+    const accountNormSimple = accountNorm
+      .replace(/s$/, '') // Retirer le 's' final
+      .replace(/x$/, ''); // Retirer le 'x' final
+    if (n.includes(accountNormSimple)) {
+      return account.name;
+    }
+  }
+  
+  return null;
+}
+
 const FOOD_PATTERN =
   /cours(e?s?)|supermarche|hypermarche|lidl|carrefour|intermarche|auchan|alimentation|epicerie|monoprix|leclerc|biocoop/;
 
@@ -53,7 +81,7 @@ const SUBSCRIPTION_PATTERN =
 // dans subscription_status à cause du mot "abonnement".
 const ADD_VERB_PATTERN = /\bajout|\bajouter|\bcree|\bcreer|\bnouveau\b|\bnouvelle\b|\bnew\b/;
 
-export function classify(query: string, subscriptions: SubscriptionData[], categories: import('./types').CategoryData[] = []): ParsedIntent {
+export function classify(query: string, subscriptions: SubscriptionData[], categories: import('./types').CategoryData[] = [], accounts: {id: number, name: string}[] = []): ParsedIntent {
   const n = normalize(query);
   const mo = parseMonth(query);
   const yr = parseYear(query);
@@ -135,8 +163,9 @@ export function classify(query: string, subscriptions: SubscriptionData[], categ
 
   // ── 4. Solde / projection ────────────────────────────────────────
   if (/solde|rest|dispo|argent|combien|avoir/.test(n)) {
-    if (mo && yr) return { intent: 'balance_forecast', month: mo, year: yr };
-    return { intent: 'balance_current', month: mo, year: yr };
+    const account = parseAccount(query, accounts) ?? undefined;
+    if (mo && yr) return { intent: 'balance_forecast', month: mo, year: yr, account };
+    return { intent: 'balance_current', month: mo, year: yr, account };
   }
 
   // ── 5. Consultation budget d'un mois ─────────────────────────────

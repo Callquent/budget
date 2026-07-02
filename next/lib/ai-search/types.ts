@@ -106,6 +106,7 @@ export interface BalanceForecastIntent extends BaseIntent {
   intent: 'balance_forecast';
   month: number;
   year: number;
+  account?: string;
 }
 
 export interface BudgetAddIntent extends BaseIntent {
@@ -133,15 +134,21 @@ export interface UnknownIntent extends BaseIntent {
   query: string;
 }
 
+export interface BalanceCurrentIntent extends BaseIntent {
+  intent: 'balance_current';
+  account?: string;
+}
+
 export type ParsedIntent =
   | TransactionsCategoryIntent
   | SubscriptionStatusIntent
   | SubscriptionsListIntent
   | BalanceForecastIntent
+  | BalanceCurrentIntent
   | BudgetAddIntent
   | CategoryDataIntent
   | AddMenuIntent
-  | ({ intent: 'balance_current' | 'budget_month' | 'expenses_summary' | 'categories_summary' } & BaseIntent)
+  | ({ intent: 'budget_month' | 'expenses_summary' | 'categories_summary' } & BaseIntent)
   | UnknownIntent;
 
 // ── Chat message ──────────────────────────────────────────────

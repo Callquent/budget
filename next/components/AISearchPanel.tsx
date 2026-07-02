@@ -161,7 +161,9 @@ export default function AISearchPanel({
 }: AISearchPanelProps) {
   const [inputValue, setInputValue] = useState('');
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [availableAccounts, setAvailableAccounts] = useState<{id: number, name: string}[]>([]);
   const [categorySelectors, setCategorySelectors] = useState<Record<string, { messageId: string; originalHtml: string; category?: string }>>({});
+  const [accountSelectors, setAccountSelectors] = useState<Record<string, { messageId: string; originalHtml: string; account?: {id: number, name: string}; month?: number; year?: number }>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -186,12 +188,14 @@ export default function AISearchPanel({
     updateMessage,
   } = useAISearch({ apiBase, onAddBudget, onAddTransaction, onAddSubscription, onAddCategory });
 
-  // Charger les catégories disponibles
+  // Charger les catégories et comptes disponibles
   useEffect(() => {
     if (contextReady) {
       const ctx = getContext();
       const categories = ctx.categories.map(cat => cat.name);
+      const accounts = ctx.accounts.map(acc => ({ id: acc.id, name: acc.name }));
       setAvailableCategories(categories);
+      setAvailableAccounts(accounts);
     }
   }, [contextReady]);
 
@@ -252,6 +256,40 @@ export default function AISearchPanel({
     });
   }, [availableCategories, setCategorySelectors]);
 
+  // Gère le clic sur "Connaître solde" - affiche les comptes dans le chat
+  const handleShowAccounts = useCallback(() => {
+    // Ajouter un message AI avec les boutons de comptes
+    const messageId = `account-selector-${Date.now()}`;
+    const accountButtons = availableAccounts.map(acc => 
+      `<button class="ais-pill" data-select-account="${acc.id}" data-message-id="${messageId}" style="margin: 4px;">${acc.name}</button>`
+    ).join('');
+    
+    const html = `
+      <div style="margin-bottom: 8px;">
+        <strong>Sélectionnez un compte :</strong>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+        ${accountButtons}
+      </div>
+      <div style="font-size: 12px; color: #666;">
+        Puis choisissez un mois et/ou une année
+      </div>
+    `;
+    
+    // Stocker l'ID et le HTML original pour pouvoir revenir en arrière
+    setAccountSelectors((prev) => ({
+      ...prev,
+      [messageId]: { messageId, originalHtml: html }
+    }));
+    
+    addMessage({
+      id: messageId,
+      role: 'ai',
+      html,
+      timestamp: new Date(),
+    });
+  }, [availableAccounts, setAccountSelectors]);
+
   // Gère la sélection d'une catégorie - remplace le message pour afficher les mois/années
   const handleCategorySelected = useCallback((category: string, messageId: string) => {
     // Trouver le sélecteur de catégories correspondant
@@ -304,6 +342,48 @@ export default function AISearchPanel({
     }));
   }, [categorySelectors, updateMessage]);
 
+  // Gère la sélection d'un compte - remplace le message pour afficher les mois
+  const handleAccountSelected = useCallback((accountId: string, messageId: string) => {
+    // Trouver le sélecteur de comptes correspondant
+    const selector = accountSelectors[messageId];
+    if (!selector) return;
+    
+    // Trouver le compte sélectionné
+    const account = availableAccounts.find(acc => acc.id === parseInt(accountId));
+    if (!account) return;
+    
+    // Générer les boutons pour les mois
+    const monthButtons = Object.entries(MONTH_NAMES).map(([num, name]) => {
+      const monthNum = parseInt(num);
+      return `<button class="ais-pill" data-select-account-month="${account.id}|${monthNum}" data-message-id="${messageId}" style="margin: 4px;">${name}</button>`;
+    }).join('');
+    
+    const html = `
+      <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <strong>Compte : ${account.name}</strong>
+        <button class="ais-pill" data-action="back-to-accounts" data-message-id="${messageId}" style="margin: 0;">← Retour</button>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <strong>Sélectionnez un mois :</strong>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+        ${monthButtons}
+      </div>
+      <div style="font-size: 12px; color: #666;">
+        Puis sélectionnez une année
+      </div>
+    `;
+    
+    // Mettre à jour le message existant
+    updateMessage(messageId, html);
+    
+    // Mettre à jour le state pour stocker le compte sélectionné
+    setAccountSelectors((prev) => ({
+      ...prev,
+      [messageId]: { ...prev[messageId], account, month: undefined, year: undefined }
+    }));
+  }, [availableAccounts, accountSelectors, updateMessage]);
+
   // Gère le retour aux catégories
   const handleBackToCategories = useCallback((messageId: string) => {
     const selector = categorySelectors[messageId];
@@ -319,7 +399,69 @@ export default function AISearchPanel({
     }
   }, [categorySelectors, updateMessage]);
 
-  // Gère la sélection d'une période (mois ou année)
+  // Gère le retour aux comptes
+  const handleBackToAccounts = useCallback((messageId: string) => {
+    const selector = accountSelectors[messageId];
+    if (selector && selector.originalHtml) {
+      // Rétablir le HTML original
+      updateMessage(messageId, selector.originalHtml);
+      
+      // Réinitialiser le compte
+      setAccountSelectors((prev) => ({
+        ...prev,
+        [messageId]: { ...prev[messageId], account: undefined, month: undefined, year: undefined }
+      }));
+    }
+  }, [accountSelectors, updateMessage]);
+
+  // Gère la sélection d'un mois - remplace le message pour afficher les années
+  const handleAccountMonthSelected = useCallback((accountId: string, month: number, messageId: string) => {
+    // Trouver le sélecteur de comptes correspondant
+    const selector = accountSelectors[messageId];
+    if (!selector) return;
+    
+    // Trouver le compte
+    const account = availableAccounts.find(acc => acc.id === parseInt(accountId));
+    if (!account) return;
+    
+    // Capitaliser le nom du mois
+    const monthName = MONTH_NAMES[month].charAt(0).toUpperCase() + MONTH_NAMES[month].slice(1);
+    
+    // Générer les boutons pour les années
+    const yearButtons = getAvailableYears().map(year => {
+      return `<button class="ais-pill" data-select-account-year="${account.id}|${month}|${year}" data-message-id="${messageId}" style="margin: 4px;">${year}</button>`;
+    }).join('');
+    
+    const html = `
+      <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <strong>Compte : ${account.name}</strong>
+        <button class="ais-pill" data-action="back-to-accounts" data-message-id="${messageId}" style="margin: 0;">← Retour</button>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <strong>Mois : ${monthName}</strong>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <strong>Sélectionnez une année :</strong>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+        ${yearButtons}
+      </div>
+      <div style="font-size: 12px; color: #666;">
+        Puis validez pour voir le solde
+      </div>
+    `;
+    
+    // Mettre à jour le message existant
+    updateMessage(messageId, html);
+    
+    // Mettre à jour le state pour stocker le compte et le mois sélectionnés
+    setAccountSelectors((prev) => ({
+      ...prev,
+      [messageId]: { ...prev[messageId], account, month, year: undefined }
+    }));
+  }, [availableAccounts, accountSelectors, updateMessage, MONTH_NAMES]);
+
+  // Gère la sélection d'une période (mois ou année) pour les catégories
   const handlePeriodSelected = useCallback((category: string, value: number, type: 'month' | 'year') => {
     // Construire la requête
     let query = category;
@@ -334,6 +476,45 @@ export default function AISearchPanel({
     sendMessage(query);
   }, [sendMessage]);
 
+  // Gère la sélection d'une année - affiche directement le solde
+  const handleAccountYearSelected = useCallback((accountId: string, month: number, year: number, messageId: string) => {
+    // Trouver le compte
+    const account = availableAccounts.find(acc => acc.id === parseInt(accountId));
+    if (!account) return;
+    
+    // Capitaliser le nom du mois
+    const monthName = MONTH_NAMES[month].charAt(0).toUpperCase() + MONTH_NAMES[month].slice(1);
+    
+    // Construire la requête : solde [compte] [mois] [année]
+    const query = `solde ${account.name} ${monthName} ${year}`;
+    
+    // Afficher un message de chargement au format cohérent avec BudgetMonthView
+    const html = `
+      <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <strong>${account.name} ${monthName} ${year}</strong>
+        <button class="ais-pill" data-action="back-to-accounts" data-message-id="${messageId}" style="margin: 0;">← Retour</button>
+      </div>
+      <div style="text-align: center; padding: 20px; color: #666;">
+        <i class="bi bi-hourglass-split" style="font-size: 24px; margin-bottom: 8px;"></i>
+        <div>Recherche du solde en cours...</div>
+      </div>
+    `;
+    
+    // Mettre à jour le message pour montrer la sélection
+    updateMessage(messageId, html);
+    
+    // Mettre à jour le state
+    setAccountSelectors((prev) => ({
+      ...prev,
+      [messageId]: { ...prev[messageId], account, month, year }
+    }));
+    
+    // Envoyer la requête après une légère pause pour permettre la mise à jour de l'UI
+    setTimeout(() => {
+      sendMessage(query);
+    }, 100);
+  }, [availableAccounts, sendMessage, updateMessage, MONTH_NAMES]);
+
   // Gère le clic sur les boutons dans les messages
   const handleMessageButtonClick = useCallback((e: MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -345,7 +526,33 @@ export default function AISearchPanel({
       return;
     }
     
-    // Sélection de période (mois ou année)
+    // Sélection de compte
+    const accountBtn = target.closest<HTMLElement>('[data-select-account]');
+    if (accountBtn?.dataset.selectAccount && accountBtn.dataset.messageId) {
+      handleAccountSelected(accountBtn.dataset.selectAccount, accountBtn.dataset.messageId);
+      return;
+    }
+    
+    // Sélection de mois pour un compte
+    const accountMonthBtn = target.closest<HTMLElement>('[data-select-account-month]');
+    if (accountMonthBtn?.dataset.selectAccountMonth && accountMonthBtn.dataset.messageId) {
+      const [accountId, monthStr] = accountMonthBtn.dataset.selectAccountMonth.split('|');
+      const month = parseInt(monthStr);
+      handleAccountMonthSelected(accountId, month, accountMonthBtn.dataset.messageId);
+      return;
+    }
+    
+    // Sélection d'année pour un compte
+    const accountYearBtn = target.closest<HTMLElement>('[data-select-account-year]');
+    if (accountYearBtn?.dataset.selectAccountYear && accountYearBtn.dataset.messageId) {
+      const [accountId, monthStr, yearStr] = accountYearBtn.dataset.selectAccountYear.split('|');
+      const month = parseInt(monthStr);
+      const year = parseInt(yearStr);
+      handleAccountYearSelected(accountId, month, year, accountYearBtn.dataset.messageId);
+      return;
+    }
+    
+    // Sélection de période (mois ou année) pour les catégories
     const periodBtn = target.closest<HTMLElement>('[data-select-period]');
     if (periodBtn?.dataset.selectPeriod && periodBtn.dataset.messageId) {
       const [category, valueStr, type] = periodBtn.dataset.selectPeriod.split('|');
@@ -355,12 +562,19 @@ export default function AISearchPanel({
     }
     
     // Bouton Retour vers les catégories
-    const backBtn = target.closest<HTMLElement>('[data-action="back-to-categories"]');
-    if (backBtn?.dataset.messageId) {
-      handleBackToCategories(backBtn.dataset.messageId);
+    const backToCategoriesBtn = target.closest<HTMLElement>('[data-action="back-to-categories"]');
+    if (backToCategoriesBtn?.dataset.messageId) {
+      handleBackToCategories(backToCategoriesBtn.dataset.messageId);
       return;
     }
-  }, [handleCategorySelected, handlePeriodSelected, handleBackToCategories]);
+    
+    // Bouton Retour vers les comptes
+    const backToAccountsBtn = target.closest<HTMLElement>('[data-action="back-to-accounts"]');
+    if (backToAccountsBtn?.dataset.messageId) {
+      handleBackToAccounts(backToAccountsBtn.dataset.messageId);
+      return;
+    }
+  }, [handleCategorySelected, handleAccountSelected, handleAccountMonthSelected, handleAccountYearSelected, handlePeriodSelected, handleBackToCategories, handleBackToAccounts]);
 
   // Ajouter un gestionnaire global pour les clics dans les messages
   const messageContainerRef = useRef<HTMLDivElement>(null);
@@ -404,6 +618,14 @@ export default function AISearchPanel({
             {s}
           </button>
         ))}
+        <button
+          className="ais-pill"
+          onClick={handleShowAccounts}
+          disabled={!contextReady || availableAccounts.length === 0}
+          title={!contextReady ? 'Chargement des données...' : availableAccounts.length === 0 ? 'Aucun compte disponible' : 'Connaître le solde d\'un compte pour un mois ou une année'}
+        >
+          💰 Connaître solde
+        </button>
         <button
           className="ais-pill"
           onClick={handleShowCategories}

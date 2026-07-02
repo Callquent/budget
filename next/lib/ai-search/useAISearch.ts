@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { classify } from './parser';
-import { buildResponse, renderAddForm } from './responseBuilder';
+import { buildResponse, renderAddForm, parseFrenchNumber } from './responseBuilder';
 import type {
   AddBudgetLinePayload,
   AddCategoryPayload,
@@ -174,7 +174,7 @@ export function useAISearch({
 
     setTimeout(() => {
       const ctx = contextRef.current;
-      const intent = classify(q, ctx.subscriptions, ctx.categories);
+      const intent = classify(q, ctx.subscriptions, ctx.categories, ctx.accounts);
 
       if (process.env.NODE_ENV === 'development') {
         console.log('[useAISearch] Intent:', intent);
@@ -226,13 +226,13 @@ export function useAISearch({
 
       try {
         if (type === 'transaction') {
-          if (!vals.label || !vals.amount || parseFloat(vals.amount) <= 0) {
+          if (!vals.label || !vals.amount || parseFrenchNumber(vals.amount) <= 0) {
             setMsg('⚠️ Libellé et montant sont requis.');
             return;
           }
           const payload: AddTransactionPayload = {
             label: vals.label,
-            amount: parseFloat(vals.amount),
+            amount: parseFrenchNumber(vals.amount),
             type: vals.type as 'credit' | 'debit',
             date: vals.date,
             category: vals.category,
@@ -243,13 +243,13 @@ export function useAISearch({
           setMsg(`✅ Transaction créée : <strong>${payload.label}</strong> · ${sign}${payload.amount.toFixed(2)} € · ${payload.category} · ${payload.account}`);
 
         } else if (type === 'subscription') {
-          if (!vals.name || !vals.amount || parseFloat(vals.amount) <= 0) {
+          if (!vals.name || !vals.amount || parseFrenchNumber(vals.amount) <= 0) {
             setMsg('⚠️ Nom et montant sont requis.');
             return;
           }
           const payload: AddSubscriptionPayload = {
             name: vals.name,
-            amount: parseFloat(vals.amount),
+            amount: parseFrenchNumber(vals.amount),
             frequency: vals.frequency as AddSubscriptionPayload['frequency'],
             dayOfMonth: vals.dayOfMonth ? parseInt(vals.dayOfMonth, 10) : undefined,
             startDate: vals.startDate,
@@ -262,7 +262,7 @@ export function useAISearch({
           setMsg(`✅ Abonnement créé : <strong>${payload.name}</strong> · ${payload.amount.toFixed(2)} €/${freqLabel} · ${payload.category}`);
 
         } else if (type === 'budget') {
-          if (!vals.amount || parseFloat(vals.amount) <= 0) {
+          if (!vals.amount || parseFrenchNumber(vals.amount) <= 0) {
             setMsg('⚠️ Le montant prévu est requis.');
             return;
           }
@@ -270,7 +270,7 @@ export function useAISearch({
           const year = parseInt(vals.year, 10);
           const payload: AddBudgetLinePayload = {
             category: vals.category,
-            amount: parseFloat(vals.amount),
+            amount: parseFrenchNumber(vals.amount),
             month,
             year,
             label: vals.label || undefined,

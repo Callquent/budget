@@ -15,10 +15,29 @@ import type {
 // ── Helpers ────────────────────────────────────────────────────
 
 function fmt(n: number | string): string {
-  return parseFloat(String(n)).toLocaleString('fr-FR', {
+  return parseFrenchNumber(n).toLocaleString('fr-FR', {
     style: 'currency',
     currency: 'EUR',
   });
+}
+
+/**
+ * Parse un nombre formaté en français (ex: "1 568,55 €" ou "1568,55")
+ * en un nombre JavaScript.
+ */
+export function parseFrenchNumber(value: string | number): number {
+  if (typeof value === 'number') return value;
+  
+  const s = String(value).trim();
+  
+  // Retirer le symbole euro et les espaces
+  const withoutEuro = s.replace(/€/g, '').replace(/\s+/g, '');
+  
+  // Remplacer la virgule par un point pour parseFloat
+  const normalized = withoutEuro.replace(/,/g, '.');
+  
+  const result = parseFloat(normalized);
+  return isNaN(result) ? 0 : result;
 }
 
 function monthLabel(mo: number | null | undefined, yr: number | null | undefined): string {
@@ -47,6 +66,101 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Reproduit exactement le calcul de `planned_net` du backend
+ * (BudgetController::index) :
+ *  - on ne compte QUE le montant prévu (pas prévu − réalisé) : une fois
+ *    une ligne "approuvée", elle est considérée comme déjà réalisée et
+ *    donc déjà présente dans le solde réel (account.balance) → on
+ *    l'exclut pour ne pas la compter deux fois ;
+ *  - une ligne de budget sans compte assigné (`account` absent) s'applique
+ *    à TOUS les comptes (équivalent du bucket "all" côté backend) ;
+ *  - on cumule le prévu du mois courant jusqu'au mois ciblé inclus (pas
+ *    seulement le mois ciblé) pour l'année en cours ; pour une année
+ *    future, on cumule depuis janvier ; pour une année passée, il n'y a
+ *    plus rien "à venir" donc le résultat est 0.
+ */
+function computePlannedNet(
+  ctx: BudgetContext,
+  mo: number,
+  yr: number,
+  accountName?: string,
+): number {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  let fromMonth: number;
+  const toMonth = mo;
+
+  if (yr < currentYear) {
+    return 0;
+  } else if (yr === currentYear) {
+    if (mo < currentMonth) return 0;
+    fromMonth = currentMonth;
+  } else {
+    fromMonth = 1;
+  }
+
+  return ctx.monthlyBudgets
+    .filter(
+      (b) =>
+        !b.isApproved &&
+        b.year === yr &&
+        b.month >= fromMonth &&
+        b.month <= toMonth &&
+        (!accountName || !b.account || b.account.name === accountName),
+    )
+    .reduce((sum, b) => {
+      const planned = parseFrenchNumber(b.plannedAmount);
+      const sign = b.category.transactionType === 'income' ? 1 : -1;
+      return sum + sign * planned;
+    }, 0);
+}
+
+/**
+ * `account.balance` (renvoyé par /ai-search/context) est un solde de
+ * référence figé — pas le solde "à jour". Le backend (BudgetController)
+ * reconstruit le solde réel comme : solde de référence + mouvements
+ * réels (crédit − débit) de l'année en cours, du mois 1 jusqu'au mois
+ * courant inclus. On reproduit ce calcul ici pour éviter d'afficher un
+ * solde de départ obsolète.
+ */
+function computeLiveBalance(
+  ctx: BudgetContext,
+  accountName: string,
+): number {
+  const account = ctx.accounts.find((a) => a.name === accountName);
+  if (!account) return 0;
+
+  const baseline = parseFrenchNumber(account.balance);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  const cumNet = ctx.transactions
+    .filter(
+      (t) =>
+        t.account.name === accountName &&
+        t.year === currentYear &&
+        t.month <= currentMonth,
+    )
+    .reduce(
+      (sum, t) =>
+        sum + (t.type === 'credit' ? 1 : -1) * parseFrenchNumber(t.amount),
+      0,
+    );
+
+  return baseline + cumNet;
+}
+
+function computeLiveTotalBalance(ctx: BudgetContext): number {
+  return ctx.accounts.reduce(
+    (sum, a) => sum + computeLiveBalance(ctx, a.name),
+    0,
+  );
+}
+
 // ── Intent handlers : lecture ──────────────────────────────────
 
 function handleTransactionsCategory(
@@ -68,7 +182,7 @@ function handleTransactionsCategory(
     return `Aucune transaction <em>${category.toLowerCase()}</em> trouvée${periodLabel ? ` en ${periodLabel}` : ''}.`;
   }
 
-  const total = txs.reduce((s, t) => s + parseFloat(t.amount), 0);
+  const total = txs.reduce((s, t) => s + parseFrenchNumber(t.amount), 0);
 
   const rows = txs
     .map(
@@ -159,7 +273,7 @@ function handleSubscriptionsList(
   // Calculer le total mensuel parmi les abonnements filtrés
   const monthlyTotal = list
     .filter((s) => s.frequency === 'monthly')
-    .reduce((s, a) => s + parseFloat(a.amount), 0);
+    .reduce((s, a) => s + parseFrenchNumber(a.amount), 0);
 
   const periodLabel = label ? ` ${label}` : '';
   
@@ -192,26 +306,52 @@ function handleSubscriptionsList(
     </div>`;
 }
 
-function handleBalanceCurrent(ctx: BudgetContext): string {
+function handleBalanceCurrent(intent: Extract<ParsedIntent, { intent: 'balance_current' }>, ctx: BudgetContext): string {
+  const { account: accountName } = intent;
+  
+  if (accountName) {
+    // Filtrer par compte spécifique
+    const account = ctx.accounts.find(a => a.name === accountName);
+    if (!account) {
+      return `⚠️ Compte "${accountName}" non trouvé.`;
+    }
+    
+    const balance = computeLiveBalance(ctx, account.name);
+    const color = balance >= 0 ? '#0a3622' : '#842029';
+    
+    return `
+      <div class="ais-card">
+        <div class="ais-card__label">${account.name}</div>
+        <div style="font-weight: 700; font-size: .95rem; color: ${color};">
+          ${fmt(balance)}
+        </div>
+        <div class="ais-card__hint">
+          <em>Solde à jour pour ce compte.</em>
+        </div>
+      </div>`;
+  }
+  
+  // Sans compte spécifié, afficher tous les comptes
   const rows = ctx.accounts
     .map(
       (a) => `
       <div class="ais-row">
         <span>${a.name}</span>
-        <span class="ais-amount">${fmt(a.balance)}</span>
+        <span class="ais-amount">${fmt(computeLiveBalance(ctx, a.name))}</span>
       </div>`,
     )
     .join('');
 
-  const total = ctx.accounts.reduce((s, a) => s + parseFloat(a.balance), 0);
+  const total = computeLiveTotalBalance(ctx);
+  const totalColor = total >= 0 ? '#0a3622' : '#842029';
 
   return `
     Soldes actuels de vos comptes :
     <div class="ais-card" style="margin-top:8px">
       ${rows}
       <div class="ais-row ais-row--total">
-        <span>Total</span>
-        <span class="ais-amount">${fmt(total)}</span>
+        <span><strong>Total :</strong></span>
+        <span style="font-weight: 700; color: ${totalColor};">${fmt(total)}</span>
       </div>
     </div>`;
 }
@@ -220,41 +360,76 @@ function handleBalanceForecast(
   intent: Extract<ParsedIntent, { intent: 'balance_forecast' }>,
   ctx: BudgetContext,
 ): string {
-  const { month: mo, year: yr } = intent;
+  const { month: mo, year: yr, account: accountName } = intent;
   const moName = MONTH_NAMES[mo];
 
-  const currentTotal = ctx.accounts.reduce((s, a) => s + parseFloat(a.balance), 0);
+  if (accountName) {
+    // Filtrer par compte spécifique
+    const account = ctx.accounts.find(a => a.name === accountName);
+    if (!account) {
+      return `⚠️ Compte "${accountName}" non trouvé.`;
+    }
+    
+    const currentBalance = computeLiveBalance(ctx, account.name);
 
-  const now = new Date();
-  const target = new Date(yr, mo - 1, 1);
-  const diffMonths = Math.max(
-    0,
-    Math.round((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30)),
-  );
+    // Reste à réaliser du budget prévu pour ce mois précis (même logique
+    // que "Solde projeté" dans BudgetMonthView : prévu − réalisé, par
+    // catégorie, pour ce compte).
+    const plannedNet = computePlannedNet(ctx, mo, yr, accountName);
+    const projected = currentBalance + plannedNet;
 
-  const recentIncome = ctx.transactions
-    .filter((t) => t.category.transactionType === 'income')
-    .slice(-90)
-    .reduce((s, t) => s + parseFloat(t.amount), 0);
-  const avgMonthlyIncome = recentIncome / 3 || 2400;
+    const projectedColor = projected >= 0 ? '#055160' : '#842029';
+    const currentColor = currentBalance >= 0 ? '#0a3622' : '#842029';
 
-  const monthlyExpenses = ctx.subscriptions
-    .filter((s) => s.status === 'active' && s.frequency === 'monthly')
-    .reduce((s, a) => s + parseFloat(a.amount), 0);
+    return `
+    <div class="ais-card">
+      <div class="ais-card__label">${account.name} ${moName} ${yr}</div>
+      <div style="font-weight: 700; font-size: .95rem; color: ${currentColor};">
+        ${fmt(currentBalance)}
+      </div>
+      ${plannedNet !== 0 ? `
+      <div style="margin-top: 8px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.10);">
+        <div style="font-size: .68rem; color: #adb5bd; margin-bottom: 1px; text-align: right;">
+          Estimation prévue du solde en fin de mois
+        </div>
+        <div style="font-size: .82rem; font-weight: 600; color: ${projectedColor}; text-align: right;">
+          ${fmt(projected)}
+        </div>
+      </div>` : ''}
+      <div class="ais-card__hint">
+        <em>Projection basée sur le budget prévu restant pour ${moName} ${yr}</em>
+      </div>
+    </div>`;
+  }
 
-  const estimatedMonthlyExpenses = monthlyExpenses + 200 + 750;
-  const netPerMonth = avgMonthlyIncome - estimatedMonthlyExpenses;
-  const projected = currentTotal + netPerMonth * diffMonths;
+  // Sans compte spécifié, calculer pour tous les comptes
+  const currentTotal = computeLiveTotalBalance(ctx);
 
-  const color = projected >= 0 ? '#1D9E75' : '#E24B4A';
+  // Reste à réaliser du budget prévu pour ce mois précis, tous comptes
+  // confondus (même logique que "Solde projeté" dans BudgetMonthView).
+  const plannedNet = computePlannedNet(ctx, mo, yr);
+  const projected = currentTotal + plannedNet;
+
+  const projectedColor = projected >= 0 ? '#055160' : '#842029';
+  const currentColor = currentTotal >= 0 ? '#0a3622' : '#842029';
 
   return `
     <div class="ais-card">
-      <div class="ais-card__label">Solde projeté en ${moName} ${yr}</div>
-      <div class="ais-card__value" style="color:${color}">${fmt(projected)}</div>
+      <div class="ais-card__label">Solde global en ${moName} ${yr}</div>
+      <div style="font-weight: 700; font-size: .95rem; color: ${currentColor};">
+        ${fmt(currentTotal)}
+      </div>
+      ${plannedNet !== 0 ? `
+      <div style="margin-top: 8px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.10);">
+        <div style="font-size: .68rem; color: #adb5bd; margin-bottom: 1px; text-align: right;">
+          Estimation prévue du solde en fin de mois
+        </div>
+        <div style="font-size: .82rem; font-weight: 600; color: ${projectedColor}; text-align: right;">
+          ${fmt(projected)}
+        </div>
+      </div>` : ''}
       <div class="ais-card__hint">
-        Base : solde actuel ${fmt(currentTotal)} + ${diffMonths} mois × solde net estimé ${fmt(netPerMonth)}/mois<br>
-        <em>Estimation basée sur vos revenus récents et abonnements actifs.</em>
+        <em>Projection basée sur le budget prévu restant pour ${moName} ${yr} (tous comptes confondus)</em>
       </div>
     </div>`;
 }
@@ -276,8 +451,8 @@ function handleBudgetMonth(intent: BaseIntentWithPeriod, ctx: BudgetContext): st
 
   const rows = budgets
     .map((b) => {
-      const actual = parseFloat(b.actualAmount);
-      const planned = parseFloat(b.plannedAmount);
+      const actual = parseFrenchNumber(b.actualAmount);
+      const planned = parseFrenchNumber(b.plannedAmount);
       return `
         <div class="ais-budget-line">
           <div class="ais-row">
@@ -304,7 +479,7 @@ function handleExpensesSummary(intent: BaseIntentWithPeriod, ctx: BudgetContext)
 
   const byCat: Record<string, number> = {};
   txs.forEach((t) => {
-    byCat[t.category.name] = (byCat[t.category.name] ?? 0) + parseFloat(t.amount);
+    byCat[t.category.name] = (byCat[t.category.name] ?? 0) + parseFrenchNumber(t.amount);
   });
 
   const total = Object.values(byCat).reduce((s, v) => s + v, 0);
@@ -381,7 +556,7 @@ function handleCategoryData(
   );
 
   if (txs.length > 0) {
-    const txTotal = txs.reduce((s, t) => s + parseFloat(t.amount), 0);
+    const txTotal = txs.reduce((s, t) => s + parseFrenchNumber(t.amount), 0);
     const rows = txs
       .map((t) => `
         <div class="ais-row">
@@ -412,8 +587,8 @@ function handleCategoryData(
   if (budgets.length > 0) {
     const rows = budgets
       .map((b) => {
-        const planned = parseFloat(b.plannedAmount);
-        const actual = parseFloat(b.actualAmount);
+        const planned = parseFrenchNumber(b.plannedAmount);
+        const actual = parseFrenchNumber(b.actualAmount);
         const pct = planned > 0 ? Math.min(Math.round((actual / planned) * 100), 100) : 0;
         const color = pct > 100 ? '#E24B4A' : pct > 75 ? '#EF9F27' : '#1D9E75';
         return `
@@ -444,7 +619,7 @@ function handleCategoryData(
   );
 
   if (subs.length > 0) {
-    const subTotal = subs.reduce((s, sub) => s + parseFloat(sub.amount), 0);
+    const subTotal = subs.reduce((s, sub) => s + parseFrenchNumber(sub.amount), 0);
     const rows = subs
       .map((s) => `
         <div class="ais-row">
@@ -735,7 +910,7 @@ export function buildResponse(
     case 'subscriptions_list':
       return handleSubscriptionsList(intent, ctx);
     case 'balance_current':
-      return handleBalanceCurrent(ctx);
+      return handleBalanceCurrent(intent, ctx);
     case 'balance_forecast':
       return handleBalanceForecast(intent, ctx);
     case 'budget_month':
