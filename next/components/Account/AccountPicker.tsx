@@ -29,7 +29,6 @@ export default function AccountPicker({
       <div className="row g-2">
         {accounts.map((acc) => {
           const isActive = value === String(acc.id);
-          const isCredit = acc.type === "credit";
           return (
             <div className="col-md-4 col-6" key={acc.id}>
               <button
@@ -53,12 +52,6 @@ export default function AccountPicker({
                   <div className="card-body py-2 px-3">
                     <div className="fw-semibold small mb-1">{acc.name}</div>
                     <div className="d-flex justify-content-between align-items-center">
-                      <span
-                        className={`badge ${isCredit ? "bg-success" : "bg-secondary"}`}
-                        style={{ fontSize: "0.65rem" }}
-                      >
-                        {isCredit ? "Crédit" : "Débit"}
-                      </span>
                       <span className="fw-bold text-primary" style={{ fontSize: "0.8rem" }}>
                         {acc.balance != null
                           ? `${formatNumber(parseFloat(String(acc.balance)))} ${acc.currency ?? "€"}`

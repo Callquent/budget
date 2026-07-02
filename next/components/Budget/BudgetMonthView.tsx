@@ -280,9 +280,7 @@ export default function BudgetMonthView({
                       style={{ minWidth: "130px" }}
                     >
                       <span className="d-flex align-items-center justify-content-end gap-1">
-                        <i
-                          className={`bi ${a.type === "credit" ? "bi-piggy-bank text-success" : "bi-wallet2 text-secondary"} small`}
-                        ></i>
+                        <i className="bi bi-piggy-bank text-success small"></i>
                         {a.name}
                       </span>
                     </th>
@@ -643,7 +641,6 @@ export default function BudgetMonthView({
             subs: 0,
           };
           const net = tx.credit - tx.debit;
-          const isCredit = account.type === "credit";
           return (
             <div className="col-md-4 col-sm-6" key={account.id}>
               <div
@@ -653,9 +650,7 @@ export default function BudgetMonthView({
                 <div
                   style={{
                     height: "4px",
-                    background: isCredit
-                      ? "var(--bs-success)"
-                      : "var(--bs-danger)",
+                    background: "var(--bs-primary)",
                   }}
                 ></div>
                 <div className="card-body pt-3">
@@ -665,12 +660,10 @@ export default function BudgetMonthView({
                       style={{
                         width: "42px",
                         height: "42px",
-                        background: isCredit ? "#dcfce7" : "#fef2f2",
+                        background: "#e7f3ff",
                       }}
                     >
-                      <i
-                        className={`bi ${isCredit ? "bi-piggy-bank text-success" : "bi-wallet2 text-danger"} fs-5`}
-                      ></i>
+                      <i className="bi bi-piggy-bank text-primary fs-5"></i>
                     </div>
                     <div className="min-w-0">
                       <div className="fw-semibold text-truncate">

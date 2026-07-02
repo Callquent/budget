@@ -95,11 +95,6 @@ export default function AccountList() {
               <div className="d-flex justify-content-between align-items-start">
                 <div>
                   <h5 className="card-title mb-1">{account.name}</h5>
-                  <span
-                    className={`badge ${account.type === "credit" ? "bg-success" : "bg-secondary"}`}
-                  >
-                    {account.type === "credit" ? "Crédit" : "Débit"}
-                  </span>
                 </div>
                 <span className="fs-5 fw-bold text-primary">
                   {formatNumber(parseFloat(account.balance))} {account.currency}

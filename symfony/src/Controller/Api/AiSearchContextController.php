@@ -147,7 +147,6 @@ class AiSearchContextController extends AbstractController
             $result[] = [
                 'id'       => $a->getId(),
                 'name'     => $a->getName(),
-                'type'     => $a->getType(),
                 'balance'  => $a->getBalance(),
                 'currency' => $a->getCurrency(),
             ];

@@ -34,7 +34,6 @@ class AccountController extends AbstractController
 
         $account = new Account();
         $account->setName($data['name']);
-        $account->setType($data['type']);
         $account->setCurrency($data['currency'] ?? 'EUR');
         $account->setBalance($data['balance'] ?? '0');
 
@@ -56,7 +55,6 @@ class AccountController extends AbstractController
         $data = json_decode($request->getContent(), true);
 
         $account->setName($data['name']);
-        $account->setType($data['type']);
         $account->setCurrency($data['currency'] ?? 'EUR');
         $account->setBalance($data['balance'] ?? $account->getBalance());
 

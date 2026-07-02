@@ -32,7 +32,7 @@ class SubscriptionType extends AbstractType
             ->add('account', EntityType::class, [
                 'label' => 'Compte débité',
                 'class' => Account::class,
-                'choice_label' => fn(Account $a) => $a->getName().' ('.$a->getType().')',
+                'choice_label' => fn(Account $a) => $a->getName(),
             ])
             ->add('category', EntityType::class, [
                 'label' => 'Catégorie',

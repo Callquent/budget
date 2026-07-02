@@ -22,13 +22,6 @@ class AccountType extends AbstractType
                 'constraints' => [new NotBlank()],
                 'attr' => ['placeholder' => 'ex : Compte CCP, Livret A…'],
             ])
-            ->add('type', ChoiceType::class, [
-                'label' => 'Type',
-                'choices' => [
-                    'Crédit (épargne, courant)' => Account::TYPE_CREDIT,
-                    'Débit (porte-monnaie…)'    => Account::TYPE_DEBIT,
-                ],
-            ])
             ->add('currency', ChoiceType::class, [
                 'label' => 'Devise',
                 'choices' => ['EUR €' => 'EUR', 'USD $' => 'USD', 'CHF' => 'CHF'],

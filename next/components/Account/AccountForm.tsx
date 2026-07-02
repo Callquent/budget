@@ -19,7 +19,6 @@ export default function AccountForm({ initialData, title }: AccountFormProps) {
     const form = e.currentTarget;
     const body = {
       name: (form.elements.namedItem("name") as HTMLInputElement).value,
-      type: (form.elements.namedItem("type") as HTMLSelectElement).value,
       currency: (form.elements.namedItem("currency") as HTMLInputElement).value,
       balance: (form.elements.namedItem("balance") as HTMLInputElement).value,
     };
@@ -74,17 +73,6 @@ export default function AccountForm({ initialData, title }: AccountFormProps) {
               />
             </div>
             <div className="row g-3 mb-3">
-              <div className="col-6">
-                <label className="form-label">Type</label>
-                <select
-                  name="type"
-                  className="form-select"
-                  defaultValue={initialData?.type ?? "debit"}
-                >
-                  <option value="credit">Crédit</option>
-                  <option value="debit">Débit</option>
-                </select>
-              </div>
               <div className="col-6">
                 <label className="form-label">Devise</label>
                 <input

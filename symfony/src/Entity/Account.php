@@ -12,10 +12,6 @@ use Symfony\Component\Serializer\Attribute\Groups;
 #[ORM\Table(name: 'account')]
 class Account
 {
-    // Types de comptes
-    public const TYPE_CREDIT = 'credit';  // ex: Livret A, CCP
-    public const TYPE_DEBIT  = 'debit';   // ex: porte-monnaie
-
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -25,11 +21,6 @@ class Account
     #[ORM\Column(length: 100)]
     #[Groups(['subscription:read', 'account:read'])]
     private string $name;
-
-    /** 'credit' ou 'debit' */
-    #[ORM\Column(length: 20)]
-    #[Groups(['account:read'])]
-    private string $type;
 
     #[ORM\Column(length: 3, options: ['default' => 'EUR'])]
     #[Groups(['account:read'])]
@@ -64,16 +55,6 @@ class Account
     public function setName(string $name): static
     {
         $this->name = $name;
-        return $this;
-    }
-
-    public function getType(): string
-    {
-        return $this->type;
-    }
-    public function setType(string $type): static
-    {
-        $this->type = $type;
         return $this;
     }
 
