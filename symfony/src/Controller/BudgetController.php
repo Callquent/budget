@@ -68,11 +68,35 @@ class BudgetController extends AbstractController
             ->orderBy('mb.month', 'ASC')->addOrderBy('c.name', 'ASC')
             ->getQuery()->getResult();
 
+        // plannedByAccount = budgets NON approuvés (pour projection future)
+        // allPlannedByAccount = TOUS budgets (pour calcul month_planned_net complet)
+        // approvalByAccount[$m][$aid] = [total, approved]
+        $allPlannedByAccount = [];
+        $approvalByAccount   = [];
         foreach ($allBudgets as $mb) {
-            if ($mb->isApproved()) continue;
             $m   = $mb->getMonth();
             $aid = $mb->getAccount()?->getId() ?? 'all';
             $type = $mb->getCategory()->getTransactionType();
+
+            // Comptage approbations par compte+mois
+            if (!isset($approvalByAccount[$m][$aid])) {
+                $approvalByAccount[$m][$aid] = ['total' => 0, 'approved' => 0];
+            }
+            $approvalByAccount[$m][$aid]['total']++;
+            if ($mb->isApproved()) $approvalByAccount[$m][$aid]['approved']++;
+
+            // Tous budgets (approuvés ou non) pour month_planned_net
+            if (!isset($allPlannedByAccount[$m][$aid])) {
+                $allPlannedByAccount[$m][$aid] = ['income' => 0.0, 'expense' => 0.0];
+            }
+            if ($type === 'income') {
+                $allPlannedByAccount[$m][$aid]['income'] += (float) $mb->getPlannedAmount();
+            } else {
+                $allPlannedByAccount[$m][$aid]['expense'] += (float) $mb->getPlannedAmount();
+            }
+
+            // Seulement non-approuvés pour la projection cumulative
+            if ($mb->isApproved()) continue;
             if (!isset($plannedByAccount[$m][$aid])) {
                 $plannedByAccount[$m][$aid] = ['income' => 0.0, 'expense' => 0.0];
             }
@@ -155,13 +179,26 @@ class BudgetController extends AbstractController
                     $cumPlannedNet += ($pAccount['income'] + $pAll['income']) - ($pAccount['expense'] + $pAll['expense']);
                 }
 
+                $apAll     = $allPlannedByAccount[$m]['all'] ?? ['income' => 0.0, 'expense' => 0.0];
+                $apAccount = $allPlannedByAccount[$m][$aid] ?? ['income' => 0.0, 'expense' => 0.0];
+                $monthPlannedNet = ($apAccount['income'] + $apAll['income']) - ($apAccount['expense'] + $apAll['expense']);
+
+                // Comptage approbations : budgets liés au compte + budgets sans compte ('all')
+                $apvAccount = $approvalByAccount[$m][$aid] ?? ['total' => 0, 'approved' => 0];
+                $apvAll     = $approvalByAccount[$m]['all'] ?? ['total' => 0, 'approved' => 0];
+                $totalBudgets    = $apvAccount['total'] + $apvAll['total'];
+                $approvedBudgets = $apvAccount['approved'] + $apvAll['approved'];
+                $allApvAccount   = $totalBudgets > 0 && $totalBudgets === $approvedBudgets;
+
                 $accountBalances[$aid][$m] = [
-                    'balance'           => $balance + $cumNet,
-                    'balance_projected' => $balance + $cumNet + $cumPlannedNet,
-                    'credit'            => $credit,
-                    'debit'             => $debit,
-                    'subs'              => $subs,
-                    'planned_net'       => $cumPlannedNet,
+                    'balance'             => $balance + $cumNet,
+                    'balance_projected'   => $balance + $cumNet + $cumPlannedNet,
+                    'credit'              => $credit,
+                    'debit'              => $debit,
+                    'subs'               => $subs,
+                    'planned_net'         => $cumPlannedNet,
+                    'month_planned_net'   => $monthPlannedNet,
+                    'month_all_approved'  => $allApvAccount,
                 ];
             }
         }

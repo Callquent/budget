@@ -342,7 +342,7 @@ export default function BudgetMonthView({
                             }}
                           >
                             {/* Solde projeté */}
-                            {(ab?.planned_net ?? 0) !== 0 && (
+                            {((ab?.month_planned_net ?? 0) !== 0 || ab?.month_all_approved) && (
                               <div
                                 style={{
                                   marginTop:
@@ -353,50 +353,58 @@ export default function BudgetMonthView({
                                 }}
                                 title="Estimation avec budget prévu"
                               >
-                                <div
-                                  style={{
-                                    fontSize: ".68rem",
-                                    color: "#adb5bd",
-                                    marginBottom: "1px",
-                                    textAlign: "right",
-                                  }}
-                                >
-                                  Estimation prévue du solde en fin de mois
-                                </div>
+                                {!ab?.month_all_approved && (
+                                  <div
+                                    style={{
+                                      fontSize: ".68rem",
+                                      color: "#adb5bd",
+                                      marginBottom: "1px",
+                                      textAlign: "right",
+                                    }}
+                                  >
+                                    Estimation prévue du solde en fin de mois
+                                  </div>
+                                )}
                                 <div
                                   style={{
                                     textAlign: "right",
                                     marginBottom: "2px",
                                   }}
                                 >
-                                  {budgetRow ? (
-                                    <span
-                                      className={`badge rounded-pill ${budgetRow.total_planned >= 0 ? "bg-success" : "bg-danger"}`}
-                                      style={{
-                                        fontSize: ".75rem",
-                                        fontWeight: 600,
-                                      }}
-                                    >
-                                      {budgetRow.total_planned >= 0 ? "+" : ""}
-                                      {fmt(budgetRow.total_planned)} €
-                                    </span>
-                                  ) : (
-                                    <span className="text-muted small">—</span>
-                                  )}
+                                  {(() => {
+                                    const allApproved = ab?.month_all_approved;
+                                    const value = allApproved
+                                      ? (ab?.credit ?? 0) - (ab?.debit ?? 0)
+                                      : ab?.month_planned_net ?? 0;
+                                    const label = allApproved ? "Réalisé" : "Estimation";
+                                    if (value === 0) return <span className="text-muted small">—</span>;
+                                    return (
+                                      <span
+                                        className={`badge rounded-pill ${value >= 0 ? "bg-success" : "bg-danger"}`}
+                                        style={{ fontSize: ".75rem", fontWeight: 600 }}
+                                        title={label}
+                                      >
+                                        {value >= 0 ? "+" : ""}
+                                        {fmt(value)} €
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
-                                <div
-                                  style={{
-                                    fontSize: "1rem",
-                                    fontWeight: 600,
-                                    color:
-                                      (ab!.balance_projected ?? 0) < 0
-                                        ? "#842029"
-                                        : "#055160",
-                                    textAlign: "right",
-                                  }}
-                                >
-                                  {fmt(ab!.balance_projected)} €
-                                </div>
+                                {!ab?.month_all_approved && (
+                                  <div
+                                    style={{
+                                      fontSize: "1rem",
+                                      fontWeight: 600,
+                                      color:
+                                        (ab!.balance_projected ?? 0) < 0
+                                          ? "#842029"
+                                          : "#055160",
+                                      textAlign: "right",
+                                    }}
+                                  >
+                                    {fmt(ab!.balance_projected)} €
+                                  </div>
+                                )}
                               </div>
                             )}
 
@@ -427,19 +435,7 @@ export default function BudgetMonthView({
                               </div>
                             </div>
 
-                            {/* Badge net crédit/débit */}
-                            {((ab?.credit ?? 0) > 0 ||
-                              (ab?.debit ?? 0) > 0) && (
-                              <div className="d-flex justify-content-end mt-1">
-                                <span
-                                  className={`badge rounded-pill ${(ab?.credit ?? 0) - (ab?.debit ?? 0) >= 0 ? "bg-success" : "bg-danger"}`}
-                                  style={{ fontSize: ".75rem", fontWeight: 600 }}
-                                >
-                                  {(ab?.credit ?? 0) - (ab?.debit ?? 0) >= 0 ? "+" : ""}
-                                  {fmt((ab?.credit ?? 0) - (ab?.debit ?? 0), 2)} €
-                                </span>
-                              </div>
-                            )}
+
                           </td>
                         );
                       })}
@@ -644,45 +640,64 @@ export default function BudgetMonthView({
       {/* Cartes comptes */}
       <div className="row g-3 mb-4">
         {accounts.map((account) => {
-          const tx = txByAccount[account.id] ?? {
-            credit: 0,
-            debit: 0,
-            subs: 0,
-          };
+          const tx = txByAccount[account.id] ?? { credit: 0, debit: 0, subs: 0 };
           const net = tx.credit - tx.debit;
+
+          const accountBudgets = budgets.filter((b) => b.account?.id === account.id);
+          const hasAccountBudgets = accountBudgets.length > 0;
+          const accountAllApproved = hasAccountBudgets && accountBudgets.every((b) => b.isApproved);
+
+          const budgetPlanned =
+            accountBudgets.filter((b) => b.category.transactionType === "income")
+              .reduce((s, b) => s + parseFloat(String(b.plannedAmount)), 0) -
+            accountBudgets.filter((b) => b.category.transactionType === "expense")
+              .reduce((s, b) => s + parseFloat(String(b.plannedAmount)), 0);
+
+          const budgetActual =
+            accountBudgets.filter((b) => b.category.transactionType === "income")
+              .reduce((s, b) => s + parseFloat(String(b.actualAmount)), 0) -
+            accountBudgets.filter((b) => b.category.transactionType === "expense")
+              .reduce((s, b) => s + parseFloat(String(b.actualAmount)), 0);
+
+          const estimationValue = accountAllApproved ? budgetActual : budgetPlanned;
+          const estimationLabel = accountAllApproved ? "Budget réalisé" : "Estimation prévue fin de mois";
+
           return (
             <div className="col-md-4 col-sm-6" key={account.id}>
               <div
                 className="card h-100 border-0 shadow-sm rounded-3"
                 style={{ overflow: "hidden" }}
               >
-                <div
-                  style={{
-                    height: "4px",
-                    background: "var(--bs-primary)",
-                  }}
-                ></div>
+                <div style={{ height: "4px", background: "var(--bs-primary)" }}></div>
                 <div className="card-body pt-3">
                   <div className="d-flex align-items-center gap-3 mb-3">
                     <div
                       className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                      style={{
-                        width: "42px",
-                        height: "42px",
-                        background: "#e7f3ff",
-                      }}
+                      style={{ width: "42px", height: "42px", background: "#e7f3ff" }}
                     >
                       <i className="bi bi-piggy-bank text-primary fs-5"></i>
                     </div>
-                    <div className="min-w-0">
-                      <div className="fw-semibold text-truncate">
-                        {account.name}
+                    <div className="min-w-0 flex-grow-1">
+                      <div className="d-flex align-items-center justify-content-between gap-2">
+                        <div className="fw-semibold text-truncate">{account.name}</div>
+                        {hasAccountBudgets && (
+                          <div className="text-end flex-shrink-0">
+                            <div style={{ fontSize: ".62rem", color: "#adb5bd", whiteSpace: "nowrap" }}>
+                              {estimationLabel}
+                            </div>
+                            <span
+                              className={`badge rounded-pill ${estimationValue >= 0 ? "bg-success" : "bg-danger"}`}
+                              style={{ fontSize: ".72rem", fontWeight: 600 }}
+                            >
+                              {estimationValue > 0 ? "+" : ""}
+                              {fmt(estimationValue)} €
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div className="small text-muted">
                         Solde :{" "}
-                        <span
-                          className={`fw-semibold ${account.balance < 0 ? "text-danger" : "text-dark"}`}
-                        >
+                        <span className={`fw-semibold ${account.balance < 0 ? "text-danger" : "text-dark"}`}>
                           {fmt(account.balance)} {account.currency ?? "€"}
                         </span>
                       </div>
@@ -692,47 +707,34 @@ export default function BudgetMonthView({
                     <>
                       <div className="d-flex justify-content-between small mb-1">
                         <span className="text-success d-flex align-items-center gap-1">
-                          <i className="bi bi-arrow-down-circle-fill"></i>
-                          Entrées
+                          <i className="bi bi-arrow-down-circle-fill"></i>Entrées
                         </span>
-                        <span className="fw-semibold text-success">
-                          +{fmt(tx.credit)} €
-                        </span>
+                        <span className="fw-semibold text-success">+{fmt(tx.credit)} €</span>
                       </div>
                       <div className="d-flex justify-content-between small mb-1">
                         <span className="text-danger d-flex align-items-center gap-1">
                           <i className="bi bi-arrow-up-circle-fill"></i>Sorties
                         </span>
-                        <span className="fw-semibold text-danger">
-                          −{fmt(tx.debit - tx.subs)} €
-                        </span>
+                        <span className="fw-semibold text-danger">−{fmt(tx.debit - tx.subs)} €</span>
                       </div>
                       {tx.subs > 0 && (
                         <div className="d-flex justify-content-between small mb-1">
                           <span className="text-warning d-flex align-items-center gap-1">
                             <i className="bi bi-arrow-repeat"></i>Abonnements
                           </span>
-                          <span className="fw-semibold text-warning">
-                            −{fmt(tx.subs)} €
-                          </span>
+                          <span className="fw-semibold text-warning">−{fmt(tx.subs)} €</span>
                         </div>
                       )}
                       <div className="border-top pt-2 mt-2 d-flex justify-content-between small">
-                        <span className="text-muted fw-medium">
-                          Net du mois
-                        </span>
-                        <span
-                          className={`fw-bold ${net >= 0 ? "text-success" : "text-danger"}`}
-                        >
-                          {net > 0 ? "+" : ""}
-                          {fmt(net)} €
+                        <span className="text-muted fw-medium">Net du mois</span>
+                        <span className={`fw-bold ${net >= 0 ? "text-success" : "text-danger"}`}>
+                          {net > 0 ? "+" : ""}{fmt(net)} €
                         </span>
                       </div>
                     </>
                   ) : (
                     <div className="text-muted small text-center py-2 bg-light rounded-2">
-                      <i className="bi bi-dash-circle me-1"></i>Aucun mouvement
-                      ce mois
+                      <i className="bi bi-dash-circle me-1"></i>Aucun mouvement ce mois
                     </div>
                   )}
                 </div>
