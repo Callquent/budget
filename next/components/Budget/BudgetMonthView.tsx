@@ -288,9 +288,6 @@ export default function BudgetMonthView({
                   <th className="text-end" style={{ minWidth: "120px" }}>
                     Total
                   </th>
-                  <th className="text-end" style={{ minWidth: "100px" }}>
-                    Budget prévu
-                  </th>
                   <th></th>
                 </tr>
               </thead>
@@ -344,52 +341,6 @@ export default function BudgetMonthView({
                                   : "3px solid rgba(25,135,84,.35)",
                             }}
                           >
-                            {/* Solde principal */}
-                            <div
-                              style={{
-                                fontWeight: 700,
-                                fontSize: ".95rem",
-                                color: colorRef < 0 ? "#842029" : "#0a3622",
-                              }}
-                            >
-                              {fmt(bal)} €
-                            </div>
-
-                            {/* Badges crédit / débit */}
-                            {((ab?.credit ?? 0) > 0 ||
-                              (ab?.debit ?? 0) > 0) && (
-                              <div className="d-flex gap-1 justify-content-end mt-1">
-                                {(ab?.credit ?? 0) > 0 && (
-                                  <span
-                                    style={{
-                                      fontSize: ".78rem",
-                                      fontWeight: 600,
-                                      color: "#146c43",
-                                      background: "#d1e7dd",
-                                      borderRadius: "4px",
-                                      padding: "1px 5px",
-                                    }}
-                                  >
-                                    +{fmt(ab!.credit, 0)}
-                                  </span>
-                                )}
-                                {(ab?.debit ?? 0) > 0 && (
-                                  <span
-                                    style={{
-                                      fontSize: ".78rem",
-                                      fontWeight: 600,
-                                      color: "#842029",
-                                      background: "#f8d7da",
-                                      borderRadius: "4px",
-                                      padding: "1px 5px",
-                                    }}
-                                  >
-                                    −{fmt(ab!.debit, 0)}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
                             {/* Solde projeté */}
                             {(ab?.planned_net ?? 0) !== 0 && (
                               <div
@@ -399,7 +350,6 @@ export default function BudgetMonthView({
                                       ? "8px"
                                       : "4px",
                                   paddingTop: "4px",
-                                  borderTop: "1px solid rgba(0,0,0,.10)",
                                 }}
                                 title="Estimation avec budget prévu"
                               >
@@ -415,7 +365,28 @@ export default function BudgetMonthView({
                                 </div>
                                 <div
                                   style={{
-                                    fontSize: ".82rem",
+                                    textAlign: "right",
+                                    marginBottom: "2px",
+                                  }}
+                                >
+                                  {budgetRow ? (
+                                    <span
+                                      className={`badge rounded-pill ${budgetRow.total_planned >= 0 ? "bg-success" : "bg-danger"}`}
+                                      style={{
+                                        fontSize: ".75rem",
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {budgetRow.total_planned >= 0 ? "+" : ""}
+                                      {fmt(budgetRow.total_planned)} €
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted small">—</span>
+                                  )}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "1rem",
                                     fontWeight: 600,
                                     color:
                                       (ab!.balance_projected ?? 0) < 0
@@ -426,6 +397,47 @@ export default function BudgetMonthView({
                                 >
                                   {fmt(ab!.balance_projected)} €
                                 </div>
+                              </div>
+                            )}
+
+                            {/* Solde principal */}
+                            <div
+                              style={{
+                                borderTop: (ab?.planned_net ?? 0) !== 0 ? "1px solid rgba(0,0,0,.10)" : "none",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: ".68rem",
+                                  color: "#adb5bd",
+                                  marginBottom: "1px",
+                                  textAlign: "right",
+                                }}
+                              >
+                                Solde actuel
+                              </div>
+                              <div
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: "1rem",
+                                  color: colorRef < 0 ? "#842029" : "#0a3622",
+                                }}
+                              >
+                                {fmt(bal)} €
+                              </div>
+                            </div>
+
+                            {/* Badge net crédit/débit */}
+                            {((ab?.credit ?? 0) > 0 ||
+                              (ab?.debit ?? 0) > 0) && (
+                              <div className="d-flex justify-content-end mt-1">
+                                <span
+                                  className={`badge rounded-pill ${(ab?.credit ?? 0) - (ab?.debit ?? 0) >= 0 ? "bg-success" : "bg-danger"}`}
+                                  style={{ fontSize: ".75rem", fontWeight: 600 }}
+                                >
+                                  {(ab?.credit ?? 0) - (ab?.debit ?? 0) >= 0 ? "+" : ""}
+                                  {fmt((ab?.credit ?? 0) - (ab?.debit ?? 0), 2)} €
+                                </span>
                               </div>
                             )}
                           </td>
@@ -447,9 +459,6 @@ export default function BudgetMonthView({
                         }}
                       >
                         {fmt(totalBalance)} €
-                      </td>
-                      <td className="text-end text-muted small">
-                        {budgetRow ? `${fmt(budgetRow.total_planned)} €` : "—"}
                       </td>
                       <td>
                         <Link
