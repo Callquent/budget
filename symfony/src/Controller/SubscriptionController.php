@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Subscription;
-use App\Repository\MonthlyBudgetRepository;
+use App\Repository\BudgetRepository;
 use App\Repository\SubscriptionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -58,7 +58,7 @@ class SubscriptionController extends AbstractController
     }
 
     #[Route('/{id}/toggle', name: 'toggle', methods: ['POST'])]
-    public function toggle(Subscription $subscription, EntityManagerInterface $em, MonthlyBudgetRepository $budgetRepo): Response
+    public function toggle(Subscription $subscription, EntityManagerInterface $em, BudgetRepository $budgetRepo): Response
     {
         $wasActive = $subscription->isActive();
 

@@ -50,13 +50,13 @@ class Category
     #[ORM\OneToMany(mappedBy: 'category', targetEntity: Transaction::class)]
     private Collection $transactions;
 
-    #[ORM\OneToMany(mappedBy: 'category', targetEntity: MonthlyBudget::class, orphanRemoval: true)]
-    private Collection $monthlyBudgets;
+    #[ORM\OneToMany(mappedBy: 'category', targetEntity: Budget::class, orphanRemoval: true)]
+    private Collection $budgets;
 
     public function __construct()
     {
         $this->transactions   = new ArrayCollection();
-        $this->monthlyBudgets = new ArrayCollection();
+        $this->budgets = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -108,9 +108,9 @@ class Category
     {
         return $this->transactions;
     }
-    public function getMonthlyBudgets(): Collection
+    public function getBudgets(): Collection
     {
-        return $this->monthlyBudgets;
+        return $this->budgets;
     }
 
     public function __toString(): string

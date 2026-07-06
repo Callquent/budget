@@ -4,7 +4,7 @@ namespace App\Form;
 
 use App\Entity\Account;
 use App\Entity\Category;
-use App\Entity\MonthlyBudget;
+use App\Entity\Budget;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -15,7 +15,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\PositiveOrZero;
 
-class MonthlyBudgetType extends AbstractType
+class BudgetType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
@@ -23,11 +23,11 @@ class MonthlyBudgetType extends AbstractType
 
         // Lire l'année de l'entité liée (disponible dans $options['data'])
         // pour inclure les années passées (ex : 2024, 2025) dans la liste.
-        /** @var MonthlyBudget|null $entity */
+        /** @var Budget|null $entity */
         $entity      = $options['data'] ?? null;
-        $entityYear  = ($entity instanceof MonthlyBudget && $entity->getYear() > 0)
-                        ? $entity->getYear()
-                        : $currentYear;
+        $entityYear  = ($entity instanceof Budget && $entity->getYear() > 0)
+            ? $entity->getYear()
+            : $currentYear;
 
         // Plage : de la plus ancienne entre l'année de l'entité et (currentYear - 1)
         // jusqu'à currentYear + 2, pour couvrir passé ET futur.
@@ -104,7 +104,7 @@ class MonthlyBudgetType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class' => MonthlyBudget::class,
+            'data_class' => Budget::class,
         ]);
     }
 }

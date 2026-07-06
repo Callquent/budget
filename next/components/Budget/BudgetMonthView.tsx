@@ -11,6 +11,7 @@ import type {
   MonthData,
   YearData,
 } from "./Budget.interface";
+import OCRReceiptImport from "../OCR/OCRReceiptImport";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -65,6 +66,25 @@ export default function BudgetMonthView({
   const [yearData, setYearData] = useState<YearData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showOCRModal, setShowOCRModal] = useState(false);
+  const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
+
+  // Catégories de dépense disponibles pour l'import OCR, dérivées des lignes
+  // de budget déjà chargées pour le mois (pas besoin d'un endpoint dédié).
+  const expenseCategories = React.useMemo(() => {
+    if (!monthData) return [];
+    const seen = new Map<number, { id: number; name: string }>();
+    monthData.budgets
+      .filter((b) => b.category.transactionType === "expense")
+      .forEach((b) => {
+        if (!seen.has(b.category.id)) {
+          seen.set(b.category.id, { id: b.category.id, name: b.category.name });
+        }
+      });
+    return Array.from(seen.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [monthData]);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchYear = useCallback(async (y: number) => {
@@ -166,6 +186,55 @@ export default function BudgetMonthView({
       await fetchMonth(urlYear!, urlMonth!);
     } catch (e) {
       alert(`Erreur : ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
+  // ── OCR Functions ─────────────────────────────────────────────────────────
+  const handleOCRSuccess = async (
+    amount: number,
+    categoryId: number,
+    accountId: number,
+    label?: string,
+  ) => {
+    const currentYear = urlYear ?? yearState;
+    const currentMonth = urlMonth ?? new Date().getMonth() + 1;
+
+    setIsCreatingTransaction(true);
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/ocr/receipt`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: amount,
+            categoryId: categoryId,
+            accountId: accountId,
+            label: label ?? "Ticket de caisse",
+            year: currentYear,
+            month: currentMonth,
+            transactionDate: `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error ?? `Erreur ${response.status}`);
+      }
+
+      // Rafraîchir les données du mois
+      await fetchMonth(currentYear, currentMonth);
+
+      // Afficher un message de succès
+      alert(`Transaction de ${fmt(amount)} € ajoutée avec succès !`);
+    } catch (e) {
+      alert(
+        `Erreur lors de l'ajout de la transaction : ${e instanceof Error ? e.message : e}`,
+      );
+    } finally {
+      setIsCreatingTransaction(false);
     }
   };
 
@@ -342,7 +411,8 @@ export default function BudgetMonthView({
                             }}
                           >
                             {/* Solde projeté */}
-                            {((ab?.month_planned_net ?? 0) !== 0 || ab?.month_all_approved) && (
+                            {((ab?.month_planned_net ?? 0) !== 0 ||
+                              ab?.month_all_approved) && (
                               <div
                                 style={{
                                   marginTop:
@@ -375,13 +445,23 @@ export default function BudgetMonthView({
                                     const allApproved = ab?.month_all_approved;
                                     const value = allApproved
                                       ? (ab?.credit ?? 0) - (ab?.debit ?? 0)
-                                      : ab?.month_planned_net ?? 0;
-                                    const label = allApproved ? "Réalisé" : "Estimation";
-                                    if (value === 0) return <span className="text-muted small">—</span>;
+                                      : (ab?.month_planned_net ?? 0);
+                                    const label = allApproved
+                                      ? "Réalisé"
+                                      : "Estimation";
+                                    if (value === 0)
+                                      return (
+                                        <span className="text-muted small">
+                                          —
+                                        </span>
+                                      );
                                     return (
                                       <span
                                         className={`badge rounded-pill ${value >= 0 ? "bg-success" : "bg-danger"}`}
-                                        style={{ fontSize: ".75rem", fontWeight: 600 }}
+                                        style={{
+                                          fontSize: ".75rem",
+                                          fontWeight: 600,
+                                        }}
                                         title={label}
                                       >
                                         {value >= 0 ? "+" : ""}
@@ -411,7 +491,10 @@ export default function BudgetMonthView({
                             {/* Solde principal */}
                             <div
                               style={{
-                                borderTop: (ab?.planned_net ?? 0) !== 0 ? "1px solid rgba(0,0,0,.10)" : "none",
+                                borderTop:
+                                  (ab?.planned_net ?? 0) !== 0
+                                    ? "1px solid rgba(0,0,0,.10)"
+                                    : "none",
                               }}
                             >
                               <div
@@ -434,8 +517,6 @@ export default function BudgetMonthView({
                                 {fmt(bal)} €
                               </div>
                             </div>
-
-
                           </td>
                         );
                       })}
@@ -540,6 +621,13 @@ export default function BudgetMonthView({
           >
             <i className="bi bi-copy me-1"></i>Dupliquer →
           </button>
+          <button
+            className="btn btn-outline-success btn-sm rounded-pill px-3"
+            onClick={() => setShowOCRModal(true)}
+            disabled={isCreatingTransaction}
+          >
+            <i className="bi bi-receipt me-1"></i>Scanner ticket
+          </button>
         </div>
       </div>
 
@@ -640,27 +728,42 @@ export default function BudgetMonthView({
       {/* Cartes comptes */}
       <div className="row g-3 mb-4">
         {accounts.map((account) => {
-          const tx = txByAccount[account.id] ?? { credit: 0, debit: 0, subs: 0 };
+          const tx = txByAccount[account.id] ?? {
+            credit: 0,
+            debit: 0,
+            subs: 0,
+          };
           const net = tx.credit - tx.debit;
 
-          const accountBudgets = budgets.filter((b) => b.account?.id === account.id);
+          const accountBudgets = budgets.filter(
+            (b) => b.account?.id === account.id,
+          );
           const hasAccountBudgets = accountBudgets.length > 0;
-          const accountAllApproved = hasAccountBudgets && accountBudgets.every((b) => b.isApproved);
+          const accountAllApproved =
+            hasAccountBudgets && accountBudgets.every((b) => b.isApproved);
 
           const budgetPlanned =
-            accountBudgets.filter((b) => b.category.transactionType === "income")
+            accountBudgets
+              .filter((b) => b.category.transactionType === "income")
               .reduce((s, b) => s + parseFloat(String(b.plannedAmount)), 0) -
-            accountBudgets.filter((b) => b.category.transactionType === "expense")
+            accountBudgets
+              .filter((b) => b.category.transactionType === "expense")
               .reduce((s, b) => s + parseFloat(String(b.plannedAmount)), 0);
 
           const budgetActual =
-            accountBudgets.filter((b) => b.category.transactionType === "income")
+            accountBudgets
+              .filter((b) => b.category.transactionType === "income")
               .reduce((s, b) => s + parseFloat(String(b.actualAmount)), 0) -
-            accountBudgets.filter((b) => b.category.transactionType === "expense")
+            accountBudgets
+              .filter((b) => b.category.transactionType === "expense")
               .reduce((s, b) => s + parseFloat(String(b.actualAmount)), 0);
 
-          const estimationValue = accountAllApproved ? budgetActual : budgetPlanned;
-          const estimationLabel = accountAllApproved ? "Budget réalisé" : "Estimation prévue fin de mois";
+          const estimationValue = accountAllApproved
+            ? budgetActual
+            : budgetPlanned;
+          const estimationLabel = accountAllApproved
+            ? "Budget réalisé"
+            : "Estimation prévue fin de mois";
 
           return (
             <div className="col-md-4 col-sm-6" key={account.id}>
@@ -668,21 +771,35 @@ export default function BudgetMonthView({
                 className="card h-100 border-0 shadow-sm rounded-3"
                 style={{ overflow: "hidden" }}
               >
-                <div style={{ height: "4px", background: "var(--bs-primary)" }}></div>
+                <div
+                  style={{ height: "4px", background: "var(--bs-primary)" }}
+                ></div>
                 <div className="card-body pt-3">
                   <div className="d-flex align-items-center gap-3 mb-3">
                     <div
                       className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                      style={{ width: "42px", height: "42px", background: "#e7f3ff" }}
+                      style={{
+                        width: "42px",
+                        height: "42px",
+                        background: "#e7f3ff",
+                      }}
                     >
                       <i className="bi bi-piggy-bank text-primary fs-5"></i>
                     </div>
                     <div className="min-w-0 flex-grow-1">
                       <div className="d-flex align-items-center justify-content-between gap-2">
-                        <div className="fw-semibold text-truncate">{account.name}</div>
+                        <div className="fw-semibold text-truncate">
+                          {account.name}
+                        </div>
                         {hasAccountBudgets && (
                           <div className="text-end flex-shrink-0">
-                            <div style={{ fontSize: ".62rem", color: "#adb5bd", whiteSpace: "nowrap" }}>
+                            <div
+                              style={{
+                                fontSize: ".62rem",
+                                color: "#adb5bd",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
                               {estimationLabel}
                             </div>
                             <span
@@ -697,7 +814,9 @@ export default function BudgetMonthView({
                       </div>
                       <div className="small text-muted">
                         Solde :{" "}
-                        <span className={`fw-semibold ${account.balance < 0 ? "text-danger" : "text-dark"}`}>
+                        <span
+                          className={`fw-semibold ${account.balance < 0 ? "text-danger" : "text-dark"}`}
+                        >
                           {fmt(account.balance)} {account.currency ?? "€"}
                         </span>
                       </div>
@@ -707,34 +826,47 @@ export default function BudgetMonthView({
                     <>
                       <div className="d-flex justify-content-between small mb-1">
                         <span className="text-success d-flex align-items-center gap-1">
-                          <i className="bi bi-arrow-down-circle-fill"></i>Entrées
+                          <i className="bi bi-arrow-down-circle-fill"></i>
+                          Entrées
                         </span>
-                        <span className="fw-semibold text-success">+{fmt(tx.credit)} €</span>
+                        <span className="fw-semibold text-success">
+                          +{fmt(tx.credit)} €
+                        </span>
                       </div>
                       <div className="d-flex justify-content-between small mb-1">
                         <span className="text-danger d-flex align-items-center gap-1">
                           <i className="bi bi-arrow-up-circle-fill"></i>Sorties
                         </span>
-                        <span className="fw-semibold text-danger">−{fmt(tx.debit - tx.subs)} €</span>
+                        <span className="fw-semibold text-danger">
+                          −{fmt(tx.debit - tx.subs)} €
+                        </span>
                       </div>
                       {tx.subs > 0 && (
                         <div className="d-flex justify-content-between small mb-1">
                           <span className="text-warning d-flex align-items-center gap-1">
                             <i className="bi bi-arrow-repeat"></i>Abonnements
                           </span>
-                          <span className="fw-semibold text-warning">−{fmt(tx.subs)} €</span>
+                          <span className="fw-semibold text-warning">
+                            −{fmt(tx.subs)} €
+                          </span>
                         </div>
                       )}
                       <div className="border-top pt-2 mt-2 d-flex justify-content-between small">
-                        <span className="text-muted fw-medium">Net du mois</span>
-                        <span className={`fw-bold ${net >= 0 ? "text-success" : "text-danger"}`}>
-                          {net > 0 ? "+" : ""}{fmt(net)} €
+                        <span className="text-muted fw-medium">
+                          Net du mois
+                        </span>
+                        <span
+                          className={`fw-bold ${net >= 0 ? "text-success" : "text-danger"}`}
+                        >
+                          {net > 0 ? "+" : ""}
+                          {fmt(net)} €
                         </span>
                       </div>
                     </>
                   ) : (
                     <div className="text-muted small text-center py-2 bg-light rounded-2">
-                      <i className="bi bi-dash-circle me-1"></i>Aucun mouvement ce mois
+                      <i className="bi bi-dash-circle me-1"></i>Aucun mouvement
+                      ce mois
                     </div>
                   )}
                 </div>
@@ -1076,6 +1208,16 @@ export default function BudgetMonthView({
           </div>
         </div>
       )}
+
+      <OCRReceiptImport
+        year={urlYear!}
+        month={urlMonth!}
+        categories={expenseCategories}
+        accounts={accounts}
+        onClose={() => setShowOCRModal(false)}
+        onSuccess={handleOCRSuccess}
+        show={showOCRModal && isMonthView}
+      />
     </>
   );
 }

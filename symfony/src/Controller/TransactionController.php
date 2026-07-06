@@ -5,7 +5,7 @@ namespace App\Controller;
 use App\Entity\Transaction;
 use App\Repository\AccountRepository;
 use App\Repository\CategoryRepository;
-use App\Repository\MonthlyBudgetRepository;
+use App\Repository\BudgetRepository;
 use App\Repository\TransactionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -79,7 +79,7 @@ class TransactionController extends AbstractController
         EntityManagerInterface $em,
         AccountRepository $accountRepo,
         CategoryRepository $categoryRepo,
-        MonthlyBudgetRepository $budgetRepo
+        BudgetRepository $budgetRepo
     ): Response {
         $data        = json_decode($request->getContent(), true);
         $transaction = new Transaction();
@@ -105,7 +105,7 @@ class TransactionController extends AbstractController
         EntityManagerInterface $em,
         AccountRepository $accountRepo,
         CategoryRepository $categoryRepo,
-        MonthlyBudgetRepository $budgetRepo
+        BudgetRepository $budgetRepo
     ): Response {
         $oldYear  = $transaction->getYear();
         $oldMonth = $transaction->getMonth();
@@ -126,7 +126,7 @@ class TransactionController extends AbstractController
     public function delete(
         Transaction $transaction,
         EntityManagerInterface $em,
-        MonthlyBudgetRepository $budgetRepo
+        BudgetRepository $budgetRepo
     ): Response {
         $year  = $transaction->getYear();
         $month = $transaction->getMonth();

@@ -4,7 +4,7 @@ namespace App\Controller\Api;
 
 use App\Repository\AccountRepository;
 use App\Repository\CategoryRepository;
-use App\Repository\MonthlyBudgetRepository;
+use App\Repository\BudgetRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TransactionRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -25,7 +25,7 @@ class AiSearchContextController extends AbstractController
         private readonly TransactionRepository    $transactionRepo,
         private readonly SubscriptionRepository   $subscriptionRepo,
         private readonly AccountRepository        $accountRepo,
-        private readonly MonthlyBudgetRepository  $budgetRepo,
+        private readonly BudgetRepository  $budgetRepo,
         private readonly CategoryRepository       $categoryRepo,
     ) {}
 

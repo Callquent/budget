@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Repository\MonthlyBudgetRepository;
+use App\Repository\BudgetRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -12,7 +12,7 @@ class StatisticsController extends AbstractController
 {
     #[Route('', name: 'index')]
     #[Route('/{year}', name: 'year', requirements: ['year' => '\d{4}'])]
-    public function index(MonthlyBudgetRepository $repo, int $year = 0): Response
+    public function index(BudgetRepository $repo, int $year = 0): Response
     {
         $now = new \DateTimeImmutable();
         if ($year === 0) {

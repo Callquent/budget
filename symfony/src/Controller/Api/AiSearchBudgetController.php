@@ -2,10 +2,10 @@
 
 namespace App\Controller\Api;
 
-use App\Entity\MonthlyBudget;
+use App\Entity\Budget;
 use App\Repository\AccountRepository;
 use App\Repository\CategoryRepository;
-use App\Repository\MonthlyBudgetRepository;
+use App\Repository\BudgetRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,7 +33,7 @@ class AiSearchBudgetController extends AbstractController
     public function __construct(
         private readonly CategoryRepository      $categoryRepo,
         private readonly AccountRepository       $accountRepo,
-        private readonly MonthlyBudgetRepository $budgetRepo,
+        private readonly BudgetRepository $budgetRepo,
         private readonly EntityManagerInterface  $em,
     ) {}
 
@@ -105,7 +105,7 @@ class AiSearchBudgetController extends AbstractController
 
         // ── Création ────────────────────────────────────────────────────
 
-        $budget = new MonthlyBudget();
+        $budget = new Budget();
         $budget->setCategory($category);
         $budget->setYear($year);
         $budget->setMonth($month);

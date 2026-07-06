@@ -2,15 +2,15 @@
 
 namespace App\Entity;
 
-use App\Repository\MonthlyBudgetRepository;
+use App\Repository\BudgetRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 
-#[ORM\Entity(repositoryClass: MonthlyBudgetRepository::class)]
+#[ORM\Entity(repositoryClass: BudgetRepository::class)]
 #[ORM\Table(name: 'monthly_budget')]
 #[ORM\UniqueConstraint(name: 'uniq_budget_period', columns: ['category_id', 'year', 'month', 'label'])]
 #[ORM\Index(columns: ['year', 'month'], name: 'idx_budget_period')]
-class MonthlyBudget
+class Budget
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]

@@ -2,10 +2,10 @@
 
 namespace App\Controller;
 
-use App\Entity\MonthlyBudget;
+use App\Entity\Budget;
 use App\Entity\Transaction;
 use App\Repository\AccountRepository;
-use App\Repository\MonthlyBudgetRepository;
+use App\Repository\BudgetRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TransactionRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,7 +25,7 @@ class BudgetController extends AbstractController
     #[Route('', name: 'index')]
     #[Route('/{year}', name: 'year', requirements: ['year' => '\d{4}'])]
     public function index(
-        MonthlyBudgetRepository $repo,
+        BudgetRepository $repo,
         AccountRepository $accountRepo,
         TransactionRepository $txRepo,
         SubscriptionRepository $subRepo,
@@ -43,7 +43,7 @@ class BudgetController extends AbstractController
         for ($m = 1; $m <= 12; $m++) {
             foreach ($subRepo->findActiveForPeriod($year, $m) as $sub) {
                 if (!$repo->findOneBy(['category' => $sub->getCategory(), 'account' => $sub->getAccount(), 'year' => $year, 'month' => $m])) {
-                    $em->persist((new MonthlyBudget())
+                    $em->persist((new Budget())
                         ->setCategory($sub->getCategory())->setAccount($sub->getAccount())
                         ->setYear($year)->setMonth($m)
                         ->setPlannedAmount((string) $sub->getAmount())
@@ -218,7 +218,7 @@ class BudgetController extends AbstractController
 
     #[Route('/{year}/{month}', name: 'month', requirements: ['year' => '\d{4}', 'month' => '\d{1,2}'])]
     public function month(
-        MonthlyBudgetRepository $repo,
+        BudgetRepository $repo,
         AccountRepository $accountRepo,
         TransactionRepository $txRepo,
         SubscriptionRepository $subRepo,
@@ -233,7 +233,7 @@ class BudgetController extends AbstractController
         $synced = 0;
         foreach ($subscriptions as $sub) {
             if (!$repo->findOneBy(['category' => $sub->getCategory(), 'account' => $sub->getAccount(), 'year' => $year, 'month' => $month])) {
-                $em->persist((new MonthlyBudget())
+                $em->persist((new Budget())
                     ->setCategory($sub->getCategory())->setAccount($sub->getAccount())
                     ->setYear($year)->setMonth($month)
                     ->setPlannedAmount((string) $sub->getAmount())
@@ -285,7 +285,7 @@ class BudgetController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $data   = json_decode($request->getContent(), true);
-        $budget = new MonthlyBudget();
+        $budget = new Budget();
         $this->hydrate($budget, $data, $em);
 
         $em->persist($budget);
@@ -295,13 +295,13 @@ class BudgetController extends AbstractController
     }
 
     #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(MonthlyBudget $budget): Response
+    public function show(Budget $budget): Response
     {
         return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
     }
 
     #[Route('/{id}/edit', name: 'edit', methods: ['POST'])]
-    public function edit(MonthlyBudget $budget, Request $request, EntityManagerInterface $em): Response
+    public function edit(Budget $budget, Request $request, EntityManagerInterface $em): Response
     {
         if ($budget->isApproved()) {
             return $this->json(['error' => 'Ligne verrouillée car approuvée.'], 409);
@@ -315,7 +315,7 @@ class BudgetController extends AbstractController
     }
 
     #[Route('/{id}/approve', name: 'approve', methods: ['POST'])]
-    public function approve(MonthlyBudget $budget, EntityManagerInterface $em): Response
+    public function approve(Budget $budget, EntityManagerInterface $em): Response
     {
         if ($budget->isApproved()) {
             return $this->json(['error' => 'Cette ligne est déjà approuvée.'], 409);
@@ -349,7 +349,7 @@ class BudgetController extends AbstractController
     }
 
     #[Route('/{id}/unapprove', name: 'unapprove', methods: ['POST'])]
-    public function unapprove(MonthlyBudget $budget, EntityManagerInterface $em): Response
+    public function unapprove(Budget $budget, EntityManagerInterface $em): Response
     {
         $tx = $budget->getApprovedTransaction();
         if ($tx) $em->remove($tx);
@@ -362,7 +362,7 @@ class BudgetController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
-    public function delete(MonthlyBudget $budget, EntityManagerInterface $em): Response
+    public function delete(Budget $budget, EntityManagerInterface $em): Response
     {
         $em->remove($budget);
         $em->flush();
@@ -371,7 +371,7 @@ class BudgetController extends AbstractController
     }
 
     #[Route('/{year}/{month}/duplicate', name: 'duplicate', methods: ['POST'])]
-    public function duplicate(MonthlyBudgetRepository $repo, EntityManagerInterface $em, int $year, int $month): Response
+    public function duplicate(BudgetRepository $repo, EntityManagerInterface $em, int $year, int $month): Response
     {
         $nextDate  = \DateTimeImmutable::createFromFormat('Y-n', "$year-$month")->modify('+1 month');
         $nextYear  = (int) $nextDate->format('Y');
@@ -380,7 +380,7 @@ class BudgetController extends AbstractController
 
         foreach ($repo->findByPeriod($year, $month) as $source) {
             if ($repo->findOneBy(['category' => $source->getCategory(), 'year' => $nextYear, 'month' => $nextMonth])) continue;
-            $em->persist((new MonthlyBudget())
+            $em->persist((new Budget())
                 ->setCategory($source->getCategory())
                 ->setYear($nextYear)->setMonth($nextMonth)
                 ->setPlannedAmount($source->getPlannedAmount()));
@@ -392,7 +392,7 @@ class BudgetController extends AbstractController
         return $this->json(['duplicated' => $count, 'year' => $nextYear, 'month' => $nextMonth]);
     }
 
-    private function hydrate(MonthlyBudget $budget, array $data, EntityManagerInterface $em): void
+    private function hydrate(Budget $budget, array $data, EntityManagerInterface $em): void
     {
         $categoryRepo = $em->getRepository(\App\Entity\Category::class);
         $accountRepo  = $em->getRepository(\App\Entity\Account::class);

@@ -42,7 +42,7 @@ export interface SubscriptionData {
   notes?: string;
 }
 
-export interface MonthlyBudgetData {
+export interface BudgetData {
   id: number;
   category: Pick<CategoryData, 'name' | 'transactionType'>;
   account?: Pick<AccountData, 'name'>;
@@ -58,7 +58,7 @@ export interface BudgetContext {
   transactions: TransactionData[];
   subscriptions: SubscriptionData[];
   accounts: AccountData[];
-  monthlyBudgets: MonthlyBudgetData[];
+  budgets: BudgetData[];
   categories: CategoryData[];
 }
 

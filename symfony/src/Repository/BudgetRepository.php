@@ -2,15 +2,15 @@
 
 namespace App\Repository;
 
-use App\Entity\MonthlyBudget;
+use App\Entity\Budget;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-class MonthlyBudgetRepository extends ServiceEntityRepository
+class BudgetRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
-        parent::__construct($registry, MonthlyBudget::class);
+        parent::__construct($registry, Budget::class);
     }
 
     /**
@@ -45,7 +45,7 @@ class MonthlyBudgetRepository extends ServiceEntityRepository
         // Pour les dépenses/virements : on somme les débits.
         // Cela évite de mélanger les deux sens dans actualAmount.
         $em->createQuery(
-            'UPDATE App\Entity\MonthlyBudget mb
+            'UPDATE App\Entity\Budget mb
              SET mb.actualAmount = (
                  SELECT COALESCE(SUM(t.amount), 0)
                  FROM App\Entity\Transaction t
