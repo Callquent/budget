@@ -11,6 +11,7 @@ import type {
   MonthData,
   YearData,
 } from "./Budget.interface";
+import OCRReceiptImport from "../Transaction/OCRReceiptImport";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -65,6 +66,8 @@ export default function BudgetMonthView({
   const [yearData, setYearData] = useState<YearData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showOCRModal, setShowOCRModal] = useState(false);
+  const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchYear = useCallback(async (y: number) => {
@@ -166,6 +169,43 @@ export default function BudgetMonthView({
       await fetchMonth(urlYear!, urlMonth!);
     } catch (e) {
       alert(`Erreur : ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
+  // ── OCR Functions ─────────────────────────────────────────────────────────
+  const handleOCRSuccess = async (amount: number, label?: string) => {
+    const currentYear = urlYear ?? yearState;
+    const currentMonth = urlMonth ?? new Date().getMonth() + 1;
+    
+    setIsCreatingTransaction(true);
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ocr/receipt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: amount,
+          label: label ?? "Ticket de caisse",
+          year: currentYear,
+          month: currentMonth,
+          transactionDate: `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`,
+        }),
+      });
+      
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error ?? `Erreur ${response.status}`);
+      }
+      
+      // Rafraîchir les données du mois
+      await fetchMonth(currentYear, currentMonth);
+      
+      // Afficher un message de succès
+      alert(`Transaction de ${fmt(amount)} € ajoutée avec succès !`);
+    } catch (e) {
+      alert(`Erreur lors de l'ajout de la transaction : ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setIsCreatingTransaction(false);
     }
   };
 
@@ -539,6 +579,13 @@ export default function BudgetMonthView({
             onClick={handleDuplicate}
           >
             <i className="bi bi-copy me-1"></i>Dupliquer →
+          </button>
+          <button
+            className="btn btn-outline-success btn-sm rounded-pill px-3"
+            onClick={() => setShowOCRModal(true)}
+            disabled={isCreatingTransaction}
+          >
+            <i className="bi bi-receipt me-1"></i>Scanner ticket
           </button>
         </div>
       </div>
@@ -1076,6 +1123,14 @@ export default function BudgetMonthView({
           </div>
         </div>
       )}
+      
+      <OCRReceiptImport
+        year={urlYear!}
+        month={urlMonth!}
+        onClose={() => setShowOCRModal(false)}
+        onSuccess={handleOCRSuccess}
+        show={showOCRModal && isMonthView}
+      />
     </>
   );
 }
