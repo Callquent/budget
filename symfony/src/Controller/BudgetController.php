@@ -8,6 +8,7 @@ use App\Repository\AccountRepository;
 use App\Repository\BudgetRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TransactionRepository;
+use App\Support\BudgetLabels;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -211,6 +212,7 @@ class BudgetController extends AbstractController
             'accounts'        => $accounts,
             'summary'         => $summaryByMonth,
             'accountBalances' => $accountBalances,
+            'monthNames'      => BudgetLabels::MONTHS,
         ], 200, [], ['groups' => ['account:read']]);
     }
 
@@ -262,20 +264,20 @@ class BudgetController extends AbstractController
             $txByAccount[$aid]['subs']  += (float) $sub->getAmount();
         }
 
-        $now    = new \DateTimeImmutable();
-        $months = [1=>'Janvier',2=>'Février',3=>'Mars',4=>'Avril',5=>'Mai',6=>'Juin',
-                   7=>'Juillet',8=>'Août',9=>'Septembre',10=>'Octobre',11=>'Novembre',12=>'Décembre'];
+        $now = new \DateTimeImmutable();
 
         return $this->json([
-            'year'          => $year,
-            'month'         => $month,
-            'nowYear'       => (int) $now->format('Y'),
-            'nowMonth'      => (int) $now->format('n'),
-            'periodLabel'   => ($months[$month] ?? '') . ' ' . $year,
-            'accounts'      => $accounts,
-            'txByAccount'   => $txByAccount,
-            'subscriptions' => $subscriptions,
-            'budgets'       => $budgets,
+            'year'            => $year,
+            'month'           => $month,
+            'nowYear'         => (int) $now->format('Y'),
+            'nowMonth'        => (int) $now->format('n'),
+            'periodLabel'     => (BudgetLabels::MONTHS[$month] ?? '') . ' ' . $year,
+            'accounts'        => $accounts,
+            'txByAccount'     => $txByAccount,
+            'subscriptions'   => $subscriptions,
+            'budgets'         => $budgets,
+            'monthNames'      => BudgetLabels::MONTHS,
+            'frequencyLabels' => BudgetLabels::FREQUENCIES,
         ], 200, [], ['groups' => ['budget:month', 'budget:read', 'account:read', 'category:read', 'subscription:read']]);
     }
 

@@ -5,6 +5,7 @@ namespace App\Form;
 use App\Entity\Account;
 use App\Entity\Category;
 use App\Entity\Budget;
+use App\Support\BudgetLabels;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -37,20 +38,8 @@ class BudgetType extends AbstractType
             $years[$y] = $y;
         }
 
-        $months = [
-            'Janvier'   => 1,
-            'Février'   => 2,
-            'Mars'      => 3,
-            'Avril'     => 4,
-            'Mai'       => 5,
-            'Juin'      => 6,
-            'Juillet'   => 7,
-            'Août'      => 8,
-            'Septembre' => 9,
-            'Octobre'   => 10,
-            'Novembre'  => 11,
-            'Décembre'  => 12,
-        ];
+        // Choix du formulaire : "Nom" => numéro, soit l'inverse de BudgetLabels::MONTHS
+        $months = array_flip(BudgetLabels::MONTHS);
 
         $builder
             ->add('category', EntityType::class, [

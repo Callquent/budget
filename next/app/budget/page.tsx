@@ -1,5 +1,5 @@
-import BudgetMonthView from "@/components/Budget/BudgetMonthView";
+import BudgetYearView from "@/components/Budget/BudgetYearView";
 
 export default function BudgetPage() {
-  return <BudgetMonthView />;
+  return <BudgetYearView />;
 }

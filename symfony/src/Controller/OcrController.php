@@ -2,12 +2,11 @@
 
 namespace App\Controller;
 
-use App\Entity\Account;
-use App\Entity\Budget;
-use App\Entity\Category;
+use App\Entity\MonthlyBudget;
+use App\Repository\AccountRepository;
+use App\Repository\CategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -15,53 +14,65 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/ocr', name: 'ocr_')]
 class OcrController extends AbstractController
 {
-    public function __construct(
-        private readonly EntityManagerInterface $em
-    ) {}
-
-    /**
-     * Crée une ligne de budget à partir d'un ticket scanné côté client
-     * (montant, compte et catégorie déjà validés par l'utilisateur dans le popup OCR).
-     * Route: POST /ocr/receipt
-     */
-    #[Route('/receipt', name: 'receipt', methods: ['POST'])]
-    public function receipt(Request $request): JsonResponse
-    {
+    #[Route('/receipt', name: 'receipt_from_ocr', methods: ['POST'])]
+    public function receiptFromOcr(
+        Request $request,
+        EntityManagerInterface $em,
+        AccountRepository $accountRepo,
+        CategoryRepository $categoryRepo
+    ): Response {
         $data = json_decode($request->getContent(), true);
 
-        if (!$data) {
-            return $this->json(['error' => 'Corps JSON invalide.'], Response::HTTP_BAD_REQUEST);
+        // Validation des données
+        if (!isset($data['amount']) || !is_numeric($data['amount']) || (float) $data['amount'] <= 0) {
+            return $this->json(['error' => 'Le montant est requis et doit être supérieur à 0'], 400);
         }
 
-        $required = ['amount', 'accountId', 'categoryId', 'year', 'month'];
-        foreach ($required as $field) {
-            if (!isset($data[$field])) {
-                return $this->json(['error' => "Le champ '$field' est requis."], Response::HTTP_BAD_REQUEST);
-            }
+        if (!isset($data['year']) || !isset($data['month'])) {
+            return $this->json(['error' => 'L\'année et le mois sont requis'], 400);
         }
 
-        $budget = new Budget();
-        $this->hydrateBudget($budget, $data);
+        if (!isset($data['categoryId']) || !is_numeric($data['categoryId'])) {
+            return $this->json(['error' => 'La catégorie est requise'], 400);
+        }
 
-        // Le montant prévu et réalisé sont identiques pour un import OCR
-        $budget->setPlannedAmount((string) $data['amount']);
-        $budget->setActualAmount((string) $data['amount']);
+        if (!isset($data['accountId']) || !is_numeric($data['accountId'])) {
+            return $this->json(['error' => 'Le compte est requis'], 400);
+        }
 
-        $this->em->persist($budget);
-        $this->em->flush();
+        // Données du ticket
+        $amount = (float) $data['amount'];
+        $year = (int) $data['year'];
+        $month = (int) $data['month'];
 
-        return $this->json($budget, Response::HTTP_CREATED, [], ['groups' => ['budget:read', 'account:read', 'category:read']]);
-    }
+        $account = $accountRepo->find((int) $data['accountId']);
+        if (!$account) {
+            return $this->json(['error' => 'Compte invalide'], 400);
+        }
 
-    private function hydrateBudget(Budget $budget, array $data): void
-    {
-        $categoryRepo = $this->em->getRepository(Category::class);
-        $accountRepo  = $this->em->getRepository(Account::class);
+        $category = $categoryRepo->find((int) $data['categoryId']);
+        if (!$category || $category->getTransactionType() !== 'expense') {
+            return $this->json(['error' => 'Catégorie invalide'], 400);
+        }
 
+
+        // Chaque ticket scanné crée toujours sa propre ligne de budget,
+        // avec son propre montant (prévu = réalisé = montant du ticket).
+        // On ne réutilise jamais une ligne existante : sinon plusieurs
+        // tickets de la même catégorie/mois se retrouveraient regroupés
+        // sur une seule ligne.
+        $budget = new MonthlyBudget();
         $budget->setLabel($data['label'] ?? 'Ticket de caisse');
-        $budget->setCategory($categoryRepo->find($data['categoryId']));
-        $budget->setAccount(!empty($data['accountId']) ? $accountRepo->find($data['accountId']) : null);
-        $budget->setYear((int) $data['year']);
-        $budget->setMonth((int) $data['month']);
+        $budget->setCategory($category);
+        $budget->setAccount($account);
+        $budget->setYear($year);
+        $budget->setMonth($month);
+        $budget->setPlannedAmount((string) $amount);
+        $budget->setActualAmount((string) $amount);
+        $em->persist($budget);
+
+        $em->flush();
+
+        return $this->json($budget, 201, [], ['groups' => ['budget:read', 'account:read', 'category:read']]);
     }
 }
