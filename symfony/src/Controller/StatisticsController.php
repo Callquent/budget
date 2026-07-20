@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Repository\BudgetRepository;
+use App\Support\BudgetLabels;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -56,6 +57,7 @@ class StatisticsController extends AbstractController
             'summary'        => $summary,
             'plannedMonthly' => array_values($plannedMonthly),
             'actualMonthly'  => array_values($actualMonthly),
+            'monthNames'     => array_values(BudgetLabels::MONTHS),
         ]);
     }
 }
