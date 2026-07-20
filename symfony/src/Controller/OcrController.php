@@ -2,13 +2,11 @@
 
 namespace App\Controller;
 
+use App\Entity\Account;
 use App\Entity\Budget;
-use App\Repository\AccountRepository;
-use App\Repository\CategoryRepository;
-use App\Service\Ocr\OcrServiceInterface;
+use App\Entity\Category;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,39 +16,16 @@ use Symfony\Component\Routing\Attribute\Route;
 class OcrController extends AbstractController
 {
     public function __construct(
-        private readonly OcrServiceInterface $ocrService,
         private readonly EntityManagerInterface $em
     ) {}
 
     /**
-     * Analyse une image de ticket pour en extraire le montant total.
-     * Route: POST /ocr/analyze
+     * Crée une ligne de budget à partir d'un ticket scanné côté client
+     * (montant, compte et catégorie déjà validés par l'utilisateur dans le popup OCR).
+     * Route: POST /ocr/receipt
      */
-    #[Route('/analyze', name: 'analyze', methods: ['POST'])]
-    public function analyze(Request $request): JsonResponse
-    {
-        /** @var UploadedFile|null $file */
-        $file = $request->files->get('file');
-
-        if (!$file) {
-            return $this->json(['error' => 'Aucun fichier image n\'a été fourni.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $total = $this->ocrService->extractTotal($file);
-
-        if ($total === null) {
-            return $this->json(['error' => 'Impossible d\'extraire le montant total du ticket.'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        return $this->json(['total' => $total]);
-    }
-
-    /**
-     * Importe la ligne de budget après validation du montant et choix des options.
-     * Route: POST /ocr/import
-     */
-    #[Route('/import', name: 'import', methods: ['POST'])]
-    public function import(Request $request): JsonResponse
+    #[Route('/receipt', name: 'receipt', methods: ['POST'])]
+    public function receipt(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
 
@@ -58,7 +33,7 @@ class OcrController extends AbstractController
             return $this->json(['error' => 'Corps JSON invalide.'], Response::HTTP_BAD_REQUEST);
         }
 
-        $required = ['total', 'accountId', 'categoryId', 'year', 'month'];
+        $required = ['amount', 'accountId', 'categoryId', 'year', 'month'];
         foreach ($required as $field) {
             if (!isset($data[$field])) {
                 return $this->json(['error' => "Le champ '$field' est requis."], Response::HTTP_BAD_REQUEST);
@@ -69,8 +44,8 @@ class OcrController extends AbstractController
         $this->hydrateBudget($budget, $data);
 
         // Le montant prévu et réalisé sont identiques pour un import OCR
-        $budget->setPlannedAmount($data['total']);
-        $budget->setActualAmount($data['total']);
+        $budget->setPlannedAmount((string) $data['amount']);
+        $budget->setActualAmount((string) $data['amount']);
 
         $this->em->persist($budget);
         $this->em->flush();
@@ -80,10 +55,10 @@ class OcrController extends AbstractController
 
     private function hydrateBudget(Budget $budget, array $data): void
     {
-        $categoryRepo = $this->em->getRepository(CategoryRepository::class);
-        $accountRepo  = $this->em->getRepository(AccountRepository::class);
+        $categoryRepo = $this->em->getRepository(Category::class);
+        $accountRepo  = $this->em->getRepository(Account::class);
 
-        $budget->setLabel($data['label'] ?? 'Import OCR');
+        $budget->setLabel($data['label'] ?? 'Ticket de caisse');
         $budget->setCategory($categoryRepo->find($data['categoryId']));
         $budget->setAccount(!empty($data['accountId']) ? $accountRepo->find($data['accountId']) : null);
         $budget->setYear((int) $data['year']);

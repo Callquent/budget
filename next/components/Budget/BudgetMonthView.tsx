@@ -3,15 +3,7 @@ import React, { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { SubscriptionInterface } from "../Subscription/Subscription.interface";
-import type {
-  Budget,
-  TxByAccount,
-  SummaryRow,
-  AccountBalance,
-  MonthData,
-  YearData,
-} from "./Budget.interface";
-import OCRReceiptImport from "../OCR/OCRReceiptImport";
+import OCRModal from "../OCR/OCRModal";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -290,12 +282,6 @@ export default function BudgetMonthView({
             <i className="bi bi-calendar3 me-2 text-primary"></i>Budget{" "}
             {yearState}
           </h1>
-          <button
-            className="btn btn-outline-success btn-sm rounded-pill px-3"
-            onClick={() => setShowOCRModal(true)}
-          >
-            <i className="bi bi-receipt me-1"></i>Scanner ticket
-          </button>
         </div>
 
         <div className="card mb-4 border-0 shadow-sm rounded-3 p-3">
@@ -1215,14 +1201,10 @@ export default function BudgetMonthView({
         </div>
       )}
 
-      <OCRReceiptImport
-        year={urlYear!}
-        month={urlMonth!}
-        categories={expenseCategories}
-        accounts={accounts}
+      <OCRModal
+        show={showOCRModal}
         onClose={() => setShowOCRModal(false)}
         onSuccess={handleOCRSuccess}
-        show={showOCRModal && isMonthView}
       />
     </>
   );

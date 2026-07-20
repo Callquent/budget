@@ -18,7 +18,7 @@ class Budget
     #[Groups(['budget:read'])]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(targetEntity: Category::class, inversedBy: 'monthlyBudgets')]
+    #[ORM\ManyToOne(targetEntity: Category::class, inversedBy: 'budgets')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['budget:read', 'budget:month'])]
     private ?Category $category = null;
