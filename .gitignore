@@ -102,6 +102,7 @@ cache/
 # =======================
 # DOCKER
 # =======================
+docker/
 docker-compose.override.yml
 docker-compose.local.yml
 .docker/
