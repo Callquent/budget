@@ -22,15 +22,6 @@ class CategoryType extends AbstractType
         ];
     }
 
-    public static function getFrequencyChoices(): array
-    {
-        return [
-            'Mensuelle'     => Category::FREQ_MONTHLY,
-            'Annuelle'      => Category::FREQ_YEARLY,
-            'Trimestrielle' => Category::FREQ_QUARTERLY,
-            'Occasionnelle' => Category::FREQ_OCCASIONAL,
-        ];
-    }
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
@@ -42,10 +33,6 @@ class CategoryType extends AbstractType
             ->add('transactionType', ChoiceType::class, [
                 'label'   => 'Type de transaction',
                 'choices' => self::getTransactionTypeChoices(),
-            ])
-            ->add('frequency', ChoiceType::class, [
-                'label'   => 'Fréquence',
-                'choices' => self::getFrequencyChoices(),
             ])
             ->add('description', TextareaType::class, [
                 'label'    => 'Description',

@@ -17,12 +17,6 @@ class Category
     public const TYPE_EXPENSE = 'expense';  // dépense
     public const TYPE_TRANSFER = 'transfer'; // virement entre comptes
 
-    // Fréquence de l'opération
-    public const FREQ_MONTHLY    = 'monthly';
-    public const FREQ_YEARLY     = 'yearly';
-    public const FREQ_QUARTERLY  = 'quarterly';
-    public const FREQ_OCCASIONAL = 'occasional';
-
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -37,11 +31,6 @@ class Category
     #[ORM\Column(length: 20)]
     #[Groups(['category:read'])]
     private string $transactionType;
-
-    /** 'monthly', 'yearly', 'quarterly', 'occasional' */
-    #[ORM\Column(length: 20)]
-    #[Groups(['category:read'])]
-    private string $frequency;
 
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['category:read'])]
@@ -81,16 +70,6 @@ class Category
     public function setTransactionType(string $type): static
     {
         $this->transactionType = $type;
-        return $this;
-    }
-
-    public function getFrequency(): string
-    {
-        return $this->frequency;
-    }
-    public function setFrequency(string $frequency): static
-    {
-        $this->frequency = $frequency;
         return $this;
     }
 

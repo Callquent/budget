@@ -15,12 +15,6 @@ const typeColors = {
   expense: "danger",
   transfer: "primary",
 };
-const freqLabels = {
-  monthly: "Mensuelle",
-  yearly: "Annuelle",
-  quarterly: "Trimestrielle",
-  occasional: "Occasionnelle",
-};
 
 export default function CategoryList() {
   const [grouped, setGrouped] = useState<Record<string, CategoryInterface[]>>(
@@ -117,7 +111,6 @@ export default function CategoryList() {
                 <thead className="table-light">
                   <tr>
                     <th>Nom</th>
-                    <th>Fréquence</th>
                     <th>Description</th>
                     <th></th>
                   </tr>
@@ -126,13 +119,6 @@ export default function CategoryList() {
                   {categories.map((category) => (
                     <tr key={category.id}>
                       <td className="fw-medium">{category.name}</td>
-                      <td>
-                        <span className={`badge badge-${category.frequency}`}>
-                          {freqLabels[
-                            category.frequency as keyof typeof freqLabels
-                          ] || category.frequency}
-                        </span>
-                      </td>
                       <td className="text-muted small">
                         {category.description || "—"}
                       </td>

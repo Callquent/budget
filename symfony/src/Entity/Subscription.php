@@ -17,6 +17,13 @@ class Subscription
     public const STATUS_ACTIVE   = 'active';
     public const STATUS_INACTIVE = 'inactive';
 
+    // Fréquence de prélèvement (déplacé depuis Category : seul un abonnement
+    // a une cadence de récurrence propre, une catégorie non).
+    public const FREQ_MONTHLY    = 'monthly';
+    public const FREQ_YEARLY     = 'yearly';
+    public const FREQ_QUARTERLY  = 'quarterly';
+    public const FREQ_OCCASIONAL = 'occasional';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]

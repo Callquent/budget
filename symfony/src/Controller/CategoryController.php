@@ -39,13 +39,7 @@ class CategoryController extends AbstractController
             CategoryType::getTransactionTypeChoices()
         );
 
-        $frequencies = array_map(
-            fn($label, $value) => ['value' => $value, 'label' => $label],
-            array_keys(CategoryType::getFrequencyChoices()),
-            CategoryType::getFrequencyChoices()
-        );
-
-        return $this->json(compact('transactionTypes', 'frequencies'));
+        return $this->json(compact('transactionTypes'));
     }
 
     #[Route('/new', name: 'new', methods: ['POST'])]
@@ -56,7 +50,6 @@ class CategoryController extends AbstractController
         $category = new Category();
         $category->setName($data['name']);
         $category->setTransactionType($data['transactionType']);
-        $category->setFrequency($data['frequency']);
         $category->setDescription($data['description'] ?? null);
 
         $em->persist($category);
@@ -78,7 +71,6 @@ class CategoryController extends AbstractController
 
         $category->setName($data['name']);
         $category->setTransactionType($data['transactionType']);
-        $category->setFrequency($data['frequency']);
         $category->setDescription($data['description'] ?? null);
 
         $em->flush();

@@ -604,7 +604,6 @@ export default function BudgetMonthView({
               <thead>
                 <tr>
                   <th>Catégorie</th>
-                  <th>Fréquence</th>
                   <th>Compte</th>
                   <th className="text-end">Prévu</th>
                   <th className="text-end">Écart</th>
@@ -641,15 +640,6 @@ export default function BudgetMonthView({
                             : b.category.transactionType === "expense"
                               ? "dépense"
                               : "virement"}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`badge rounded-pill badge-${b.category.frequency}`}
-                          style={{ fontSize: ".72rem" }}
-                        >
-                          {frequencyLabels[b.category.frequency] ??
-                            b.category.frequency}
                         </span>
                       </td>
                       <td className="small text-muted">
@@ -789,7 +779,7 @@ export default function BudgetMonthView({
               </tbody>
               <tfoot className="table-light fw-semibold">
                 <tr>
-                  <td colSpan={3}>Solde net (recettes − dépenses)</td>
+                  <td colSpan={2}>Solde net (recettes − dépenses)</td>
                   {(() => {
                     const netPlanned =
                       budgets

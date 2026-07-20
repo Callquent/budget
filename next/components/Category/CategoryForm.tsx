@@ -14,13 +14,9 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
   const [loading, setLoading] = useState(true);
 
   const [typeOptions, setTypeOptions] = useState<PickerOption[]>([]);
-  const [freqOptions, setFreqOptions] = useState<PickerOption[]>([]);
 
   const [transactionType, setTransactionType] = useState<string>(
     initialData?.transactionType ?? "",
-  );
-  const [frequency, setFrequency] = useState<string>(
-    initialData?.frequency ?? "",
   );
 
   // ── Fetch des options depuis Symfony (/categories/options) ────────────────
@@ -32,10 +28,8 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
       })
       .then((data) => {
         setTypeOptions(data.transactionTypes);
-        setFreqOptions(data.frequencies);
-        // Valeurs par défaut après chargement si pas d'initialData
+        // Valeur par défaut après chargement si pas d'initialData
         if (!transactionType) setTransactionType(data.transactionTypes[0]?.value ?? "");
-        if (!frequency)       setFrequency(data.frequencies[0]?.value ?? "");
       })
       .catch((e) => setError(`Impossible de charger les options : ${e.message}`))
       .finally(() => setLoading(false));
@@ -51,7 +45,6 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
     const body = {
       name:            (form.elements.namedItem("name") as HTMLInputElement).value,
       transactionType,
-      frequency,
       description:     (form.elements.namedItem("description") as HTMLTextAreaElement).value,
     };
 
@@ -112,14 +105,6 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
                   options={typeOptions}
                   value={transactionType}
                   onChange={setTransactionType}
-                />
-              </div>
-              <div className="mb-3">
-                <label className="form-label">Fréquence</label>
-                <OptionPicker
-                  options={freqOptions}
-                  value={frequency}
-                  onChange={setFrequency}
                 />
               </div>
               <div className="mb-3">

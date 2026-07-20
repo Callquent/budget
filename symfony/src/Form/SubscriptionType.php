@@ -37,7 +37,7 @@ class SubscriptionType extends AbstractType
             ->add('category', EntityType::class, [
                 'label' => 'Catégorie',
                 'class' => Category::class,
-                'choice_label' => fn(Category $c) => $c->getName().' — '.$c->getFrequency(),
+                'choice_label' => fn(Category $c) => $c->getName(),
                 'group_by' => fn(Category $c) => match($c->getTransactionType()) {
                     Category::TYPE_INCOME   => 'Recettes',
                     Category::TYPE_EXPENSE  => 'Dépenses',
@@ -53,10 +53,10 @@ class SubscriptionType extends AbstractType
             ->add('frequency', ChoiceType::class, [
                 'label' => 'Fréquence de prélèvement',
                 'choices' => [
-                    'Mensuelle'     => Category::FREQ_MONTHLY,
-                    'Annuelle'      => Category::FREQ_YEARLY,
-                    'Trimestrielle' => Category::FREQ_QUARTERLY,
-                    'Occasionnelle' => Category::FREQ_OCCASIONAL,
+                    'Mensuelle'     => Subscription::FREQ_MONTHLY,
+                    'Annuelle'      => Subscription::FREQ_YEARLY,
+                    'Trimestrielle' => Subscription::FREQ_QUARTERLY,
+                    'Occasionnelle' => Subscription::FREQ_OCCASIONAL,
                 ],
             ])
             ->add('dayOfMonth', IntegerType::class, [

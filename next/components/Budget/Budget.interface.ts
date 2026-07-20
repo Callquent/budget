@@ -9,7 +9,7 @@ export interface Budget extends BudgetBase {
   id: number;
   approvedAt?: string;
   account: { id: number; name: string; type: string; balance: string; currency: string } | null;
-  category: { id: number; name: string; transactionType: string; frequency: string };
+  category: { id: number; name: string; transactionType: string };
   year: number;
   month: number;
 }
