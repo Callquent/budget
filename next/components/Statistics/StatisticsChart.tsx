@@ -67,7 +67,7 @@ export default function StatisticsChart({
   netActualMonthly,
   monthNames,
 }: StatisticsChartProps) {
-  const [activeTab, setActiveTab] = useState<"dist" | "evo" | "net">("dist");
+  const [activeTab, setActiveTab] = useState<"dist" | "evo">("dist");
 
   // Conversion défensive : les montants peuvent arriver en string (colonnes
   // decimal Doctrine/Symfony). "+" sur des strings concatène au lieu d'additionner
@@ -113,6 +113,32 @@ export default function StatisticsChart({
     ],
   };
 
+  const netLineData = {
+    labels: monthNames,
+    datasets: [
+      {
+        label: "Bilan prévu",
+        data: netPlannedMonthly.map(toNum),
+        borderColor: "#8b5cf6",
+        backgroundColor: "rgba(139, 92, 246, 0.1)",
+        fill: true,
+        tension: 0.3,
+        borderWidth: 3,
+        pointRadius: 4,
+      },
+      {
+        label: "Bilan réalisé",
+        data: netActualMonthly.map(toNum),
+        borderColor: "#ec4899",
+        backgroundColor: "rgba(236, 72, 153, 0.1)",
+        fill: true,
+        tension: 0.3,
+        borderWidth: 3,
+        pointRadius: 4,
+      },
+    ],
+  };
+
   return (
     <>
       <ul className="nav nav-tabs mb-4" role="tablist">
@@ -132,15 +158,6 @@ export default function StatisticsChart({
             type="button"
           >
             <i className="bi bi-graph-up me-2"></i>Évolution Mensuelle
-          </button>
-        </li>
-        <li className="nav-item" role="presentation">
-          <button
-            className={`nav-link ${activeTab === "net" ? "active" : ""}`}
-            onClick={() => setActiveTab("net")}
-            type="button"
-          >
-            <i className="bi bi-cash-stack me-2"></i>Bilan Mensuel
           </button>
         </li>
       </ul>
@@ -267,7 +284,7 @@ export default function StatisticsChart({
 
         {activeTab === "evo" && (
           <div className="tab-pane fade show active">
-            <div className="card">
+            <div className="card mb-4">
               <div className="card-header bg-white fw-semibold">
                 <i className="bi bi-graph-up me-2 text-primary"></i>
                 Évolution des dépenses mensuelles
@@ -284,58 +301,22 @@ export default function StatisticsChart({
                 />
               </div>
             </div>
-          </div>
-        )}
 
-        {activeTab === "net" && (
-          <div className="tab-pane fade show active">
             <div className="card">
               <div className="card-header bg-white fw-semibold">
                 <i className="bi bi-cash-stack me-2 text-primary"></i>
-                Solde net par mois (revenus − dépenses)
+                Bilan mensuel (revenus − dépenses)
               </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  {monthNames.map((name, idx) => {
-                    const actualNet = toNum(netActualMonthly[idx] ?? 0);
-                    const plannedNet = toNum(netPlannedMonthly[idx] ?? 0);
-                    const isPositive = actualNet > 0;
-                    const isNegative = actualNet < 0;
-                    const bgClass = isPositive
-                      ? "bg-success-subtle"
-                      : isNegative
-                        ? "bg-danger-subtle"
-                        : "bg-light";
-                    const badgeClass = isPositive
-                      ? "bg-success"
-                      : isNegative
-                        ? "bg-danger"
-                        : "bg-secondary";
-
-                    return (
-                      <div className="col-md-3 col-sm-6" key={idx}>
-                        <div className={`card h-100 border-0 ${bgClass}`}>
-                          <div className="card-body text-center py-3">
-                            <div className="text-muted small fw-semibold mb-2 text-uppercase">
-                              {name}
-                            </div>
-                            <span
-                              className={`badge ${badgeClass} px-3 py-2`}
-                              style={{ fontSize: "0.95rem" }}
-                            >
-                              {isPositive ? "+" : ""}
-                              {formatNumber(actualNet)} €
-                            </span>
-                            <div className="text-muted small mt-2">
-                              Prévu : {plannedNet > 0 ? "+" : ""}
-                              {formatNumber(plannedNet)} €
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="card-body" style={{ height: "400px" }}>
+                <Line
+                  data={netLineData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "top" } },
+                    scales: { y: { beginAtZero: false } },
+                  }}
+                />
               </div>
             </div>
           </div>

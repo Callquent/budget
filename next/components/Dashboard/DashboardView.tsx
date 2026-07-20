@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BudgetOverdraftAlert from "./BudgetOverdraftAlert";
+import BudgetMonthlyBalance from "./BudgetMonthlyBalance";
 
 interface NavCard {
   href: string;
@@ -71,7 +72,6 @@ export default function DashboardView() {
         </h1>
       </div>
 
-      <BudgetOverdraftAlert />
       {/* Section Bienvenue */}
       <div className="card mb-4 border-0 shadow-sm rounded-3">
         <div className="card-body">
@@ -99,6 +99,7 @@ export default function DashboardView() {
           </div>
         </div>
       </div>
+
       {/* Cartes de navigation rapide */}
       <div className="row g-3 mb-4">
         {NAV_CARDS.map((card) => (
@@ -130,6 +131,10 @@ export default function DashboardView() {
           </div>
         ))}
       </div>
+
+      <BudgetOverdraftAlert />
+
+      <BudgetMonthlyBalance />
     </div>
   );
 }

@@ -14,6 +14,28 @@ function fmt(num: number | string, decimals = 2) {
   }).format(parseFloat(String(num)) || 0);
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────
+// Style épuré inspiré de la doc Bootstrap : en-têtes discrets (petite taille,
+// gris, lettres espacées), séparation par simple filet horizontal, pas
+// d'aplats de couleur — seule la typo (couleur/poids) porte l'information.
+
+const thStyle: React.CSSProperties = {
+  fontSize: ".72rem",
+  fontWeight: 600,
+  color: "#6c757d",
+  textTransform: "uppercase",
+  letterSpacing: ".06em",
+  borderBottom: "2px solid #e9ecef",
+  padding: "12px 16px",
+  whiteSpace: "nowrap",
+};
+
+const tdStyle: React.CSSProperties = {
+  borderBottom: "1px solid #eef0f2",
+  padding: "14px 16px",
+  verticalAlign: "middle",
+};
+
 // ─── Composant vue année ──────────────────────────────────────────────────────
 // Utilisé par app/budget/page.tsx (tableau récapitulatif des mois)
 
@@ -134,10 +156,7 @@ export default function BudgetYearView() {
       </div>
 
       <div className="card mb-4 border-0 shadow-sm rounded-3">
-        <div
-          className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 rounded-top-3"
-          style={{ borderLeft: "4px solid var(--bs-primary)" }}
-        >
+        <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-4 px-4 pb-2">
           <span className="fw-semibold">Récapitulatif annuel {yearState}</span>
           <span className="text-muted small">
             <i className="bi bi-info-circle me-1"></i>Solde fin de mois par
@@ -148,23 +167,23 @@ export default function BudgetYearView() {
           <table className="table table-hover mb-0 align-middle">
             <thead>
               <tr>
-                <th style={{ minWidth: "110px" }}>Mois</th>
+                <th style={{ ...thStyle, minWidth: "110px" }}>Mois</th>
                 {accounts.map((a) => (
                   <th
                     key={a.id}
                     className="text-end"
-                    style={{ minWidth: "130px" }}
+                    style={{ ...thStyle, minWidth: "150px" }}
                   >
                     <span className="d-flex align-items-center justify-content-end gap-1">
-                      <i className="bi bi-piggy-bank text-success small"></i>
+                      <i className="bi bi-piggy-bank text-success"></i>
                       {a.name}
                     </span>
                   </th>
                 ))}
-                <th className="text-end" style={{ minWidth: "120px" }}>
+                <th className="text-end" style={{ ...thStyle, minWidth: "130px" }}>
                   Total
                 </th>
-                <th></th>
+                <th style={{ ...thStyle, width: "56px" }}></th>
               </tr>
             </thead>
             <tbody>
@@ -175,19 +194,20 @@ export default function BudgetYearView() {
                   totalBalance +=
                     accountBalances[a.id]?.[m]?.balance ?? a.balance;
                 });
+                const isCurrent = yearState === currentYear && m === currentMonth;
 
                 return (
-                  <tr key={m}>
-                    <td>
+                  <tr key={m} style={isCurrent ? { background: "#f8f9fb" } : undefined}>
+                    <td style={tdStyle}>
                       <Link
                         href={`/budget/${yearState}/${m}`}
                         className="text-decoration-none fw-semibold text-dark"
                       >
                         {monthNames[m]}
-                        {yearState === currentYear && m === currentMonth && (
+                        {isCurrent && (
                           <span
-                            className="badge bg-primary bg-opacity-10 text-primary ms-1 rounded-pill"
-                            style={{ fontSize: ".6rem" }}
+                            className="badge bg-primary bg-opacity-10 text-primary ms-2 rounded-pill fw-normal"
+                            style={{ fontSize: ".62rem" }}
                           >
                             en cours
                           </span>
@@ -202,81 +222,63 @@ export default function BudgetYearView() {
                         ab?.balance_projected != null
                           ? ab.balance_projected
                           : bal;
+                      const balColor = colorRef < 0 ? "#c53030" : "#1a7f4b";
+
                       return (
-                        <td
-                          key={a.id}
-                          className="text-end"
-                          style={{
-                            background:
-                              colorRef < 0
-                                ? "rgba(220,53,69,.08)"
-                                : "rgba(25,135,84,.07)",
-                            borderLeft:
-                              colorRef < 0
-                                ? "3px solid rgba(220,53,69,.35)"
-                                : "3px solid rgba(25,135,84,.35)",
-                          }}
-                        >
+                        <td key={a.id} className="text-end" style={tdStyle}>
                           {/* Solde projeté */}
                           {((ab?.month_planned_net ?? 0) !== 0 ||
                             ab?.month_all_approved) && (
-                            <div
-                              style={{
-                                marginTop:
-                                  (ab!.balance_projected ?? 0) < 0
-                                    ? "8px"
-                                    : "4px",
-                                paddingTop: "4px",
-                              }}
-                              title="Estimation avec budget prévu"
-                            >
+                            <div style={{ marginBottom: "6px" }}>
                               {!ab?.month_all_approved && (
                                 <div
                                   style={{
                                     fontSize: ".68rem",
                                     color: "#adb5bd",
-                                    marginBottom: "1px",
-                                    textAlign: "right",
+                                    marginBottom: "2px",
                                   }}
                                 >
                                   Estimation prévue du solde en fin de mois
                                 </div>
                               )}
-                              <div
-                                style={{
-                                  textAlign: "right",
-                                  marginBottom: "2px",
-                                }}
-                              >
-                                {(() => {
-                                  const allApproved = ab?.month_all_approved;
-                                  const value = allApproved
-                                    ? (ab?.credit ?? 0) - (ab?.debit ?? 0)
-                                    : (ab?.month_planned_net ?? 0);
-                                  const label = allApproved
-                                    ? "Réalisé"
-                                    : "Estimation";
-                                  if (value === 0)
-                                    return (
-                                      <span className="text-muted small">
-                                        —
-                                      </span>
-                                    );
+                              {(() => {
+                                const allApproved = ab?.month_all_approved;
+                                const value = allApproved
+                                  ? (ab?.credit ?? 0) - (ab?.debit ?? 0)
+                                  : (ab?.month_planned_net ?? 0);
+                                const label = allApproved
+                                  ? "Réalisé"
+                                  : "Estimation";
+                                if (value === 0)
                                   return (
+                                    <span className="text-muted small">—</span>
+                                  );
+                                return (
+                                  <div
+                                    className="d-flex align-items-center justify-content-end gap-2"
+                                    style={{ marginBottom: "2px" }}
+                                  >
                                     <span
-                                      className={`badge rounded-pill ${value >= 0 ? "bg-success" : "bg-danger"}`}
                                       style={{
-                                        fontSize: ".75rem",
-                                        fontWeight: 600,
+                                        fontSize: ".68rem",
+                                        color: "#adb5bd",
                                       }}
-                                      title={label}
+                                    >
+                                      {label}
+                                    </span>
+                                    <span
+                                      style={{
+                                        fontSize: ".85rem",
+                                        fontWeight: 600,
+                                        color: value >= 0 ? "#1a7f4b" : "#c53030",
+                                      }}
                                     >
                                       {value >= 0 ? "+" : ""}
                                       {fmt(value)} €
                                     </span>
-                                  );
-                                })()}
-                              </div>
+                                  </div>
+                                );
+                              })()}
                               {!ab?.month_all_approved && (
                                 <div
                                   style={{
@@ -284,9 +286,8 @@ export default function BudgetYearView() {
                                     fontWeight: 600,
                                     color:
                                       (ab!.balance_projected ?? 0) < 0
-                                        ? "#842029"
-                                        : "#055160",
-                                    textAlign: "right",
+                                        ? "#c53030"
+                                        : "#1a7f4b",
                                   }}
                                 >
                                   {fmt(ab!.balance_projected)} €
@@ -300,16 +301,17 @@ export default function BudgetYearView() {
                             style={{
                               borderTop:
                                 (ab?.planned_net ?? 0) !== 0
-                                  ? "1px solid rgba(0,0,0,.10)"
+                                  ? "1px solid #eef0f2"
                                   : "none",
+                              paddingTop:
+                                (ab?.planned_net ?? 0) !== 0 ? "6px" : 0,
                             }}
                           >
                             <div
                               style={{
                                 fontSize: ".68rem",
                                 color: "#adb5bd",
-                                marginBottom: "1px",
-                                textAlign: "right",
+                                marginBottom: "2px",
                               }}
                             >
                               Solde actuel
@@ -318,7 +320,7 @@ export default function BudgetYearView() {
                               style={{
                                 fontWeight: 700,
                                 fontSize: "1rem",
-                                color: colorRef < 0 ? "#842029" : "#0a3622",
+                                color: balColor,
                               }}
                             >
                               {fmt(bal)} €
@@ -330,24 +332,17 @@ export default function BudgetYearView() {
                     <td
                       className="text-end fw-bold"
                       style={{
-                        color: totalBalance < 0 ? "#842029" : "#0a3622",
-                        background:
-                          totalBalance < 0
-                            ? "rgba(220,53,69,.1)"
-                            : "rgba(25,135,84,.09)",
-                        borderLeft:
-                          totalBalance < 0
-                            ? "3px solid rgba(220,53,69,.45)"
-                            : "3px solid rgba(25,135,84,.45)",
-                        fontSize: "1rem",
+                        ...tdStyle,
+                        color: totalBalance < 0 ? "#c53030" : "#1a7f4b",
+                        fontSize: ".95rem",
                       }}
                     >
                       {fmt(totalBalance)} €
                     </td>
-                    <td>
+                    <td style={tdStyle}>
                       <Link
                         href={`/budget/${yearState}/${m}`}
-                        className="btn btn-outline-secondary btn-action"
+                        className="btn btn-sm btn-outline-secondary btn-action"
                         title="Détail"
                       >
                         <i className="bi bi-eye"></i>
@@ -357,18 +352,27 @@ export default function BudgetYearView() {
                 );
               })}
             </tbody>
-            <tfoot className="table-light">
+            <tfoot>
               <tr>
-                <td className="fw-semibold">Solde actuel</td>
+                <td style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef", fontWeight: 600 }}>
+                  Solde actuel
+                </td>
                 {accounts.map((a) => (
-                  <td key={a.id} className="text-end fw-semibold">
+                  <td
+                    key={a.id}
+                    className="text-end fw-semibold"
+                    style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}
+                  >
                     {fmt(a.balance)} €
                   </td>
                 ))}
-                <td className="text-end fw-bold text-primary">
+                <td
+                  className="text-end fw-bold text-primary"
+                  style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}
+                >
                   {fmt(accounts.reduce((s, a) => s + a.balance, 0))} €
                 </td>
-                <td colSpan={2}></td>
+                <td style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}></td>
               </tr>
             </tfoot>
           </table>

@@ -52,10 +52,10 @@ export default function BudgetForm({
 
   const isApproved = initialData?.isApproved ?? false;
 
-  // Pour une catégorie Virement, le sens n'est plus choisi manuellement :
-  // "Compte destinataire" (accountId) reçoit toujours le crédit, et
-  // "Compte expéditeur" (destinationAccountId) reçoit toujours le débit —
-  // voir BudgetController::new() qui crée la ligne miroir avec le sens opposé.
+  // Pour une catégorie Virement, une seule ligne Budget porte les deux
+  // comptes : "Compte" (accountId) = expéditeur (débit), "Compte
+  // destinataire" (destinationAccountId) = destinataire (crédit). Le backend
+  // en déduit le sens tout seul, plus besoin de le choisir manuellement.
   const selectedCategoryType = React.useMemo(() => {
     for (const [txType, cats] of Object.entries(grouped)) {
       if (cats.some((c) => String(c.id) === categoryId)) return txType;
@@ -113,7 +113,7 @@ export default function BudgetForm({
     setError(null);
 
     if (isTransferCategory && !accountId) {
-      setError("Veuillez sélectionner le compte destinataire pour une ligne de virement.");
+      setError("Veuillez sélectionner le compte expéditeur pour une ligne de virement.");
       setSaving(false);
       return;
     }
@@ -135,9 +135,6 @@ export default function BudgetForm({
       month: parseInt(get("month")),
       plannedAmount: plannedAmount,
       actualAmount: sameAmount ? plannedAmount : (actualAmount || plannedAmount),
-      // Compte destinataire = toujours crédit ; le compte expéditeur (ligne
-      // miroir créée côté backend) reçoit automatiquement le débit.
-      type: isTransferCategory ? "credit" : null,
     };
 
     const url = initialData?.id
@@ -202,7 +199,7 @@ export default function BudgetForm({
 
             <div className="mb-3">
               <label className="form-label">
-                {isTransferCategory ? "Compte destinataire" : "Compte"}
+                {isTransferCategory ? "Compte expéditeur" : "Compte"}
               </label>
               <AccountPicker
                 accounts={accounts}
@@ -230,7 +227,7 @@ export default function BudgetForm({
 
             {isTransferCategory && (
               <div className="mb-3">
-                <label className="form-label">Compte expéditeur</label>
+                <label className="form-label">Compte destinataire</label>
                 <AccountPicker
                   accounts={accounts.filter(
                     (a) => String(a.id) !== accountId,
@@ -244,11 +241,11 @@ export default function BudgetForm({
                     <>
                       {!destinationAccountId && <i className="bi bi-exclamation-triangle me-1"></i>}
                       {destinationAccountId
-                        ? "Ligne miroir (débit) créée automatiquement sur ce compte."
-                        : "Optionnel : si renseigné, la ligne miroir (débit) est créée automatiquement sur ce compte."}
+                        ? "Ce compte recevra le crédit lors de l'approbation."
+                        : "Requis pour pouvoir approuver ce virement."}
                     </>
                   ) : (
-                    "Sélectionnez d'abord le compte destinataire ci-dessus."
+                    "Sélectionnez d'abord le compte expéditeur ci-dessus."
                   )}
                 </div>
               </div>

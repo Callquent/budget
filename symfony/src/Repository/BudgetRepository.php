@@ -41,9 +41,15 @@ class BudgetRepository extends ServiceEntityRepository
     {
         $em = $this->getEntityManager();
 
-        // Pour les recettes (income) : on somme les crédits.
-        // Pour les dépenses/virements : on somme les débits.
-        // Cela évite de mélanger les deux sens dans actualAmount.
+        // Pour les recettes (income) : on somme les crédits (peu importe le
+        // compte — une ligne sans compte assigné représente "tous comptes").
+        // Pour les dépenses (expense) : on somme les débits, même logique.
+        // Pour les virements (transfer) : il FAUT distinguer par compte, sinon
+        // débit (compte expéditeur) et crédit (compte destinataire) se
+        // mélangeraient. La transaction sur mb.account est un débit, celle
+        // sur mb.destinationAccount un crédit — voir BudgetController::approve().
+        // Transaction n'a jamais de type='transfer' (seulement credit/debit),
+        // d'où cette distinction par compte plutôt que par un type inexistant.
         $em->createQuery(
             'UPDATE App\Entity\Budget mb
              SET mb.actualAmount = (
@@ -56,7 +62,8 @@ class BudgetRepository extends ServiceEntityRepository
                    AND (
                        (c2.transactionType = \'income\'   AND t.type = \'credit\') OR
                        (c2.transactionType = \'expense\'  AND t.type = \'debit\')  OR
-                       (c2.transactionType = \'transfer\' AND t.type = \'transfer\')
+                       (c2.transactionType = \'transfer\' AND t.type = \'debit\'  AND t.account = mb.account) OR
+                       (c2.transactionType = \'transfer\' AND t.type = \'credit\' AND t.account = mb.destinationAccount)
                    )
              )
              WHERE mb.year = :year AND mb.month = :month'

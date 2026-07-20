@@ -61,6 +61,13 @@ class Budget
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Transaction $approvedTransaction = null;
 
+    // Virement uniquement : la transaction miroir (crédit) créée sur
+    // destinationAccount lors de l'approbation — approvedTransaction porte
+    // alors la transaction débit sur account. Voir BudgetController::approve().
+    #[ORM\ManyToOne(targetEntity: Transaction::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Transaction $approvedDestinationTransaction = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getCategory(): ?Category { return $this->category; }
@@ -94,6 +101,9 @@ class Budget
 
     public function getApprovedTransaction(): ?Transaction { return $this->approvedTransaction; }
     public function setApprovedTransaction(?Transaction $tx): static { $this->approvedTransaction = $tx; return $this; }
+
+    public function getApprovedDestinationTransaction(): ?Transaction { return $this->approvedDestinationTransaction; }
+    public function setApprovedDestinationTransaction(?Transaction $tx): static { $this->approvedDestinationTransaction = $tx; return $this; }
 
     public function isApproved(): bool { return $this->approvedAt !== null; }
 

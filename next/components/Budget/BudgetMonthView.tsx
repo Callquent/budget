@@ -644,13 +644,30 @@ export default function BudgetMonthView({
                       </td>
                       <td className="small text-muted">
                         {b.account ? (
-                          b.account.name
+                          b.category.transactionType === "transfer" &&
+                          b.destinationAccount ? (
+                            <span className="d-inline-flex align-items-center gap-1">
+                              {b.account.name}
+                              <i className="bi bi-arrow-right"></i>
+                              {b.destinationAccount.name}
+                            </span>
+                          ) : (
+                            b.account.name
+                          )
                         ) : (
                           <span className="text-warning">
                             <i className="bi bi-exclamation-triangle me-1"></i>
                             Non défini
                           </span>
                         )}
+                        {b.category.transactionType === "transfer" &&
+                          b.account &&
+                          !b.destinationAccount && (
+                            <div className="text-warning" style={{ fontSize: ".72rem" }}>
+                              <i className="bi bi-exclamation-triangle me-1"></i>
+                              Compte destinataire manquant
+                            </div>
+                          )}
                       </td>
                       <td className="text-end text-muted">
                         {fmt(b.plannedAmount)} €

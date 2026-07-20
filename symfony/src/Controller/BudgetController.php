@@ -74,37 +74,67 @@ class BudgetController extends AbstractController
         // approvalByAccount[$m][$aid] = [total, approved]
         $allPlannedByAccount = [];
         $approvalByAccount   = [];
-        foreach ($allBudgets as $mb) {
-            $m   = $mb->getMonth();
-            $aid = $mb->getAccount()?->getId() ?? 'all';
-            $type = $mb->getCategory()->getTransactionType();
 
-            // Comptage approbations par compte+mois
+        $applyEntry = function (int $m, $aid, bool $isCredit, float $amount, bool $approved) use (&$allPlannedByAccount, &$approvalByAccount) {
             if (!isset($approvalByAccount[$m][$aid])) {
                 $approvalByAccount[$m][$aid] = ['total' => 0, 'approved' => 0];
             }
             $approvalByAccount[$m][$aid]['total']++;
-            if ($mb->isApproved()) $approvalByAccount[$m][$aid]['approved']++;
+            if ($approved) $approvalByAccount[$m][$aid]['approved']++;
 
-            // Tous budgets (approuvés ou non) pour month_planned_net
             if (!isset($allPlannedByAccount[$m][$aid])) {
                 $allPlannedByAccount[$m][$aid] = ['income' => 0.0, 'expense' => 0.0];
             }
-            if ($type === 'income') {
-                $allPlannedByAccount[$m][$aid]['income'] += (float) $mb->getPlannedAmount();
+            if ($isCredit) {
+                $allPlannedByAccount[$m][$aid]['income'] += $amount;
             } else {
-                $allPlannedByAccount[$m][$aid]['expense'] += (float) $mb->getPlannedAmount();
+                $allPlannedByAccount[$m][$aid]['expense'] += $amount;
+            }
+        };
+
+        foreach ($allBudgets as $mb) {
+            $m            = $mb->getMonth();
+            $categoryType = $mb->getCategory()->getTransactionType();
+            $amount       = (float) $mb->getPlannedAmount();
+            $approved     = $mb->isApproved();
+
+            if ($categoryType === 'transfer' && $mb->getDestinationAccount()) {
+                // Une seule ligne, mais un impact sur DEUX comptes : sortie
+                // (débit) sur account, entrée (crédit) sur destinationAccount.
+                $srcAid = $mb->getAccount()?->getId() ?? 'all';
+                $dstAid = $mb->getDestinationAccount()->getId();
+                $applyEntry($m, $srcAid, false, $amount, $approved);
+                $applyEntry($m, $dstAid, true, $amount, $approved);
+            } else {
+                $aid      = $mb->getAccount()?->getId() ?? 'all';
+                $isCredit = $categoryType === 'income';
+                $applyEntry($m, $aid, $isCredit, $amount, $approved);
             }
 
             // Seulement non-approuvés pour la projection cumulative
-            if ($mb->isApproved()) continue;
-            if (!isset($plannedByAccount[$m][$aid])) {
-                $plannedByAccount[$m][$aid] = ['income' => 0.0, 'expense' => 0.0];
-            }
-            if ($type === 'income') {
-                $plannedByAccount[$m][$aid]['income'] += (float) $mb->getPlannedAmount();
+            if ($approved) continue;
+
+            if ($categoryType === 'transfer' && $mb->getDestinationAccount()) {
+                $srcAid = $mb->getAccount()?->getId() ?? 'all';
+                $dstAid = $mb->getDestinationAccount()->getId();
+                if (!isset($plannedByAccount[$m][$srcAid])) {
+                    $plannedByAccount[$m][$srcAid] = ['income' => 0.0, 'expense' => 0.0];
+                }
+                $plannedByAccount[$m][$srcAid]['expense'] += $amount;
+                if (!isset($plannedByAccount[$m][$dstAid])) {
+                    $plannedByAccount[$m][$dstAid] = ['income' => 0.0, 'expense' => 0.0];
+                }
+                $plannedByAccount[$m][$dstAid]['income'] += $amount;
             } else {
-                $plannedByAccount[$m][$aid]['expense'] += (float) $mb->getPlannedAmount();
+                $aid = $mb->getAccount()?->getId() ?? 'all';
+                if (!isset($plannedByAccount[$m][$aid])) {
+                    $plannedByAccount[$m][$aid] = ['income' => 0.0, 'expense' => 0.0];
+                }
+                if ($categoryType === 'income') {
+                    $plannedByAccount[$m][$aid]['income'] += $amount;
+                } else {
+                    $plannedByAccount[$m][$aid]['expense'] += $amount;
+                }
             }
         }
 
@@ -151,10 +181,17 @@ class BudgetController extends AbstractController
                 $startingNetByAccount[(int) $row['account_id']] = (float)$row['credit'] - (float)$row['debit'];
             }
             foreach ($repo->createQueryBuilder('mb')->join('mb.category', 'c')->where('mb.year = :y')->setParameter('y', $year - 1)->getQuery()->getResult() as $mb) {
-                $aid  = $mb->getAccount()?->getId() ?? 'all';
-                $amt  = (float) $mb->getPlannedAmount();
-                $startingPlannedByAccount[$aid] = ($startingPlannedByAccount[$aid] ?? 0.0)
-                    + ($mb->getCategory()->getTransactionType() === 'income' ? $amt : -$amt);
+                $amt = (float) $mb->getPlannedAmount();
+                if ($mb->getCategory()->getTransactionType() === 'transfer' && $mb->getDestinationAccount()) {
+                    $srcAid = $mb->getAccount()?->getId() ?? 'all';
+                    $dstAid = $mb->getDestinationAccount()->getId();
+                    $startingPlannedByAccount[$srcAid] = ($startingPlannedByAccount[$srcAid] ?? 0.0) - $amt;
+                    $startingPlannedByAccount[$dstAid] = ($startingPlannedByAccount[$dstAid] ?? 0.0) + $amt;
+                } else {
+                    $aid = $mb->getAccount()?->getId() ?? 'all';
+                    $startingPlannedByAccount[$aid] = ($startingPlannedByAccount[$aid] ?? 0.0)
+                        + ($mb->getCategory()->getTransactionType() === 'income' ? $amt : -$amt);
+                }
             }
         }
 
@@ -290,6 +327,14 @@ class BudgetController extends AbstractController
         $budget = new Budget();
         $this->hydrate($budget, $data, $em);
 
+        if (
+            $budget->getDestinationAccount()
+            && $budget->getAccount()
+            && $budget->getDestinationAccount()->getId() === $budget->getAccount()->getId()
+        ) {
+            return $this->json(['error' => 'Le compte expéditeur et le compte destinataire doivent être différents.'], 422);
+        }
+
         $em->persist($budget);
         $em->flush();
 
@@ -311,6 +356,15 @@ class BudgetController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
         $this->hydrate($budget, $data, $em);
+
+        if (
+            $budget->getDestinationAccount()
+            && $budget->getAccount()
+            && $budget->getDestinationAccount()->getId() === $budget->getAccount()->getId()
+        ) {
+            return $this->json(['error' => 'Le compte expéditeur et le compte destinataire doivent être différents.'], 422);
+        }
+
         $em->flush();
 
         return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
@@ -326,25 +380,54 @@ class BudgetController extends AbstractController
             return $this->json(['error' => "Veuillez d'abord associer un compte à cette ligne budgétaire avant d'approuver."], 422);
         }
 
-        $txType = match ($budget->getCategory()->getTransactionType()) {
-            'income'   => Transaction::TYPE_CREDIT,
-            'transfer' => Transaction::TYPE_CREDIT,
-            default    => Transaction::TYPE_DEBIT,
-        };
-
+        $categoryType = $budget->getCategory()->getTransactionType();
         $txDate = \DateTimeImmutable::createFromFormat('Y-n-j', $budget->getYear() . '-' . $budget->getMonth() . '-1');
+        $label  = $budget->getLabel() ?? ($budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel());
 
-        $transaction = (new Transaction())
-            ->setAccount($budget->getAccount())
-            ->setCategory($budget->getCategory())
-            ->setAmount($budget->getActualAmount())
-            ->setType($txType)
-            ->setTransactionDate($txDate)
-            ->setLabel($budget->getLabel() ?? ($budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel()));
+        if ($categoryType === 'transfer') {
+            if (!$budget->getDestinationAccount()) {
+                return $this->json(['error' => "Veuillez indiquer le compte destinataire de ce virement avant d'approuver."], 422);
+            }
 
-        $em->persist($transaction);
+            // Une ligne de virement génère deux transactions : sortie
+            // (débit) sur le compte expéditeur, entrée (crédit) sur le
+            // compte destinataire.
+            $debitTx = (new Transaction())
+                ->setAccount($budget->getAccount())
+                ->setCategory($budget->getCategory())
+                ->setAmount($budget->getActualAmount())
+                ->setType(Transaction::TYPE_DEBIT)
+                ->setTransactionDate($txDate)
+                ->setLabel($label);
+
+            $creditTx = (new Transaction())
+                ->setAccount($budget->getDestinationAccount())
+                ->setCategory($budget->getCategory())
+                ->setAmount($budget->getActualAmount())
+                ->setType(Transaction::TYPE_CREDIT)
+                ->setTransactionDate($txDate)
+                ->setLabel($label);
+
+            $em->persist($debitTx);
+            $em->persist($creditTx);
+            $budget->setApprovedTransaction($debitTx);
+            $budget->setApprovedDestinationTransaction($creditTx);
+        } else {
+            $txType = $categoryType === 'income' ? Transaction::TYPE_CREDIT : Transaction::TYPE_DEBIT;
+
+            $transaction = (new Transaction())
+                ->setAccount($budget->getAccount())
+                ->setCategory($budget->getCategory())
+                ->setAmount($budget->getActualAmount())
+                ->setType($txType)
+                ->setTransactionDate($txDate)
+                ->setLabel($label);
+
+            $em->persist($transaction);
+            $budget->setApprovedTransaction($transaction);
+        }
+
         $budget->setApprovedAt(new \DateTimeImmutable());
-        $budget->setApprovedTransaction($transaction);
         $em->flush();
 
         return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
@@ -356,8 +439,12 @@ class BudgetController extends AbstractController
         $tx = $budget->getApprovedTransaction();
         if ($tx) $em->remove($tx);
 
+        $dstTx = $budget->getApprovedDestinationTransaction();
+        if ($dstTx) $em->remove($dstTx);
+
         $budget->setApprovedAt(null);
         $budget->setApprovedTransaction(null);
+        $budget->setApprovedDestinationTransaction(null);
         $em->flush();
 
         return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
@@ -384,6 +471,8 @@ class BudgetController extends AbstractController
             if ($repo->findOneBy(['category' => $source->getCategory(), 'year' => $nextYear, 'month' => $nextMonth])) continue;
             $em->persist((new Budget())
                 ->setCategory($source->getCategory())
+                ->setAccount($source->getAccount())
+                ->setDestinationAccount($source->getDestinationAccount())
                 ->setYear($nextYear)->setMonth($nextMonth)
                 ->setPlannedAmount($source->getPlannedAmount()));
             $count++;
