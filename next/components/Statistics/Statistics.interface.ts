@@ -13,6 +13,9 @@ export interface ApiData {
   categories: string[];
   plannedMonthly: number[];
   actualMonthly: number[];
+  netPlannedMonthly: number[];
+  netActualMonthly: number[];
+  monthNames: string[];
 }
 
 export interface StatisticsViewProps {
@@ -26,4 +29,7 @@ export interface StatisticsChartProps {
   categories: string[];
   plannedMonthly: number[];
   actualMonthly: number[];
+  netPlannedMonthly: number[];
+  netActualMonthly: number[];
+  monthNames: string[];
 }

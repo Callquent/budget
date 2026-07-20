@@ -66,6 +66,8 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
     categories,
     plannedMonthly,
     actualMonthly,
+    netPlannedMonthly,
+    netActualMonthly,
     monthNames,
   } = data;
 
@@ -99,6 +101,8 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
         categories={categories}
         plannedMonthly={plannedMonthly}
         actualMonthly={actualMonthly}
+        netPlannedMonthly={netPlannedMonthly}
+        netActualMonthly={netActualMonthly}
         monthNames={monthNames}
       />
     </>
