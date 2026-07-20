@@ -66,6 +66,7 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
     categories,
     plannedMonthly,
     actualMonthly,
+    monthNames,
   } = data;
 
   return (
@@ -98,6 +99,7 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
         categories={categories}
         plannedMonthly={plannedMonthly}
         actualMonthly={actualMonthly}
+        monthNames={monthNames}
       />
     </>
   );

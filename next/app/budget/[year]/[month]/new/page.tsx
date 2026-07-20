@@ -1,17 +1,17 @@
 import BudgetForm from "@/components/Budget/BudgetForm";
 
 export default async function BudgetNewPage({
-  searchParams,
+  params,
 }: {
-  searchParams: Promise<{ year?: string; month?: string }>;
+  params: Promise<{ year: string; month: string }>;
 }) {
-  const { year, month } = await searchParams;
+  const { year, month } = await params;
 
   return (
     <BudgetForm
       title="Nouvelle ligne de budget"
-      currentYear={year ? parseInt(year) : undefined}
-      currentMonth={month ? parseInt(month) : undefined}
+      currentYear={parseInt(year)}
+      currentMonth={parseInt(month)}
     />
   );
 }

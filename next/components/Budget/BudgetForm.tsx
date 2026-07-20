@@ -10,6 +10,21 @@ import AccountPicker from "../Account/AccountPicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
+const MONTH_NAMES = [
+  "Janvier",
+  "Février",
+  "Mars",
+  "Avril",
+  "Mai",
+  "Juin",
+  "Juillet",
+  "Août",
+  "Septembre",
+  "Octobre",
+  "Novembre",
+  "Décembre",
+];
+
 export default function BudgetForm({
   initialData,
   title,
@@ -26,6 +41,13 @@ export default function BudgetForm({
 
   const [categoryId, setCategoryId] = useState<string>("");
   const [accountId, setAccountId] = useState<string>("");
+  const [plannedAmount, setPlannedAmount] = useState<string>(
+    initialData?.plannedAmount != null ? String(initialData.plannedAmount) : "",
+  );
+  const [actualAmount, setActualAmount] = useState<string>(
+    initialData?.actualAmount != null ? String(initialData.actualAmount) : "",
+  );
+  const [sameAmount, setSameAmount] = useState(false);
 
   const isApproved = initialData?.isApproved ?? false;
 
@@ -49,6 +71,16 @@ export default function BudgetForm({
     });
   }, [initialData?.category?.id, initialData?.account?.id, initialData?.categoryId, initialData?.accountId]);
 
+  const handleSameAmountToggle = (checked: boolean) => {
+    setSameAmount(checked);
+    setActualAmount(checked ? plannedAmount : "");
+  };
+
+  const handlePlannedAmountChange = (value: string) => {
+    setPlannedAmount(value);
+    if (sameAmount) setActualAmount(value);
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
@@ -65,8 +97,8 @@ export default function BudgetForm({
       accountId: accountId ? parseInt(accountId) : null,
       year: parseInt(get("year")),
       month: parseInt(get("month")),
-      plannedAmount: get("plannedAmount"),
-      actualAmount: get("actualAmount") || get("plannedAmount"),
+      plannedAmount: plannedAmount,
+      actualAmount: sameAmount ? plannedAmount : (actualAmount || plannedAmount),
     };
 
     const url = initialData?.id
@@ -169,16 +201,19 @@ export default function BudgetForm({
               </div>
               <div className="col-6">
                 <label className="form-label">Mois</label>
-                <input
-                  type="number"
+                <select
                   name="month"
-                  className="form-control"
+                  className="form-select"
                   defaultValue={initialData?.month ?? currentMonth}
-                  min="1"
-                  max="12"
                   disabled={isApproved}
                   required
-                />
+                >
+                  {MONTH_NAMES.map((label, idx) => (
+                    <option key={idx + 1} value={idx + 1}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -190,12 +225,28 @@ export default function BudgetForm({
                   name="plannedAmount"
                   step="0.01"
                   className="form-control"
-                  defaultValue={initialData?.plannedAmount ?? ""}
+                  value={plannedAmount}
+                  onChange={(e) => handlePlannedAmountChange(e.target.value)}
                   disabled={isApproved}
                   required
                 />
                 <span className="input-group-text">€</span>
               </div>
+            </div>
+
+            <div className="form-check form-switch mb-3">
+              <input
+                type="checkbox"
+                role="switch"
+                id="sameAmount"
+                className="form-check-input"
+                checked={sameAmount}
+                onChange={(e) => handleSameAmountToggle(e.target.checked)}
+                disabled={isApproved}
+              />
+              <label className="form-check-label" htmlFor="sameAmount">
+                Montant réalisé identique au montant prévu
+              </label>
             </div>
 
             <div className="mb-3">
@@ -206,8 +257,9 @@ export default function BudgetForm({
                   name="actualAmount"
                   step="0.01"
                   className="form-control"
-                  defaultValue={initialData?.actualAmount ?? ""}
-                  disabled={isApproved}
+                  value={actualAmount}
+                  onChange={(e) => setActualAmount(e.target.value)}
+                  disabled={isApproved || sameAmount}
                 />
                 <span className="input-group-text">€</span>
               </div>

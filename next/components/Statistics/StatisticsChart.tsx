@@ -15,29 +15,46 @@ import {
 import { Pie, Line } from "react-chartjs-2";
 
 ChartJS.register(
-  ArcElement, CategoryScale, LinearScale, PointElement,
-  LineElement, Title, Tooltip, Legend, Filler
+  ArcElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
 );
 
 import type { StatisticsChartProps } from "./Statistics.interface";
 
-function formatNumber(num: number) {
+function formatNumber(num: number | string) {
   return new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(num);
+  }).format(parseFloat(String(num)) || 0);
 }
 
 const CHART_COLORS = [
-  "#3b82f6","#ef4444","#10b981","#f59e0b","#8b5cf6",
-  "#ec4899","#06b6d4","#f97316","#6366f1","#14b8a6",
-  "#94a3b8","#fca5a5","#fde68a","#bbf7d0","#bfdbfe",
+  "#3b82f6",
+  "#ef4444",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#ec4899",
+  "#06b6d4",
+  "#f97316",
+  "#6366f1",
+  "#14b8a6",
+  "#94a3b8",
+  "#fca5a5",
+  "#fde68a",
+  "#bbf7d0",
+  "#bfdbfe",
 ];
 
-const MONTHS = [
-  "Janvier","Février","Mars","Avril","Mai","Juin",
-  "Juillet","Août","Septembre","Octobre","Novembre","Décembre",
-];
+// MONTHS vient désormais de l'API (props.monthNames), source unique partagée
+// avec le backend (App\Support\BudgetLabels) — plus de duplication.
 
 export default function StatisticsChart({
   summary,
@@ -46,22 +63,30 @@ export default function StatisticsChart({
   categories,
   plannedMonthly,
   actualMonthly,
+  monthNames,
 }: StatisticsChartProps) {
   const [activeTab, setActiveTab] = useState<"dist" | "evo">("dist");
 
-  const totalPlanned = summary.reduce((s, r) => s + r.planned, 0);
-  const totalActual = summary.reduce((s, r) => s + r.actual, 0);
+  // Conversion défensive : les montants peuvent arriver en string (colonnes
+  // decimal Doctrine/Symfony). "+" sur des strings concatène au lieu d'additionner
+  // (contrairement à "-"), d'où le bug TOTAL NaN corrigé ici.
+  const toNum = (v: number | string) => parseFloat(String(v)) || 0;
 
-  const pieData = (dataObj: Record<string, number>) => ({
+  const totalPlanned = summary.reduce((s, r) => s + toNum(r.planned), 0);
+  const totalActual = summary.reduce((s, r) => s + toNum(r.actual), 0);
+
+  const pieData = (dataObj: Record<string, number | string>) => ({
     labels: categories,
-    datasets: [{
-      data: categories.map((l) => dataObj[l] || 0),
-      backgroundColor: CHART_COLORS,
-    }],
+    datasets: [
+      {
+        data: categories.map((l) => toNum(dataObj[l] ?? 0)),
+        backgroundColor: CHART_COLORS,
+      },
+    ],
   });
 
   const lineData = {
-    labels: MONTHS,
+    labels: monthNames,
     datasets: [
       {
         label: "Prévu",
@@ -120,8 +145,19 @@ export default function StatisticsChart({
                     Répartition Prévue (Annuelle)
                   </div>
                   <div className="card-body d-flex justify-content-center">
-                    <div style={{ maxWidth: "400px", maxHeight: "400px", width: "100%" }}>
-                      <Pie data={pieData(plannedChart)} options={{ plugins: { legend: { position: "bottom" } } }} />
+                    <div
+                      style={{
+                        maxWidth: "400px",
+                        maxHeight: "400px",
+                        width: "100%",
+                      }}
+                    >
+                      <Pie
+                        data={pieData(plannedChart)}
+                        options={{
+                          plugins: { legend: { position: "bottom" } },
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -133,8 +169,19 @@ export default function StatisticsChart({
                     Répartition Réelle (Annuelle)
                   </div>
                   <div className="card-body d-flex justify-content-center">
-                    <div style={{ maxWidth: "400px", maxHeight: "400px", width: "100%" }}>
-                      <Pie data={pieData(actualChart)} options={{ plugins: { legend: { position: "bottom" } } }} />
+                    <div
+                      style={{
+                        maxWidth: "400px",
+                        maxHeight: "400px",
+                        width: "100%",
+                      }}
+                    >
+                      <Pie
+                        data={pieData(actualChart)}
+                        options={{
+                          plugins: { legend: { position: "bottom" } },
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -143,7 +190,8 @@ export default function StatisticsChart({
 
             <div className="card">
               <div className="card-header bg-white fw-semibold">
-                <i className="bi bi-table me-2 text-primary"></i>Détail par catégorie
+                <i className="bi bi-table me-2 text-primary"></i>Détail par
+                catégorie
               </div>
               <div className="table-responsive">
                 <table className="table table-hover mb-0 align-middle">
@@ -151,20 +199,27 @@ export default function StatisticsChart({
                     <tr>
                       <th>Catégorie</th>
                       <th className="text-end">Total Prévu</th>
-                      <th className="text-end">Total Réalisé</th>
                       <th className="text-end">Écart</th>
+                      <th className="text-end">Total Réalisé</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.map((row, idx) => {
-                      const variance = row.planned - row.actual;
+                      const variance = toNum(row.planned) - toNum(row.actual);
                       return (
                         <tr key={idx}>
                           <td className="fw-medium">{row.category_name}</td>
-                          <td className="text-end text-muted">{formatNumber(row.planned)} €</td>
-                          <td className="text-end">{formatNumber(row.actual)} €</td>
-                          <td className={`text-end ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : ""}`}>
-                            {variance > 0 ? "+" : ""}{formatNumber(variance)} €
+                          <td className="text-end text-muted">
+                            {formatNumber(row.planned)} €
+                          </td>
+                          <td
+                            className={`text-end ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : ""}`}
+                          >
+                            {variance > 0 ? "+" : ""}
+                            {formatNumber(variance)} €
+                          </td>
+                          <td className="text-end">
+                            {formatNumber(row.actual)} €
                           </td>
                         </tr>
                       );
@@ -173,9 +228,24 @@ export default function StatisticsChart({
                   <tfoot className="table-light fw-bold">
                     <tr>
                       <td>TOTAL</td>
-                      <td className="text-end">{formatNumber(totalPlanned)} €</td>
-                      <td className="text-end">{formatNumber(totalActual)} €</td>
-                      <td className="text-end">{formatNumber(totalPlanned - totalActual)} €</td>
+                      <td className="text-end">
+                        {formatNumber(totalPlanned)} €
+                      </td>
+                      <td
+                        className={
+                          totalPlanned - totalActual !== 0
+                            ? totalPlanned - totalActual > 0
+                              ? "text-end text-success"
+                              : "text-end text-danger"
+                            : "text-end"
+                        }
+                      >
+                        {totalPlanned - totalActual > 0 ? "+" : ""}
+                        {formatNumber(totalPlanned - totalActual)} €
+                      </td>
+                      <td className="text-end">
+                        {formatNumber(totalActual)} €
+                      </td>
                     </tr>
                   </tfoot>
                 </table>
