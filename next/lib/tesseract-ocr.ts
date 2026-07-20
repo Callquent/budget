@@ -14,26 +14,32 @@ export interface ReceiptOcrResult {
 // ─── Prétraitement de l'image (canvas) ─────────────────────────────────────
 // Convertit en niveaux de gris + augmente le contraste pour améliorer la
 // reconnaissance sur des tickets de caisse souvent flous ou peu contrastés.
+// Extrait en fonctions réutilisables pour être appliqué aussi bien à un
+// fichier importé qu'à une frame capturée en direct depuis la caméra.
 
-async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Impossible de charger l'image."));
-    image.src = URL.createObjectURL(file);
-  });
+// Limite la taille pour rester performant tout en gardant une résolution
+// suffisante pour l'OCR.
+const MAX_DIM = 1800;
 
-  // Limite la taille pour rester performant tout en gardant une résolution
-  // suffisante pour l'OCR.
-  const maxDim = 1800;
-  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+function drawScaled(
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+): HTMLCanvasElement {
+  const scale = Math.min(1, MAX_DIM / Math.max(sourceWidth, sourceHeight));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(img.width * scale);
-  canvas.height = Math.round(img.height * scale);
+  canvas.width = Math.round(sourceWidth * scale);
+  canvas.height = Math.round(sourceHeight * scale);
 
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Contexte canvas indisponible.");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+function applyGrayscaleContrast(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Contexte canvas indisponible.");
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const { data } = imageData;
@@ -49,7 +55,29 @@ async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
   }
 
   ctx.putImageData(imageData, 0, 0);
+}
+
+async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Impossible de charger l'image."));
+    image.src = URL.createObjectURL(file);
+  });
+
+  const canvas = drawScaled(img, img.width, img.height);
+  applyGrayscaleContrast(canvas);
   URL.revokeObjectURL(img.src);
+  return canvas;
+}
+
+// Capture une frame de la vidéo en cours (caméra en direct) sous forme de
+// canvas prétraité, prêt pour l'OCR — même pipeline que pour un fichier.
+export function captureCanvasFromVideo(
+  video: HTMLVideoElement,
+): HTMLCanvasElement {
+  const canvas = drawScaled(video, video.videoWidth, video.videoHeight);
+  applyGrayscaleContrast(canvas);
   return canvas;
 }
 
@@ -195,6 +223,29 @@ async function extractTextFromPdf(file: File): Promise<string> {
 
 // ─── Point d'entrée principal ───────────────────────────────────────────────
 
+// Reconnaissance sur un canvas déjà prétraité (ex : frame capturée depuis la
+// caméra en direct). Partagé par extractTotalFromReceipt pour les photos.
+async function recognizeCanvas(canvas: HTMLCanvasElement): Promise<ReceiptOcrResult> {
+  const worker = await createWorker("fra");
+  try {
+    const {
+      data: { text },
+    } = await worker.recognize(canvas);
+    const { total, strategy } = extractTotalFromText(text);
+    return { total, rawText: text, strategy };
+  } finally {
+    await worker.terminate();
+  }
+}
+
+// Utilisé par le mode "caméra en direct" de OCRModal : le canvas vient d'une
+// frame vidéo déjà capturée et prétraitée via captureCanvasFromVideo.
+export async function extractTotalFromCanvas(
+  canvas: HTMLCanvasElement,
+): Promise<ReceiptOcrResult> {
+  return recognizeCanvas(canvas);
+}
+
 export async function extractTotalFromReceipt(
   file: File,
 ): Promise<ReceiptOcrResult> {
@@ -210,15 +261,5 @@ export async function extractTotalFromReceipt(
 
   // Sinon (photo), on passe par le pipeline OCR habituel.
   const canvas = await preprocessImage(file);
-
-  const worker = await createWorker("fra");
-  try {
-    const {
-      data: { text },
-    } = await worker.recognize(canvas);
-    const { total, strategy } = extractTotalFromText(text);
-    return { total, rawText: text, strategy };
-  } finally {
-    await worker.terminate();
-  }
+  return recognizeCanvas(canvas);
 }

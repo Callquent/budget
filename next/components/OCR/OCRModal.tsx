@@ -4,7 +4,11 @@ import type { AccountInterface } from "../Account/Account.interface";
 import type { CategoryInterface } from "../Category/Category.interface";
 import CategoryPicker from "../Category/CategoryPicker";
 import AccountPicker from "../Account/AccountPicker";
-import { extractTotalFromReceipt } from "../../lib/tesseract-ocr";
+import {
+  extractTotalFromReceipt,
+  extractTotalFromCanvas,
+  captureCanvasFromVideo,
+} from "../../lib/tesseract-ocr";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -40,6 +44,74 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
   const [fileName, setFileName] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [captureSource, setCaptureSource] = useState<"file" | "camera">(
+    "file",
+  );
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraActive(false);
+  };
+
+  const startCamera = async () => {
+    setError(null);
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraActive(true);
+      setStep("idle");
+      // Le <video> n'est monté qu'une fois cameraActive=true ; on attend le
+      // prochain rendu pour lui attacher le flux.
+      requestAnimationFrame(() => {
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      });
+    } catch (err) {
+      setCameraError(
+        "Impossible d'accéder à la caméra. Vérifiez les autorisations du navigateur.",
+      );
+    }
+  };
+
+  const handleCapture = async () => {
+    if (!videoRef.current) return;
+    const canvas = captureCanvasFromVideo(videoRef.current);
+    stopCamera();
+
+    setPreviewUrl(canvas.toDataURL("image/jpeg", 0.85));
+    setIsPdf(false);
+    setCaptureSource("camera");
+    setFileName("Photo (caméra)");
+    setStep("analyzing");
+
+    try {
+      const result = await extractTotalFromCanvas(canvas);
+      setDebugText(result.rawText);
+      setDebugStrategy(result.strategy);
+      if (result.total === null) {
+        setError(
+          "Le montant total n'a pas pu être détecté automatiquement. Vous pouvez le saisir manuellement.",
+        );
+      }
+      setTotal(result.total !== null ? result.total.toFixed(2) : "");
+      setStep("review");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erreur lors de l'analyse de la photo.",
+      );
+      setStep("review");
+    }
+  };
 
   // Charge comptes / catégories à l'ouverture, comme dans BudgetForm.
   useEffect(() => {
@@ -60,6 +132,8 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
   // Réinitialise l'état à chaque fermeture.
   useEffect(() => {
     if (!show) {
+      stopCamera();
+      setCameraError(null);
       setStep("idle");
       setPreviewUrl(null);
       setError(null);
@@ -72,6 +146,8 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
       setIsPdf(false);
       setFileName("");
     }
+    // Coupe aussi la caméra si le composant se démonte pendant qu'elle tourne.
+    return () => stopCamera();
   }, [show]);
 
   if (!show) return null;
@@ -88,6 +164,7 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
 
     setError(null);
     setIsPdf(filePdf);
+    setCaptureSource("file");
     setFileName(file.name);
     setPreviewUrl(filePdf ? null : URL.createObjectURL(file));
     setStep("analyzing");
@@ -219,25 +296,87 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
             <div className="alert alert-warning py-2 small mb-3">{error}</div>
           )}
 
-          {step === "idle" && (
-            <div
-              style={{
-                border: "2px dashed #ced4da",
-                borderRadius: "12px",
-                textAlign: "center",
-                padding: "3rem 1rem",
-                cursor: "pointer",
-                color: "#6c757d",
-              }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <i
-                className="bi bi-camera d-block mb-2"
-                style={{ fontSize: "2.5rem" }}
-              ></i>
-              <span>
-                Cliquez pour importer une photo du ticket, ou un PDF
-              </span>
+          {step === "idle" && !cameraActive && (
+            <>
+              <div
+                style={{
+                  border: "2px dashed #ced4da",
+                  borderRadius: "12px",
+                  textAlign: "center",
+                  padding: "2rem 1rem",
+                  cursor: "pointer",
+                  color: "#6c757d",
+                }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <i
+                  className="bi bi-upload d-block mb-2"
+                  style={{ fontSize: "2rem" }}
+                ></i>
+                <span>Importer une photo du ticket, ou un PDF</span>
+              </div>
+
+              <div className="d-flex align-items-center gap-2 my-3 text-muted small">
+                <hr className="flex-grow-1" />
+                ou
+                <hr className="flex-grow-1" />
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-outline-success w-100"
+                onClick={startCamera}
+              >
+                <i className="bi bi-camera-fill me-2"></i>
+                Utiliser la caméra en direct
+              </button>
+
+              {cameraError && (
+                <div className="alert alert-warning py-2 small mt-3 mb-0">
+                  {cameraError}
+                </div>
+              )}
+            </>
+          )}
+
+          {step === "idle" && cameraActive && (
+            <div>
+              <div
+                style={{
+                  position: "relative",
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  background: "#000",
+                }}
+              >
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: "100%", display: "block" }}
+                />
+              </div>
+              <div className="d-flex gap-2 mt-3">
+                <button
+                  type="button"
+                  className="btn btn-success flex-grow-1"
+                  onClick={handleCapture}
+                >
+                  <i className="bi bi-camera-fill me-2"></i>Capturer
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={stopCamera}
+                >
+                  Annuler
+                </button>
+              </div>
+              <div className="text-muted small text-center mt-2">
+                Cadrez le ticket, en particulier la ligne du total, puis
+                capturez.
+              </div>
             </div>
           )}
 
@@ -319,10 +458,17 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
                   <button
                     type="button"
                     className="btn btn-sm btn-outline-secondary"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() =>
+                      captureSource === "camera"
+                        ? startCamera()
+                        : fileInputRef.current?.click()
+                    }
                     disabled={step === "submitting"}
                   >
-                    <i className="bi bi-arrow-repeat me-1"></i>Changer de fichier
+                    <i className="bi bi-arrow-repeat me-1"></i>
+                    {captureSource === "camera"
+                      ? "Reprendre une photo"
+                      : "Changer de fichier"}
                   </button>
                 )}
               </div>
