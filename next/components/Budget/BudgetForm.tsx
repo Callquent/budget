@@ -41,6 +41,7 @@ export default function BudgetForm({
 
   const [categoryId, setCategoryId] = useState<string>("");
   const [accountId, setAccountId] = useState<string>("");
+  const [destinationAccountId, setDestinationAccountId] = useState<string>("");
   const [plannedAmount, setPlannedAmount] = useState<string>(
     initialData?.plannedAmount != null ? String(initialData.plannedAmount) : "",
   );
@@ -50,6 +51,26 @@ export default function BudgetForm({
   const [sameAmount, setSameAmount] = useState(false);
 
   const isApproved = initialData?.isApproved ?? false;
+
+  // Pour une catégorie Virement, le sens n'est plus choisi manuellement :
+  // "Compte destinataire" (accountId) reçoit toujours le crédit, et
+  // "Compte expéditeur" (destinationAccountId) reçoit toujours le débit —
+  // voir BudgetController::new() qui crée la ligne miroir avec le sens opposé.
+  const selectedCategoryType = React.useMemo(() => {
+    for (const [txType, cats] of Object.entries(grouped)) {
+      if (cats.some((c) => String(c.id) === categoryId)) return txType;
+    }
+    return null;
+  }, [grouped, categoryId]);
+  const isTransferCategory = selectedCategoryType === "transfer";
+
+  useEffect(() => {
+    if (!isTransferCategory) {
+      setDestinationAccountId("");
+    } else if (destinationAccountId && destinationAccountId === accountId) {
+      setDestinationAccountId("");
+    }
+  }, [isTransferCategory, accountId, destinationAccountId]);
 
   useEffect(() => {
     Promise.all([
@@ -68,8 +89,13 @@ export default function BudgetForm({
         : initialData?.accountId != null ? String(initialData.accountId)
         : "",
       );
+      setDestinationAccountId(
+        initialData?.destinationAccount?.id != null ? String(initialData.destinationAccount.id)
+        : initialData?.destinationAccountId != null ? String(initialData.destinationAccountId)
+        : "",
+      );
     });
-  }, [initialData?.category?.id, initialData?.account?.id, initialData?.categoryId, initialData?.accountId]);
+  }, [initialData?.category?.id, initialData?.account?.id, initialData?.destinationAccount?.id, initialData?.categoryId, initialData?.accountId, initialData?.destinationAccountId]);
 
   const handleSameAmountToggle = (checked: boolean) => {
     setSameAmount(checked);
@@ -86,6 +112,12 @@ export default function BudgetForm({
     setSaving(true);
     setError(null);
 
+    if (isTransferCategory && !accountId) {
+      setError("Veuillez sélectionner le compte destinataire pour une ligne de virement.");
+      setSaving(false);
+      return;
+    }
+
     const form = e.currentTarget;
     const get = (name: string) =>
       (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement)
@@ -95,10 +127,17 @@ export default function BudgetForm({
       label: get("label") || null,
       categoryId: parseInt(categoryId),
       accountId: accountId ? parseInt(accountId) : null,
+      destinationAccountId:
+        isTransferCategory && destinationAccountId
+          ? parseInt(destinationAccountId)
+          : null,
       year: parseInt(get("year")),
       month: parseInt(get("month")),
       plannedAmount: plannedAmount,
       actualAmount: sameAmount ? plannedAmount : (actualAmount || plannedAmount),
+      // Compte destinataire = toujours crédit ; le compte expéditeur (ligne
+      // miroir créée côté backend) reçoit automatiquement le débit.
+      type: isTransferCategory ? "credit" : null,
     };
 
     const url = initialData?.id
@@ -162,7 +201,9 @@ export default function BudgetForm({
             </div>
 
             <div className="mb-3">
-              <label className="form-label">Compte</label>
+              <label className="form-label">
+                {isTransferCategory ? "Compte destinataire" : "Compte"}
+              </label>
               <AccountPicker
                 accounts={accounts}
                 value={accountId}
@@ -186,6 +227,32 @@ export default function BudgetForm({
                 disabled={isApproved}
               />
             </div>
+
+            {isTransferCategory && (
+              <div className="mb-3">
+                <label className="form-label">Compte expéditeur</label>
+                <AccountPicker
+                  accounts={accounts.filter(
+                    (a) => String(a.id) !== accountId,
+                  )}
+                  value={destinationAccountId}
+                  onChange={setDestinationAccountId}
+                  disabled={isApproved || !accountId}
+                />
+                <div className={`form-text ${accountId && !destinationAccountId ? "text-warning mt-1" : ""}`}>
+                  {accountId ? (
+                    <>
+                      {!destinationAccountId && <i className="bi bi-exclamation-triangle me-1"></i>}
+                      {destinationAccountId
+                        ? "Ligne miroir (débit) créée automatiquement sur ce compte."
+                        : "Optionnel : si renseigné, la ligne miroir (débit) est créée automatiquement sur ce compte."}
+                    </>
+                  ) : (
+                    "Sélectionnez d'abord le compte destinataire ci-dessus."
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="row g-3 mb-3">
               <div className="col-6">

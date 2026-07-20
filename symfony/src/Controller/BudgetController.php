@@ -402,6 +402,7 @@ class BudgetController extends AbstractController
         $budget->setLabel($data['label'] ?? null);
         $budget->setCategory($categoryRepo->find($data['categoryId']));
         $budget->setAccount(!empty($data['accountId']) ? $accountRepo->find($data['accountId']) : null);
+        $budget->setDestinationAccount(!empty($data['destinationAccountId']) ? $accountRepo->find($data['destinationAccountId']) : null);
         $budget->setYear((int) $data['year']);
         $budget->setMonth((int) $data['month']);
         $budget->setPlannedAmount((string) $data['plannedAmount']);

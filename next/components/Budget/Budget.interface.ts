@@ -3,6 +3,9 @@ interface BudgetBase {
   actualAmount: number;
   isApproved: boolean;
   label?: string;
+  // Sens (crédit/débit), utile uniquement pour une catégorie Virement —
+  // Recette/Dépense se déduisent automatiquement de category.transactionType.
+  type?: "credit" | "debit" | null;
 }
 
 export interface Budget extends BudgetBase {
@@ -22,8 +25,10 @@ export interface BudgetFormProps {
     // Forme plate (compatibilité)
     categoryId?: number;
     accountId?: number;
+    destinationAccountId?: number;
     // Forme imbriquée (retournée par l'API)
     account?: { id: number; name: string; type: string; balance: string; currency: string } | null;
+    destinationAccount?: { id: number; name: string; type: string; balance: string; currency: string } | null;
     category?: { id: number; name: string; transactionType: string; frequency: string };
   };
   title: string;

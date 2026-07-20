@@ -32,6 +32,11 @@ class Budget
     #[Groups(['budget:read', 'budget:month'])]
     private ?Account $account = null;
 
+    #[ORM\ManyToOne(targetEntity: Account::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    #[Groups(['budget:read', 'budget:month'])]
+    private ?Account $destinationAccount = null;
+
     #[ORM\Column(type: 'smallint')]
     #[Groups(['budget:read', 'budget:month'])]
     private int $year;
@@ -63,6 +68,9 @@ class Budget
 
     public function getAccount(): ?Account { return $this->account; }
     public function setAccount(?Account $account): static { $this->account = $account; return $this; }
+
+    public function getDestinationAccount(): ?Account { return $this->destinationAccount; }
+    public function setDestinationAccount(?Account $account): static { $this->destinationAccount = $account; return $this; }
 
     public function getLabel(): ?string { return $this->label; }
     public function setLabel(?string $label): static { $this->label = $label; return $this; }
