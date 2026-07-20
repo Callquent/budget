@@ -58,29 +58,51 @@ function toNumber(match: string): number {
   return parseFloat(match.replace(",", "."));
 }
 
-// Niveau 1 : recherche des lignes contenant "TOTAL" (ou variantes) et
-// extraction du montant le plus proche sur cette ligne / la suivante.
-function tryTotalContext(lines: string[]): number | null {
-  const totalLineRe = /total(?!isé)|à\s*payer|net\s*[aà]\s*payer|montant/i;
-  for (let i = 0; i < lines.length; i++) {
-    if (totalLineRe.test(lines[i])) {
-      const candidates = [lines[i], lines[i + 1] ?? ""].join(" ");
-      const found = [...candidates.matchAll(AMOUNT_RE)].map((m) =>
+// Mots-clés identifiant une ligne "total / paiement" plutôt qu'une ligne
+// produit. On ne cherche des montants que sur ces lignes-là (+ la ligne
+// suivante), ce qui élimine structurellement les prix au kg ("2.49 €/kg",
+// "1.99 €/kg"...) du calcul : ils n'apparaissent jamais sur ce type de ligne.
+const KEYWORD_RE =
+  /total(?!isé)|carte\s*(bancaire)?|\bcb\b|esp[eè]ces|ch[eè]que|à\s*payer|net\s*[aà]\s*payer|montant|ttc/i;
+
+// Niveau 1 (prioritaire) : parmi les montants trouvés sur des lignes
+// "total/paiement", on retient celui qui revient le plus souvent. Le total
+// réel est presque toujours répété plusieurs fois sur un ticket (ligne
+// TOTAL, ligne moyen de paiement, récapitulatif TVA en bas), alors qu'une
+// éventuelle erreur de lecture OCR sur une occurrence donnée (ex: "TTC"
+// mal reconnu et fusionné avec le nombre suivant) ne l'est pas.
+function tryContextFrequency(
+  lines: string[],
+): { value: number; count: number } | null {
+  const candidates: number[] = [];
+
+  lines.forEach((line, i) => {
+    if (KEYWORD_RE.test(line)) {
+      const window = [line, lines[i + 1] ?? ""].join(" ");
+      const found = [...window.matchAll(AMOUNT_RE)].map((m) =>
         toNumber(m[1]),
       );
-      if (found.length) {
-        // Le plus grand montant sur la ligne "total" est généralement le bon
-        // (évite de prendre un sous-total ou une quantité).
-        return Math.max(...found);
-      }
+      candidates.push(...found);
     }
-  }
-  return null;
+  });
+
+  if (!candidates.length) return null;
+
+  const counts = new Map<number, number>();
+  candidates.forEach((n) => counts.set(n, (counts.get(n) ?? 0) + 1));
+
+  const sorted = [...counts.entries()].sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1]; // fréquence décroissante
+    return b[0] - a[0]; // puis montant décroissant
+  });
+
+  const [value, count] = sorted[0];
+  return { value, count };
 }
 
-// Niveau 2 : vote de fréquence — le montant qui apparaît le plus souvent
-// dans le texte (hors lignes clairement identifiées comme sous-totaux/TVA)
-// est souvent le total, car il est répété (ligne détail + ligne total).
+// Niveau 2 : repli — vote de fréquence sur l'intégralité du texte (utile si
+// aucune ligne "total/paiement" n'a été détectée, par ex. en cas de flou
+// important sur cette zone du ticket).
 function tryFrequencyVoting(text: string): number | null {
   const all = [...text.matchAll(AMOUNT_RE)].map((m) => toNumber(m[1]));
   if (!all.length) return null;
@@ -89,8 +111,8 @@ function tryFrequencyVoting(text: string): number | null {
   all.forEach((n) => counts.set(n, (counts.get(n) ?? 0) + 1));
 
   const sorted = [...counts.entries()].sort((a, b) => {
-    if (b[1] !== a[1]) return b[1] - a[1]; // fréquence décroissante
-    return b[0] - a[0]; // puis montant décroissant
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return b[0] - a[0];
   });
 
   return sorted[0]?.[0] ?? null;
@@ -111,9 +133,9 @@ export function extractTotalFromText(rawText: string): {
 } {
   const lines = rawText.split(/\r?\n/).filter((l) => l.trim().length > 0);
 
-  const contextResult = tryTotalContext(lines);
-  if (contextResult !== null) {
-    return { total: contextResult, strategy: "total-context" };
+  const contextVoted = tryContextFrequency(lines);
+  if (contextVoted !== null) {
+    return { total: contextVoted.value, strategy: "total-context" };
   }
 
   const votedResult = tryFrequencyVoting(rawText);

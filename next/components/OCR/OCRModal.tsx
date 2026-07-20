@@ -34,6 +34,8 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
   const [categoryId, setCategoryId] = useState<string>("");
   const [accountId, setAccountId] = useState<string>("");
   const [label, setLabel] = useState<string>("Ticket de caisse");
+  const [debugText, setDebugText] = useState<string>("");
+  const [debugStrategy, setDebugStrategy] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +65,8 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
       setCategoryId("");
       setAccountId("");
       setLabel("Ticket de caisse");
+      setDebugText("");
+      setDebugStrategy("");
     }
   }, [show]);
 
@@ -80,6 +84,8 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
 
     try {
       const result = await extractTotalFromReceipt(file);
+      setDebugText(result.rawText);
+      setDebugStrategy(result.strategy);
       if (result.total === null) {
         setError(
           "Le montant total n'a pas pu être détecté automatiquement. Vous pouvez le saisir manuellement.",
@@ -328,6 +334,27 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
                   disabled={step === "submitting"}
                 />
               </div>
+
+              {debugText && (
+                <details className="mt-3">
+                  <summary
+                    className="text-muted small"
+                    style={{ cursor: "pointer" }}
+                  >
+                    Texte détecté par l'OCR ({debugStrategy})
+                  </summary>
+                  <pre
+                    className="small bg-light p-2 rounded mt-1"
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      maxHeight: "150px",
+                      overflowY: "auto",
+                    }}
+                  >
+                    {debugText}
+                  </pre>
+                </details>
+              )}
             </>
           )}
         </div>
