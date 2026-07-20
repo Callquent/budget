@@ -36,6 +36,8 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
   const [label, setLabel] = useState<string>("Ticket de caisse");
   const [debugText, setDebugText] = useState<string>("");
   const [debugStrategy, setDebugStrategy] = useState<string>("");
+  const [isPdf, setIsPdf] = useState(false);
+  const [fileName, setFileName] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +69,8 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
       setLabel("Ticket de caisse");
       setDebugText("");
       setDebugStrategy("");
+      setIsPdf(false);
+      setFileName("");
     }
   }, [show]);
 
@@ -78,8 +82,14 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const filePdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
+
     setError(null);
-    setPreviewUrl(URL.createObjectURL(file));
+    setIsPdf(filePdf);
+    setFileName(file.name);
+    setPreviewUrl(filePdf ? null : URL.createObjectURL(file));
     setStep("analyzing");
 
     try {
@@ -97,7 +107,7 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
       setError(
         err instanceof Error
           ? err.message
-          : "Erreur lors de l'analyse de l'image.",
+          : "Erreur lors de l'analyse du fichier.",
       );
       setStep("review");
     }
@@ -225,20 +235,22 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
                 className="bi bi-camera d-block mb-2"
                 style={{ fontSize: "2.5rem" }}
               ></i>
-              <span>Cliquez pour importer une photo du ticket</span>
+              <span>
+                Cliquez pour importer une photo du ticket, ou un PDF
+              </span>
             </div>
           )}
 
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf,.pdf"
             capture="environment"
             style={{ display: "none" }}
             onChange={handleFileChange}
           />
 
-          {previewUrl && step !== "idle" && (
+          {(previewUrl || (isPdf && fileName)) && step !== "idle" && (
             <div
               style={{
                 display: "flex",
@@ -247,18 +259,48 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
                 marginBottom: "1rem",
               }}
             >
-              <img
-                src={previewUrl}
-                alt="Aperçu du ticket"
-                style={{
-                  width: "90px",
-                  height: "90px",
-                  objectFit: "cover",
-                  borderRadius: "8px",
-                  border: "1px solid #dee2e6",
-                  flexShrink: 0,
-                }}
-              />
+              {isPdf ? (
+                <div
+                  style={{
+                    width: "90px",
+                    height: "90px",
+                    borderRadius: "8px",
+                    border: "1px solid #dee2e6",
+                    flexShrink: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#f8f9fa",
+                    color: "#6c757d",
+                    padding: "0.25rem",
+                  }}
+                >
+                  <i
+                    className="bi bi-file-earmark-pdf"
+                    style={{ fontSize: "1.75rem", color: "#dc3545" }}
+                  ></i>
+                  <span
+                    className="small text-truncate"
+                    style={{ maxWidth: "80px" }}
+                  >
+                    {fileName}
+                  </span>
+                </div>
+              ) : (
+                <img
+                  src={previewUrl!}
+                  alt="Aperçu du ticket"
+                  style={{
+                    width: "90px",
+                    height: "90px",
+                    objectFit: "cover",
+                    borderRadius: "8px",
+                    border: "1px solid #dee2e6",
+                    flexShrink: 0,
+                  }}
+                />
+              )}
               <div style={{ flexGrow: 1 }}>
                 {step === "analyzing" && (
                   <div
@@ -280,7 +322,7 @@ export default function OCRModal({ show, onClose, onSuccess }: OCRModalProps) {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={step === "submitting"}
                   >
-                    <i className="bi bi-arrow-repeat me-1"></i>Changer de photo
+                    <i className="bi bi-arrow-repeat me-1"></i>Changer de fichier
                   </button>
                 )}
               </div>

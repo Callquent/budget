@@ -1,4 +1,7 @@
 import { createWorker } from "tesseract.js";
+import * as pdfjsLib from "pdfjs-dist";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -151,11 +154,61 @@ export function extractTotalFromText(rawText: string): {
   return { total: null, strategy: "none" };
 }
 
+// ─── Extraction de texte natif depuis un PDF ───────────────────────────────
+// Certains tickets sont des PDF envoyés par e-mail (ex: E.Leclerc) et
+// contiennent déjà du texte réel — inutile de passer par l'OCR, on peut lire
+// le texte directement, ce qui est bien plus fiable qu'une reconnaissance
+// d'image. On reconstruit les lignes en regroupant les éléments de texte par
+// position verticale (l'API pdf.js ne renvoie pas de sauts de ligne), pour
+// que la logique de détection par mots-clés (qui raisonne ligne par ligne)
+// fonctionne de la même façon que sur du texte OCR.
+async function extractTextFromPdf(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const allLines: string[] = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+
+    const rows = new Map<number, { x: number; str: string }[]>();
+    for (const item of content.items as any[]) {
+      if (!item.str || !item.str.trim()) continue;
+      // transform[5] = position verticale (Y) du texte sur la page.
+      const y = Math.round(item.transform[5]);
+      if (!rows.has(y)) rows.set(y, []);
+      rows.get(y)!.push({ x: item.transform[4], str: item.str });
+    }
+
+    // L'axe Y d'un PDF part du bas de la page : on trie donc du plus grand
+    // au plus petit pour retrouver l'ordre de lecture (haut → bas), puis
+    // chaque ligne est triée de gauche à droite.
+    const sortedY = [...rows.keys()].sort((a, b) => b - a);
+    for (const y of sortedY) {
+      const row = rows.get(y)!.sort((a, b) => a.x - b.x);
+      allLines.push(row.map((r) => r.str).join(" "));
+    }
+  }
+
+  return allLines.join("\n");
+}
+
 // ─── Point d'entrée principal ───────────────────────────────────────────────
 
 export async function extractTotalFromReceipt(
   file: File,
 ): Promise<ReceiptOcrResult> {
+  // PDF avec texte natif : pas besoin d'OCR, on lit directement le texte.
+  if (
+    file.type === "application/pdf" ||
+    file.name.toLowerCase().endsWith(".pdf")
+  ) {
+    const rawText = await extractTextFromPdf(file);
+    const { total, strategy } = extractTotalFromText(rawText);
+    return { total, rawText, strategy };
+  }
+
+  // Sinon (photo), on passe par le pipeline OCR habituel.
   const canvas = await preprocessImage(file);
 
   const worker = await createWorker("fra");
