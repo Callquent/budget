@@ -180,7 +180,10 @@ export default function BudgetYearView() {
                     </span>
                   </th>
                 ))}
-                <th className="text-end" style={{ ...thStyle, minWidth: "130px" }}>
+                <th
+                  className="text-end"
+                  style={{ ...thStyle, minWidth: "130px" }}
+                >
                   Total
                 </th>
                 <th style={{ ...thStyle, width: "56px" }}></th>
@@ -194,10 +197,14 @@ export default function BudgetYearView() {
                   totalBalance +=
                     accountBalances[a.id]?.[m]?.balance ?? a.balance;
                 });
-                const isCurrent = yearState === currentYear && m === currentMonth;
+                const isCurrent =
+                  yearState === currentYear && m === currentMonth;
 
                 return (
-                  <tr key={m} style={isCurrent ? { background: "#f8f9fb" } : undefined}>
+                  <tr
+                    key={m}
+                    style={isCurrent ? { background: "#f8f9fb" } : undefined}
+                  >
                     <td style={tdStyle}>
                       <Link
                         href={`/budget/${yearState}/${m}`}
@@ -248,7 +255,7 @@ export default function BudgetYearView() {
                                   : (ab?.month_planned_net ?? 0);
                                 const label = allApproved
                                   ? "Réalisé"
-                                  : "Estimation";
+                                  : "Estimation par mois";
                                 if (value === 0)
                                   return (
                                     <span className="text-muted small">—</span>
@@ -270,7 +277,8 @@ export default function BudgetYearView() {
                                       style={{
                                         fontSize: ".85rem",
                                         fontWeight: 600,
-                                        color: value >= 0 ? "#1a7f4b" : "#c53030",
+                                        color:
+                                          value >= 0 ? "#1a7f4b" : "#c53030",
                                       }}
                                     >
                                       {value >= 0 ? "+" : ""}
@@ -354,25 +362,46 @@ export default function BudgetYearView() {
             </tbody>
             <tfoot>
               <tr>
-                <td style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef", fontWeight: 600 }}>
+                <td
+                  style={{
+                    ...tdStyle,
+                    borderBottom: "none",
+                    borderTop: "2px solid #e9ecef",
+                    fontWeight: 600,
+                  }}
+                >
                   Solde actuel
                 </td>
                 {accounts.map((a) => (
                   <td
                     key={a.id}
                     className="text-end fw-semibold"
-                    style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}
+                    style={{
+                      ...tdStyle,
+                      borderBottom: "none",
+                      borderTop: "2px solid #e9ecef",
+                    }}
                   >
                     {fmt(a.balance)} €
                   </td>
                 ))}
                 <td
                   className="text-end fw-bold text-primary"
-                  style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}
+                  style={{
+                    ...tdStyle,
+                    borderBottom: "none",
+                    borderTop: "2px solid #e9ecef",
+                  }}
                 >
                   {fmt(accounts.reduce((s, a) => s + a.balance, 0))} €
                 </td>
-                <td style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}></td>
+                <td
+                  style={{
+                    ...tdStyle,
+                    borderBottom: "none",
+                    borderTop: "2px solid #e9ecef",
+                  }}
+                ></td>
               </tr>
             </tfoot>
           </table>
