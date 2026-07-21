@@ -81,7 +81,15 @@ export default function CategoryList() {
       </div>
     );
 
-  if (Object.keys(grouped).length === 0)
+  // La catégorie Virement est auto-provisionnée côté backend (voir
+  // CategoryRepository::findOrCreateTransferCategory) et n'a pas vocation à
+  // être gérée ici : elle reste utilisable partout ailleurs (ex : le picker
+  // de /budget/.../new), juste masquée de cette page de gestion.
+  const manageableGrouped = Object.fromEntries(
+    Object.entries(grouped).filter(([type]) => type !== "transfer"),
+  );
+
+  if (Object.keys(manageableGrouped).length === 0)
     return (
       <div className="alert alert-info">
         Aucune catégorie.{" "}
@@ -94,7 +102,7 @@ export default function CategoryList() {
 
   return (
     <>
-      {Object.entries(grouped).map(([type, categories]) => (
+      {Object.entries(manageableGrouped).map(([type, categories]) => (
         <ReactFragment key={type}>
           <h5
             className={`text-${typeColors[type as keyof typeof typeColors] || "secondary"} mt-4 mb-3`}

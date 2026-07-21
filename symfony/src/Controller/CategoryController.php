@@ -20,6 +20,10 @@ class CategoryController extends AbstractController
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(CategoryRepository $repo): Response
     {
+        // Auto-provisioning : garantit qu'une catégorie Virement existe
+        // toujours, sans action manuelle de l'utilisateur.
+        $repo->findOrCreateTransferCategory();
+
         $categories = $repo->findBy([], ['transactionType' => 'ASC', 'name' => 'ASC']);
 
         $grouped = [];

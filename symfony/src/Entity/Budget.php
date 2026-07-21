@@ -8,7 +8,7 @@ use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: BudgetRepository::class)]
 #[ORM\Table(name: 'monthly_budget')]
-#[ORM\UniqueConstraint(name: 'uniq_budget_period', columns: ['category_id', 'year', 'month', 'label'])]
+#[ORM\UniqueConstraint(name: 'uniq_budget_period', columns: ['category_id', 'account_id', 'destination_account_id', 'year', 'month', 'label'])]
 #[ORM\Index(columns: ['year', 'month'], name: 'idx_budget_period')]
 class Budget
 {

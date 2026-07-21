@@ -36,6 +36,16 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // La catégorie Virement est désormais auto-provisionnée côté backend
+  // (voir CategoryRepository::findOrCreateTransferCategory) : plus besoin
+  // d'en créer une manuellement, donc on retire ce choix à la création.
+  // On le garde disponible en édition pour ne pas casser le type de la
+  // catégorie Virement existante si l'utilisateur la modifie.
+  const isNew = !initialData?.id;
+  const availableTypeOptions = isNew
+    ? typeOptions.filter((o) => o.value !== "transfer")
+    : typeOptions;
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
@@ -102,7 +112,7 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
               <div className="mb-3">
                 <label className="form-label">Type de transaction</label>
                 <OptionPicker
-                  options={typeOptions}
+                  options={availableTypeOptions}
                   value={transactionType}
                   onChange={setTransactionType}
                 />
