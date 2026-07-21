@@ -10,6 +10,13 @@ import AccountPicker from "../Account/AccountPicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
+const FREQUENCIES = [
+  { value: "monthly", label: "Mensuel" },
+  { value: "yearly", label: "Annuel" },
+  { value: "quarterly", label: "Trimestriel" },
+  { value: "occasional", label: "Occasionnel" },
+] as const;
+
 export default function SubscriptionForm({
   initialData,
   title,
@@ -24,6 +31,9 @@ export default function SubscriptionForm({
     initialData?.categoryId != null ? String(initialData.categoryId) : "",
   );
   const [status, setStatus] = useState<string>(initialData?.status ?? "active");
+  const [frequency, setFrequency] = useState<string>(
+    initialData?.frequency ?? "monthly",
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -35,7 +45,8 @@ export default function SubscriptionForm({
       initialData?.categoryId != null ? String(initialData.categoryId) : "",
     );
     setStatus(initialData?.status ?? "active");
-  }, [initialData?.accountId, initialData?.categoryId, initialData?.status]);
+    setFrequency(initialData?.frequency ?? "monthly");
+  }, [initialData?.accountId, initialData?.categoryId, initialData?.status, initialData?.frequency]);
 
   useEffect(() => {
     Promise.all([
@@ -66,7 +77,7 @@ export default function SubscriptionForm({
       accountId: accountId ? parseInt(accountId) : null,
       categoryId: categoryId ? parseInt(categoryId) : null,
       amount: get("amount"),
-      frequency: get("frequency"),
+      frequency,
       startDate: get("startDate"),
       endDate: get("endDate") || null,
       dayOfMonth: get("dayOfMonth") ? parseInt(get("dayOfMonth")) : null,
@@ -155,18 +166,20 @@ export default function SubscriptionForm({
                   <span className="input-group-text">€</span>
                 </div>
               </div>
-              <div className="col-6">
-                <label className="form-label">Fréquence</label>
-                <select
-                  name="frequency"
-                  className="form-select"
-                  defaultValue={initialData?.frequency ?? "monthly"}
-                >
-                  <option value="monthly">Mensuel</option>
-                  <option value="yearly">Annuel</option>
-                  <option value="quarterly">Trimestriel</option>
-                  <option value="occasional">Occasionnel</option>
-                </select>
+            </div>
+            <div className="mb-3">
+              <label className="form-label d-block">Fréquence</label>
+              <div className="d-flex flex-wrap gap-2">
+                {FREQUENCIES.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    className={`btn btn-sm ${frequency === f.value ? "btn-primary" : "btn-outline-secondary"}`}
+                    onClick={() => setFrequency(f.value)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="row g-3 mb-3">
