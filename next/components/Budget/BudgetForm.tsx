@@ -112,8 +112,14 @@ export default function BudgetForm({
     setSaving(true);
     setError(null);
 
-    if (isTransferCategory && !accountId) {
-      setError("Veuillez sélectionner le compte expéditeur pour une ligne de virement.");
+    if (!accountId) {
+      setError("Veuillez sélectionner un compte.");
+      setSaving(false);
+      return;
+    }
+
+    if (isTransferCategory && !destinationAccountId) {
+      setError("Veuillez sélectionner le compte destinataire pour une ligne de virement.");
       setSaving(false);
       return;
     }
@@ -126,7 +132,7 @@ export default function BudgetForm({
     const body = {
       label: get("label") || null,
       categoryId: parseInt(categoryId),
-      accountId: accountId ? parseInt(accountId) : null,
+      accountId: parseInt(accountId),
       destinationAccountId:
         isTransferCategory && destinationAccountId
           ? parseInt(destinationAccountId)
@@ -199,18 +205,20 @@ export default function BudgetForm({
 
             <div className="mb-3">
               <label className="form-label">
-                {isTransferCategory ? "Compte expéditeur" : "Compte"}
+                {isTransferCategory ? "Compte expéditeur" : "Compte"}{" "}
+                <span className="text-danger">*</span>
               </label>
               <AccountPicker
                 accounts={accounts}
                 value={accountId}
                 onChange={setAccountId}
                 disabled={isApproved}
+                required
               />
-              {!initialData?.account?.id && !initialData?.accountId && (
+              {!accountId && (
                 <div className="form-text text-warning mt-1">
                   <i className="bi bi-exclamation-triangle me-1"></i>
-                  Un compte est requis pour pouvoir approuver cette ligne.
+                  Un compte est requis pour enregistrer cette ligne.
                 </div>
               )}
             </div>

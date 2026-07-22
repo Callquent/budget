@@ -28,7 +28,7 @@ class Budget
     private ?string $label = null;
 
     #[ORM\ManyToOne(targetEntity: Account::class)]
-    #[ORM\JoinColumn(nullable: true)]
+    #[ORM\JoinColumn(nullable: false)]
     #[Groups(['budget:read', 'budget:month'])]
     private ?Account $account = null;
 

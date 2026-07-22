@@ -58,8 +58,7 @@ class BudgetType extends AbstractType
                 'label'        => 'Compte (expéditeur pour un virement)',
                 'class'        => Account::class,
                 'choice_label' => fn(Account $a) => $a->getName(),
-                'required'     => false,
-                'placeholder'  => '— Tous les comptes —',
+                'constraints'  => [new NotBlank(message: 'Un compte est requis.')],
             ])
             ->add('destinationAccount', EntityType::class, [
                 'label'        => 'Compte destinataire (virement uniquement)',
