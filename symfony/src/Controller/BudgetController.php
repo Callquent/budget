@@ -327,6 +327,10 @@ class BudgetController extends AbstractController
         $budget = new Budget();
         $this->hydrate($budget, $data, $em);
 
+        if (!$budget->getAccount()) {
+            return $this->json(['error' => 'Un compte est requis.'], 422);
+        }
+
         if (
             $budget->getDestinationAccount()
             && $budget->getAccount()
@@ -356,6 +360,10 @@ class BudgetController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
         $this->hydrate($budget, $data, $em);
+
+        if (!$budget->getAccount()) {
+            return $this->json(['error' => 'Un compte est requis.'], 422);
+        }
 
         if (
             $budget->getDestinationAccount()
@@ -496,5 +504,4 @@ class BudgetController extends AbstractController
         $budget->setMonth((int) $data['month']);
         $budget->setPlannedAmount((string) $data['plannedAmount']);
         $budget->setActualAmount((string) ($data['actualAmount'] ?? $data['plannedAmount']));
-    }
-}
+    }}
