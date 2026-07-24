@@ -763,7 +763,7 @@ export default function BudgetMonthView({
                           </button>
                         )}
                         <Link
-                          href={`/budget/${year}/${month}/edit/${b.id}`}
+                          href={`/budget/edit/${b.id}`}
                           className="btn btn-outline-primary btn-action me-1 rounded-circle"
                           style={{
                             width: "30px",
