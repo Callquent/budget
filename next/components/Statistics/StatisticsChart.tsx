@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Chart as ChartJS,
   ArcElement,
@@ -56,6 +56,34 @@ const CHART_COLORS = [
 // MONTHS vient désormais de l'API (props.monthNames), source unique partagée
 // avec le backend (App\Support\BudgetLabels) — plus de duplication.
 
+interface CategoryGroup {
+  label: string;
+  categories: string[];
+}
+
+const GROUPS_STORAGE_KEY = "statistics-category-groups";
+
+// Calcule, pour le graphique de répartition uniquement, le libellé à afficher
+// pour chaque catégorie brute en tenant compte des groupes définis par l'utilisateur
+// (le tableau "Détail par catégorie" reste inchangé, catégorie par catégorie).
+function buildCategoryToLabel(categories: string[], groups: CategoryGroup[]) {
+  const categoryToLabel: Record<string, string> = {};
+  const groupedLabels: string[] = [];
+  const seen = new Set<string>();
+
+  categories.forEach((cat) => {
+    const groupEntry = groups.find((g) => g.categories.includes(cat));
+    const label = groupEntry ? groupEntry.label : cat;
+    categoryToLabel[cat] = label;
+    if (!seen.has(label)) {
+      seen.add(label);
+      groupedLabels.push(label);
+    }
+  });
+
+  return { categoryToLabel, groupedLabels };
+}
+
 export default function StatisticsChart({
   summary,
   plannedChart,
@@ -69,6 +97,54 @@ export default function StatisticsChart({
 }: StatisticsChartProps) {
   const [activeTab, setActiveTab] = useState<"dist" | "evo">("dist");
 
+  const [groups, setGroups] = useState<CategoryGroup[]>([]);
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
+  const [selectedCats, setSelectedCats] = useState<string[]>([]);
+  const [newGroupLabel, setNewGroupLabel] = useState("");
+  const [showGroupPanel, setShowGroupPanel] = useState(false);
+
+  // Chargement des groupes définis par l'utilisateur (persistés en local, par navigateur).
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(GROUPS_STORAGE_KEY);
+      if (saved) setGroups(JSON.parse(saved));
+    } catch (e) {
+      console.error("Lecture des groupes de catégories impossible", e);
+    } finally {
+      setGroupsLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!groupsLoaded) return;
+    try {
+      window.localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+    } catch (e) {
+      console.error("Sauvegarde des groupes de catégories impossible", e);
+    }
+  }, [groups, groupsLoaded]);
+
+  function toggleCatSelection(cat: string) {
+    setSelectedCats((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  }
+
+  function createGroup() {
+    const label = newGroupLabel.trim();
+    if (!label || selectedCats.length < 2) return;
+    setGroups((prev) => [...prev, { label, categories: selectedCats }]);
+    setSelectedCats([]);
+    setNewGroupLabel("");
+  }
+
+  function removeGroup(label: string) {
+    setGroups((prev) => prev.filter((g) => g.label !== label));
+  }
+
+  // Catégories déjà utilisées dans un groupe existant, pour éviter les doublons.
+  const groupedCategoriesSet = new Set(groups.flatMap((g) => g.categories));
+
   // Conversion défensive : les montants peuvent arriver en string (colonnes
   // decimal Doctrine/Symfony). "+" sur des strings concatène au lieu d'additionner
   // (contrairement à "-"), d'où le bug TOTAL NaN corrigé ici.
@@ -77,15 +153,36 @@ export default function StatisticsChart({
   const totalPlanned = summary.reduce((s, r) => s + toNum(r.planned), 0);
   const totalActual = summary.reduce((s, r) => s + toNum(r.actual), 0);
 
-  const pieData = (dataObj: Record<string, number | string>) => ({
-    labels: categories,
-    datasets: [
-      {
-        data: categories.map((l) => toNum(dataObj[l] ?? 0)),
-        backgroundColor: CHART_COLORS,
-      },
-    ],
+  const { categoryToLabel, groupedLabels } = buildCategoryToLabel(categories, groups);
+
+  // Même regroupement que pour le camembert, appliqué au tableau de détail :
+  // les lignes des catégories fusionnées sont sommées sous le libellé du groupe.
+  const groupedSummary = groupedLabels.map((label) => {
+    const rows = summary.filter((r) => categoryToLabel[r.category_name] === label);
+    return {
+      category_name: label,
+      planned: rows.reduce((s, r) => s + toNum(r.planned), 0),
+      actual: rows.reduce((s, r) => s + toNum(r.actual), 0),
+    };
   });
+
+  const pieData = (dataObj: Record<string, number | string>) => {
+    const groupedValues: Record<string, number> = {};
+    categories.forEach((cat) => {
+      const label = categoryToLabel[cat];
+      groupedValues[label] = (groupedValues[label] ?? 0) + toNum(dataObj[cat] ?? 0);
+    });
+
+    return {
+      labels: groupedLabels,
+      datasets: [
+        {
+          data: groupedLabels.map((l) => groupedValues[l] ?? 0),
+          backgroundColor: CHART_COLORS,
+        },
+      ],
+    };
+  };
 
   const lineData = {
     labels: monthNames,
@@ -165,6 +262,104 @@ export default function StatisticsChart({
       <div className="tab-content">
         {activeTab === "dist" && (
           <div className="tab-pane fade show active">
+            <div className="card mb-4">
+              <div
+                className="card-header bg-white fw-semibold d-flex align-items-center justify-content-between"
+                role="button"
+                onClick={() => setShowGroupPanel((v) => !v)}
+              >
+                <span>
+                  <i className="bi bi-diagram-3 me-2 text-primary"></i>
+                  Regrouper des catégories
+                  {groups.length > 0 && (
+                    <span className="badge bg-primary ms-2">{groups.length}</span>
+                  )}
+                </span>
+                <i className={`bi bi-chevron-${showGroupPanel ? "up" : "down"}`}></i>
+              </div>
+              {showGroupPanel && (
+                <div className="card-body">
+                  {groups.length > 0 && (
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      {groups.map((g) => (
+                        <span
+                          key={g.label}
+                          className="badge bg-light text-dark border d-flex align-items-center gap-2 py-2 px-3"
+                        >
+                          <span>
+                            <strong>{g.label}</strong> ({g.categories.join(", ")})
+                          </span>
+                          <i
+                            className="bi bi-x-circle text-danger"
+                            role="button"
+                            onClick={() => removeGroup(g.label)}
+                          ></i>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="row g-3 align-items-start">
+                    <div className="col-md-7">
+                      <div className="small text-muted fw-semibold mb-2">
+                        Sélectionner au moins 2 catégories à fusionner
+                      </div>
+                      <div
+                        className="d-flex flex-wrap gap-2"
+                        style={{ maxHeight: "180px", overflowY: "auto" }}
+                      >
+                        {categories.map((cat) => {
+                          const alreadyGrouped = groupedCategoriesSet.has(cat);
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              disabled={alreadyGrouped}
+                              className={`btn btn-sm ${
+                                selectedCats.includes(cat)
+                                  ? "btn-primary"
+                                  : "btn-outline-secondary"
+                              }`}
+                              onClick={() => toggleCatSelection(cat)}
+                              title={
+                                alreadyGrouped
+                                  ? "Déjà incluse dans un groupe existant"
+                                  : ""
+                              }
+                            >
+                              {cat}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="col-md-5">
+                      <div className="small text-muted fw-semibold mb-2">
+                        Nom du groupe affiché sur le graphique
+                      </div>
+                      <div className="input-group">
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Ex : Abonnements"
+                          value={newGroupLabel}
+                          onChange={(e) => setNewGroupLabel(e.target.value)}
+                        />
+                        <button
+                          className="btn btn-primary"
+                          type="button"
+                          disabled={selectedCats.length < 2 || !newGroupLabel.trim()}
+                          onClick={createGroup}
+                        >
+                          <i className="bi bi-plus-lg me-1"></i>Créer
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="row g-3 mb-4">
               <div className="col-md-6">
                 <div className="card h-100">
@@ -232,7 +427,7 @@ export default function StatisticsChart({
                     </tr>
                   </thead>
                   <tbody>
-                    {summary.map((row, idx) => {
+                    {groupedSummary.map((row, idx) => {
                       const variance = toNum(row.planned) - toNum(row.actual);
                       return (
                         <tr key={idx}>

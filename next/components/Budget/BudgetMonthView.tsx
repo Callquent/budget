@@ -256,7 +256,7 @@ export default function BudgetMonthView({
         </div>
         <div className="d-flex gap-2">
           <Link
-            href={`/budget/${year}/${month}/new`}
+            href={`/budget/new?year=${year}&month=${month}`}
             className="btn btn-primary btn-sm rounded-pill px-3"
           >
             <i className="bi bi-plus-lg me-1"></i>Nouvelle ligne
