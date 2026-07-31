@@ -55,6 +55,10 @@ class CategoryController extends AbstractController
             return $this->json(['error' => $error], 400);
         }
 
+        if ($error = $this->assertTransferUnique($data['transactionType'], $repo, null)) {
+            return $this->json(['error' => $error], 409);
+        }
+
         $category = new Category();
         $category->setName(trim($data['name']));
         $category->setTransactionType($data['transactionType']);
@@ -85,6 +89,10 @@ class CategoryController extends AbstractController
 
         if ($error = $this->validatePayload($data)) {
             return $this->json(['error' => $error], 400);
+        }
+
+        if ($error = $this->assertTransferUnique($data['transactionType'], $repo, $category)) {
+            return $this->json(['error' => $error], 409);
         }
 
         $category->setName(trim($data['name']));
@@ -147,6 +155,25 @@ class CategoryController extends AbstractController
         $validTypes = [Category::TYPE_INCOME, Category::TYPE_EXPENSE, Category::TYPE_TRANSFER];
         if (!isset($data['transactionType']) || !in_array($data['transactionType'], $validTypes, true)) {
             return 'Type de transaction invalide.';
+        }
+
+        return null;
+    }
+
+    // Empêche qu'une deuxième catégorie de type Virement voie le jour, que ce
+    // soit via /new ou via /{id}/edit (en changeant le type d'une catégorie
+    // existante vers "transfer"). Une seule catégorie Virement doit exister
+    // — voir CategoryRepository::findOrCreateTransferCategory, qui la
+    // retrouve par transactionType et suppose son unicité.
+    private function assertTransferUnique(string $transactionType, CategoryRepository $repo, ?Category $current): ?string
+    {
+        if ($transactionType !== Category::TYPE_TRANSFER) {
+            return null;
+        }
+
+        $existing = $repo->findOneBy(['transactionType' => Category::TYPE_TRANSFER]);
+        if ($existing && $existing->getId() !== $current?->getId()) {
+            return 'Une catégorie de virement existe déjà, elle ne peut pas être dupliquée.';
         }
 
         return null;

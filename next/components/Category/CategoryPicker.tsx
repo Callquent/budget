@@ -230,7 +230,13 @@ export default function CategoryPicker({
                   </button>
                 </div>
               ) : (
-                !disabled && (
+                // Pas de bouton "+" pour le type transfer : une seule
+                // catégorie Virement doit exister (voir
+                // CategoryRepository::findOrCreateTransferCategory), elle est
+                // garantie/créée automatiquement côté backend. En proposer
+                // la création manuelle laisserait croire qu'on peut en avoir
+                // plusieurs.
+                !disabled && type !== "transfer" && (
                   <button
                     type="button"
                     className={`btn btn-sm btn-outline-${color}`}

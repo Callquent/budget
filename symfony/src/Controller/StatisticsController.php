@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Repository\BudgetRepository;
+use App\Repository\StatisticsRepository;
 use App\Support\BudgetLabels;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,14 +14,14 @@ class StatisticsController extends AbstractController
 {
     #[Route('', name: 'index')]
     #[Route('/{year}', name: 'year', requirements: ['year' => '\d{4}'])]
-    public function index(BudgetRepository $repo, int $year = 0): Response
+    public function index(BudgetRepository $repo, StatisticsRepository $statisticsRepo, int $year = 0): Response
     {
         $now = new \DateTimeImmutable();
         if ($year === 0) {
             $year = (int) $now->format('Y');
         }
 
-        $summary = $repo->findYearlyCategorySummary($year);
+        $summary = $statisticsRepo->findYearlyCategorySummary($year);
 
         $plannedChart = [];
         $actualChart = [];

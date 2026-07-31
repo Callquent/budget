@@ -109,25 +109,6 @@ class BudgetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Récupère le total prévu et réalisé par catégorie pour une année donnée.
-     * Uniquement pour les dépenses.
-     */
-    public function findYearlyCategorySummary(int $year): array
-    {
-        return $this->createQueryBuilder('mb')
-            ->select('c.name as category_name', 'SUM(mb.plannedAmount) as planned', 'SUM(mb.actualAmount) as actual')
-            ->join('mb.category', 'c')
-            ->where('mb.year = :year')
-            ->andWhere('c.transactionType = :type')
-            ->setParameter('year', $year)
-            ->setParameter('type', 'expense')
-            ->groupBy('c.id')
-            ->orderBy('c.name', 'ASC')
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
      * Récupère les totaux prévus et réalisés par mois pour une année donnée.
      * Uniquement pour les dépenses.
      */
