@@ -1,7 +1,10 @@
 "use client";
 import React, { Fragment as ReactFragment, useState, useEffect } from "react";
 import Link from "next/link";
-import type { CategoryInterface, CategoryApiResponse } from "./Category.interface";
+import type {
+  CategoryInterface,
+  CategoryApiResponse,
+} from "./Category.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -40,7 +43,10 @@ function buildTree(categories: CategoryInterface[]): CategoryNode[] {
 
 // Aplatit l'arbre en ordre préfixe (parent immédiatement suivi de ses enfants)
 // pour un rendu simple en lignes de tableau, avec la profondeur pour l'indentation.
-function flattenTree(nodes: CategoryNode[], depth = 0): { node: CategoryNode; depth: number }[] {
+function flattenTree(
+  nodes: CategoryNode[],
+  depth = 0,
+): { node: CategoryNode; depth: number }[] {
   return nodes.flatMap((node) => [
     { node, depth },
     ...flattenTree(node.children, depth + 1),
@@ -138,7 +144,6 @@ export default function CategoryList() {
     moveCategory(draggedId, null);
   };
 
-
   if (loading)
     return (
       <div className="d-flex justify-content-center py-5">
@@ -186,82 +191,96 @@ export default function CategoryList() {
       {Object.entries(manageableGrouped).map(([type, categories]) => {
         const rows = flattenTree(buildTree(categories));
         return (
-        <ReactFragment key={type}>
-          <h5
-            className={`text-${typeColors[type as keyof typeof typeColors] || "secondary"} mt-4 mb-3`}
-          >
-            <i
-              className="bi bi-circle-fill me-2"
-              style={{ fontSize: ".6rem", verticalAlign: "middle" }}
-            ></i>
-            {typeLabels[type as keyof typeof typeLabels] || type}
-          </h5>
-          <div className="card mb-3">
-            <div className="table-responsive">
-              <table className="table table-hover mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th>Nom</th>
-                    <th>Description</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody onDragOver={(e) => e.preventDefault()} onDrop={handleDropToRoot}>
-                  {rows.map(({ node: category, depth }) => (
-                    <tr
-                      key={category.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, category.id)}
-                      onDragOver={(e) => handleDragOverRow(e, category.id)}
-                      onDragLeave={() => setDragOverId(null)}
-                      onDrop={(e) => handleDropOnRow(e, category.id)}
-                      className={dragOverId === category.id ? "table-primary" : ""}
-                      style={{ cursor: "grab" }}
-                    >
-                      <td
-                        className="fw-medium"
-                        style={{ paddingLeft: `${0.75 + depth * 1.5}rem` }}
-                      >
-                        <i className="bi bi-grip-vertical text-muted me-2"></i>
-                        {depth > 0 && (
-                          <i className="bi bi-arrow-return-right text-muted me-1"></i>
-                        )}
-                        {category.name}
-                      </td>
-                      <td className="text-muted small">
-                        {category.description || "—"}
-                      </td>
-                      <td className="text-end">
-                        <Link
-                          href={`/categories/edit/${category.id}`}
-                          className="btn btn-outline-primary btn-action me-1"
-                        >
-                          <i className="bi bi-pencil"></i>
-                        </Link>
-                        <button
-                          className="btn btn-outline-danger btn-action"
-                          onClick={() =>
-                            handleDelete(category.id, category.name)
-                          }
-                        >
-                          <i className="bi bi-trash"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div
-              className="card-footer text-muted small text-center py-2"
-              style={{ opacity: 0.7 }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDropToRoot}
+          <ReactFragment key={type}>
+            <h5
+              className={`text-${typeColors[type as keyof typeof typeColors] || "secondary"} mt-4 mb-3`}
             >
-              Déposer ici pour remettre une catégorie au premier niveau
+              <i
+                className="bi bi-circle-fill me-2"
+                style={{ fontSize: ".6rem", verticalAlign: "middle" }}
+              ></i>
+              {typeLabels[type as keyof typeof typeLabels] || type}
+            </h5>
+            <div className="card mb-3">
+              <div className="table-responsive">
+                <table className="table table-hover mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Nom</th>
+                      <th>Description</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDropToRoot}
+                  >
+                    {rows.map(({ node: category, depth }) => (
+                      <tr
+                        key={category.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, category.id)}
+                        onDragOver={(e) => handleDragOverRow(e, category.id)}
+                        onDragLeave={() => setDragOverId(null)}
+                        onDrop={(e) => handleDropOnRow(e, category.id)}
+                        className={
+                          dragOverId === category.id ? "table-primary" : ""
+                        }
+                        style={{ cursor: "grab" }}
+                      >
+                        <td
+                          className="fw-medium"
+                          style={{ paddingLeft: `${0.75 + depth * 1.5}rem` }}
+                        >
+                          <i className="bi bi-grip-vertical text-muted me-2"></i>
+                          {depth > 0 && (
+                            <i className="bi bi-arrow-return-right text-muted me-1"></i>
+                          )}
+                          {category.name}
+                        </td>
+                        <td className="text-muted small">
+                          {category.description || "—"}
+                        </td>
+                        <td className="text-end">
+                          {depth > 0 && (
+                            <button
+                              className="btn btn-outline-secondary btn-action me-1"
+                              onClick={() => moveCategory(category.id, null)}
+                              title="Promouvoir en catégorie racine"
+                            >
+                              <i className="bi bi-arrow-up-circle"></i>
+                            </button>
+                          )}
+                          <Link
+                            href={`/categories/edit/${category.id}`}
+                            className="btn btn-outline-primary btn-action me-1"
+                          >
+                            <i className="bi bi-pencil"></i>
+                          </Link>
+                          <button
+                            className="btn btn-outline-danger btn-action"
+                            onClick={() =>
+                              handleDelete(category.id, category.name)
+                            }
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div
+                className="card-footer text-muted small text-center py-2"
+                style={{ opacity: 0.7 }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDropToRoot}
+              >
+                Déposer ici pour remettre une catégorie au premier niveau
+              </div>
             </div>
-          </div>
-        </ReactFragment>
+          </ReactFragment>
         );
       })}
     </>
