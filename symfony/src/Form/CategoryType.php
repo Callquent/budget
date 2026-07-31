@@ -16,8 +16,8 @@ class CategoryType extends AbstractType
     public static function getTransactionTypeChoices(): array
     {
         return [
-            'Recette (entrée)' => Category::TYPE_INCOME,
             'Dépense (sortie)' => Category::TYPE_EXPENSE,
+            'Recette (entrée)' => Category::TYPE_INCOME,
             'Virement interne' => Category::TYPE_TRANSFER,
         ];
     }

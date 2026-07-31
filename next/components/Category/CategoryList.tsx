@@ -16,12 +16,44 @@ const typeColors = {
   transfer: "primary",
 };
 
+interface CategoryNode extends CategoryInterface {
+  children: CategoryNode[];
+}
+
+function buildTree(categories: CategoryInterface[]): CategoryNode[] {
+  const byId = new Map<number, CategoryNode>();
+  categories.forEach((c) => byId.set(c.id, { ...c, children: [] }));
+
+  const roots: CategoryNode[] = [];
+  categories.forEach((c) => {
+    const node = byId.get(c.id)!;
+    const parent = c.parentId != null ? byId.get(c.parentId) : undefined;
+    if (parent) {
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  return roots;
+}
+
+// Aplatit l'arbre en ordre préfixe (parent immédiatement suivi de ses enfants)
+// pour un rendu simple en lignes de tableau, avec la profondeur pour l'indentation.
+function flattenTree(nodes: CategoryNode[], depth = 0): { node: CategoryNode; depth: number }[] {
+  return nodes.flatMap((node) => [
+    { node, depth },
+    ...flattenTree(node.children, depth + 1),
+  ]);
+}
+
 export default function CategoryList() {
   const [grouped, setGrouped] = useState<Record<string, CategoryInterface[]>>(
     {},
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
 
   const fetchCategories = async () => {
     setLoading(true);
@@ -57,6 +89,55 @@ export default function CategoryList() {
       alert(`Erreur lors de la suppression : ${e.message}`);
     }
   };
+
+  const moveCategory = async (id: number, parentId: number | null) => {
+    try {
+      const res = await fetch(`${API}/categories/${id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Erreur ${res.status}`);
+      }
+      fetchCategories();
+    } catch (e: any) {
+      alert(`Déplacement impossible : ${e.message}`);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: number) => {
+    e.dataTransfer.setData("text/plain", String(id));
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOverRow = (e: React.DragEvent, id: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverId(id);
+  };
+
+  const handleDropOnRow = (e: React.DragEvent, targetId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverId(null);
+    const draggedId = Number(e.dataTransfer.getData("text/plain"));
+    if (!draggedId || draggedId === targetId) return;
+    moveCategory(draggedId, targetId);
+  };
+
+  // Déposer en dehors d'une ligne précise (zone vide du tableau, ou pied de carte)
+  // remonte la catégorie au premier niveau.
+  const handleDropToRoot = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverId(null);
+    const draggedId = Number(e.dataTransfer.getData("text/plain"));
+    if (!draggedId) return;
+    moveCategory(draggedId, null);
+  };
+
 
   if (loading)
     return (
@@ -102,7 +183,9 @@ export default function CategoryList() {
 
   return (
     <>
-      {Object.entries(manageableGrouped).map(([type, categories]) => (
+      {Object.entries(manageableGrouped).map(([type, categories]) => {
+        const rows = flattenTree(buildTree(categories));
+        return (
         <ReactFragment key={type}>
           <h5
             className={`text-${typeColors[type as keyof typeof typeColors] || "secondary"} mt-4 mb-3`}
@@ -123,10 +206,28 @@ export default function CategoryList() {
                     <th></th>
                   </tr>
                 </thead>
-                <tbody>
-                  {categories.map((category) => (
-                    <tr key={category.id}>
-                      <td className="fw-medium">{category.name}</td>
+                <tbody onDragOver={(e) => e.preventDefault()} onDrop={handleDropToRoot}>
+                  {rows.map(({ node: category, depth }) => (
+                    <tr
+                      key={category.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, category.id)}
+                      onDragOver={(e) => handleDragOverRow(e, category.id)}
+                      onDragLeave={() => setDragOverId(null)}
+                      onDrop={(e) => handleDropOnRow(e, category.id)}
+                      className={dragOverId === category.id ? "table-primary" : ""}
+                      style={{ cursor: "grab" }}
+                    >
+                      <td
+                        className="fw-medium"
+                        style={{ paddingLeft: `${0.75 + depth * 1.5}rem` }}
+                      >
+                        <i className="bi bi-grip-vertical text-muted me-2"></i>
+                        {depth > 0 && (
+                          <i className="bi bi-arrow-return-right text-muted me-1"></i>
+                        )}
+                        {category.name}
+                      </td>
                       <td className="text-muted small">
                         {category.description || "—"}
                       </td>
@@ -151,9 +252,18 @@ export default function CategoryList() {
                 </tbody>
               </table>
             </div>
+            <div
+              className="card-footer text-muted small text-center py-2"
+              style={{ opacity: 0.7 }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDropToRoot}
+            >
+              Déposer ici pour remettre une catégorie au premier niveau
+            </div>
           </div>
         </ReactFragment>
-      ))}
+        );
+      })}
     </>
   );
 }

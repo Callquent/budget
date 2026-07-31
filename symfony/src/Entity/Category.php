@@ -42,15 +42,49 @@ class Category
     #[ORM\OneToMany(mappedBy: 'category', targetEntity: Budget::class, orphanRemoval: true)]
     private Collection $budgets;
 
+    // Sous-catégorie : une catégorie peut avoir une catégorie parente (ex : "Abonnement mobile"
+    // sous "Abonnements"). onDelete SET NULL : si le parent est supprimé, les enfants remontent
+    // simplement au premier niveau au lieu d'être supprimés en cascade.
+    #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
+    #[ORM\JoinColumn(name: 'parent_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?self $parent = null;
+
+    #[ORM\OneToMany(mappedBy: 'parent', targetEntity: self::class)]
+    private Collection $children;
+
     public function __construct()
     {
         $this->transactions   = new ArrayCollection();
         $this->budgets = new ArrayCollection();
+        $this->children = new ArrayCollection();
     }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    // Exposé en group category:read comme un simple id plutôt que l'objet $parent
+    // complet, pour éviter une récursion infinie du serializer (parent -> children -> parent...).
+    #[Groups(['category:read'])]
+    public function getParentId(): ?int
+    {
+        return $this->parent?->getId();
+    }
+
+    public function getParent(): ?self
+    {
+        return $this->parent;
+    }
+    public function setParent(?self $parent): static
+    {
+        $this->parent = $parent;
+        return $this;
+    }
+
+    public function getChildren(): Collection
+    {
+        return $this->children;
     }
 
     public function getName(): string

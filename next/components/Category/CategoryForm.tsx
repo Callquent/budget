@@ -41,10 +41,7 @@ export default function CategoryForm({ initialData, title }: CategoryFormProps) 
   // d'en créer une manuellement, donc on retire ce choix à la création.
   // On le garde disponible en édition pour ne pas casser le type de la
   // catégorie Virement existante si l'utilisateur la modifie.
-  const isNew = !initialData?.id;
-  const availableTypeOptions = isNew
-    ? typeOptions.filter((o) => o.value !== "transfer")
-    : typeOptions;
+  const availableTypeOptions = typeOptions.filter((o) => o.value !== "transfer");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

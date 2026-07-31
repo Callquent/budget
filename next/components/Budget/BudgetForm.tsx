@@ -97,6 +97,16 @@ export default function BudgetForm({
     });
   }, [initialData?.category?.id, initialData?.account?.id, initialData?.destinationAccount?.id, initialData?.categoryId, initialData?.accountId, initialData?.destinationAccountId]);
 
+  // Appelé par CategoryPicker après une création rapide de catégorie : on
+  // l'ajoute directement au state local pour l'afficher sans recharger la
+  // liste complète depuis l'API.
+  const handleCategoryCreated = (type: string, category: CategoryInterface) => {
+    setGrouped((prev) => ({
+      ...prev,
+      [type]: [...(prev[type] ?? []), category],
+    }));
+  };
+
   const handleSameAmountToggle = (checked: boolean) => {
     setSameAmount(checked);
     setActualAmount(checked ? plannedAmount : "");
@@ -229,6 +239,7 @@ export default function BudgetForm({
                 grouped={grouped}
                 value={categoryId}
                 onChange={setCategoryId}
+                onCategoryCreated={handleCategoryCreated}
                 disabled={isApproved}
               />
             </div>

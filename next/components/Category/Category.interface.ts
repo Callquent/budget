@@ -3,6 +3,7 @@ export interface CategoryInterface {
   name: string;
   description: string;
   transactionType: string;
+  parentId: number | null;
 }
 
 export interface CategoryFormProps {
