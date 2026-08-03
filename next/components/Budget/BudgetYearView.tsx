@@ -199,6 +199,9 @@ export default function BudgetYearView() {
                 });
                 const isCurrent =
                   yearState === currentYear && m === currentMonth;
+                const isFutureMonth =
+                  yearState > currentYear ||
+                  (yearState === currentYear && m > currentMonth);
 
                 return (
                   <tr
@@ -304,36 +307,38 @@ export default function BudgetYearView() {
                             </div>
                           )}
 
-                          {/* Solde principal */}
-                          <div
-                            style={{
-                              borderTop:
-                                (ab?.planned_net ?? 0) !== 0
-                                  ? "1px solid #eef0f2"
-                                  : "none",
-                              paddingTop:
-                                (ab?.planned_net ?? 0) !== 0 ? "6px" : 0,
-                            }}
-                          >
+                          {/* Solde principal — uniquement pour les mois passés et le mois en cours */}
+                          {!isFutureMonth && (
                             <div
                               style={{
-                                fontSize: ".68rem",
-                                color: "#adb5bd",
-                                marginBottom: "2px",
+                                borderTop:
+                                  (ab?.planned_net ?? 0) !== 0
+                                    ? "1px solid #eef0f2"
+                                    : "none",
+                                paddingTop:
+                                  (ab?.planned_net ?? 0) !== 0 ? "6px" : 0,
                               }}
                             >
-                              Solde actuel
+                              <div
+                                style={{
+                                  fontSize: ".68rem",
+                                  color: "#adb5bd",
+                                  marginBottom: "2px",
+                                }}
+                              >
+                                Solde actuel
+                              </div>
+                              <div
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: "1rem",
+                                  color: balColor,
+                                }}
+                              >
+                                {fmt(bal)} €
+                              </div>
                             </div>
-                            <div
-                              style={{
-                                fontWeight: 700,
-                                fontSize: "1rem",
-                                color: balColor,
-                              }}
-                            >
-                              {fmt(bal)} €
-                            </div>
-                          </div>
+                          )}
                         </td>
                       );
                     })}
