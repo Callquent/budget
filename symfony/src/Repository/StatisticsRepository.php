@@ -19,7 +19,7 @@ class StatisticsRepository extends ServiceEntityRepository
      * leur catégorie parente (ex: "Abonnement internet" + "Abonnement mobile"
      * -> "Abonnements"). Les catégories sans parent restent inchangées.
      */
-    public function findYearlyCategorySummary(int $year): array
+    public function findYearlyCategorySummary(int $year, bool $groupByParent = true): array
     {
         $rows = $this->createQueryBuilder('mb')
             ->select(
@@ -38,6 +38,18 @@ class StatisticsRepository extends ServiceEntityRepository
             ->addGroupBy('parent.id')
             ->getQuery()
             ->getResult();
+
+        if (!$groupByParent) {
+            $result = array_map(static fn(array $row): array => [
+                'category_name' => $row['category_name'],
+                'planned'        => (float) $row['planned'],
+                'actual'         => (float) $row['actual'],
+            ], $rows);
+
+            usort($result, static fn($a, $b) => strcasecmp($a['category_name'], $b['category_name']));
+
+            return $result;
+        }
 
         $grouped = [];
         foreach ($rows as $row) {

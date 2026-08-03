@@ -7,6 +7,7 @@ use App\Repository\StatisticsRepository;
 use App\Support\BudgetLabels;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/statistics', name: 'statistics_')]
@@ -14,14 +15,15 @@ class StatisticsController extends AbstractController
 {
     #[Route('', name: 'index')]
     #[Route('/{year}', name: 'year', requirements: ['year' => '\d{4}'])]
-    public function index(BudgetRepository $repo, StatisticsRepository $statisticsRepo, int $year = 0): Response
+    public function index(Request $request, BudgetRepository $repo, StatisticsRepository $statisticsRepo, int $year = 0): Response
     {
         $now = new \DateTimeImmutable();
         if ($year === 0) {
             $year = (int) $now->format('Y');
         }
 
-        $summary = $statisticsRepo->findYearlyCategorySummary($year);
+        $groupBy = $request->query->get('groupBy', 'category');
+        $summary = $statisticsRepo->findYearlyCategorySummary($year, $groupBy !== 'subcategory');
 
         $plannedChart = [];
         $actualChart = [];
@@ -66,6 +68,7 @@ class StatisticsController extends AbstractController
             'year'               => $year,
             'currentYear'        => $currentYear,
             'availableYears'     => $availableYears,
+            'groupBy'            => $groupBy,
             'plannedChart'       => $plannedChart,
             'actualChart'        => $actualChart,
             'categories'         => $categories,

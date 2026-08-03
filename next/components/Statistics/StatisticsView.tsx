@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import StatisticsChart from "@/components/Statistics/StatisticsChart";
-import type { SummaryRow, ApiData, StatisticsViewProps } from "./Statistics.interface";
+import type { SummaryRow, ApiData, StatisticsViewProps, StatisticsGroupBy } from "./Statistics.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -11,12 +11,13 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<StatisticsGroupBy>("category");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/statistics/${year}`, {
+      const res = await fetch(`${API}/statistics/${year}?groupBy=${groupBy}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
@@ -26,7 +27,7 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [year]);
+  }, [year, groupBy]);
 
   useEffect(() => {
     fetchData();
@@ -83,15 +84,29 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
           >
             {y}
             {y === currentYear && (
-              <span
-                className="badge bg-primary ms-1"
-                style={{ fontSize: ".6rem" }}
-              >
+              <span className="badge bg-primary ms-1" style={{ fontSize: ".6rem" }}>
                 en cours
               </span>
             )}
           </Link>
         ))}
+
+        <div className="btn-group ms-auto" role="group">
+          <button
+            type="button"
+            className={`btn btn-sm ${groupBy === "category" ? "btn-dark" : "btn-outline-secondary"}`}
+            onClick={() => setGroupBy("category")}
+          >
+            Catégories
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${groupBy === "subcategory" ? "btn-dark" : "btn-outline-secondary"}`}
+            onClick={() => setGroupBy("subcategory")}
+          >
+            Sous-catégories
+          </button>
+        </div>
       </div>
 
       <StatisticsChart

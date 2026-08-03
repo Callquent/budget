@@ -4,9 +4,12 @@ export interface SummaryRow {
   actual: number;
 }
 
+export type StatisticsGroupBy = "category" | "subcategory";
+
 export interface ApiData {
   currentYear: number;
   availableYears: number[];
+  groupBy: StatisticsGroupBy;
   summary: SummaryRow[];
   plannedChart: Record<string, number>;
   actualChart: Record<string, number>;
