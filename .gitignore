@@ -112,6 +112,11 @@ docker-compose*
 .dockerignore
 
 # =======================
+# DATABASE
+# =======================
+/mysql-data/
+
+# =======================
 # IDE / EDITORS
 # =======================
 .idea/
