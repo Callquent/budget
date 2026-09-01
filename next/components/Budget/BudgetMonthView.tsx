@@ -36,6 +36,7 @@ export default function BudgetMonthView({
   const [showOCRModal, setShowOCRModal] = useState(false);
   const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
 
+
   // Catégories de dépense disponibles pour l'import OCR, dérivées des lignes
   // de budget déjà chargées pour le mois (pas besoin d'un endpoint dédié).
   const expenseCategories = React.useMemo(() => {
@@ -119,6 +120,39 @@ export default function BudgetMonthView({
     if (!window.confirm("Supprimer cette ligne ?")) return;
     try {
       await postAction(`/${b.id}/delete`);
+      await fetchMonth(urlYear, urlMonth);
+    } catch (e) {
+      alert(`Erreur : ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
+  // Approuver directement une ligne abonnement : crée la ligne de budget du
+  // mois (si besoin) puis l'approuve en une seule action.
+  const handleApproveSubscription = async (sub: SubscriptionInterface) => {
+    if (
+      !window.confirm(
+        `Approuver « ${sub.category.name} » et créer la transaction de ${fmt(sub.amount)} € ?`,
+      )
+    )
+      return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budget/new`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          label: sub.name,
+          categoryId: sub.category.id,
+          accountId: sub.account.id,
+          destinationAccountId: null,
+          year: urlYear,
+          month: urlMonth,
+          plannedAmount: sub.amount,
+          actualAmount: sub.amount,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const created = await res.json();
+      await postAction(`/${created.id}/approve`);
       await fetchMonth(urlYear, urlMonth);
     } catch (e) {
       alert(`Erreur : ${e instanceof Error ? e.message : e}`);
@@ -235,6 +269,31 @@ export default function BudgetMonthView({
   const prevYear = month === 1 ? year - 1 : year;
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
+
+  // Un abonnement déjà représenté par une ligne de budget (même catégorie,
+  // même compte, même montant) ne doit pas être affiché une seconde fois.
+  const isDejaBudgete = (sub: (typeof subscriptions)[number]) =>
+    budgets.some(
+      (b) =>
+        b.category.name === sub.category.name &&
+        b.account.id === sub.account.id &&
+        Math.abs(
+          parseFloat(String(b.plannedAmount)) - parseFloat(String(sub.amount)),
+        ) < 0.01,
+    );
+  const subscriptionsNonBudgetees = subscriptions.filter(
+    (sub) => !isDejaBudgete(sub),
+  );
+  // Une ligne de budget qui correspond à un abonnement (même logique inverse)
+  const isAbonnement = (b: (typeof budgets)[number]) =>
+    subscriptions.some(
+      (sub) =>
+        sub.category.name === b.category.name &&
+        sub.account.id === b.account.id &&
+        Math.abs(
+          parseFloat(String(b.plannedAmount)) - parseFloat(String(sub.amount)),
+        ) < 0.01,
+    );
 
   return (
     <>
@@ -522,75 +581,8 @@ export default function BudgetMonthView({
         })}
       </div>
 
-      {/* Abonnements */}
-      {subscriptions.length > 0 && (
-        <div className="card mb-4 border-0 shadow-sm rounded-3">
-          <div
-            className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 rounded-top-3"
-            style={{ borderLeft: "4px solid var(--bs-warning)" }}
-          >
-            <span className="fw-semibold">
-              <i className="bi bi-arrow-repeat me-2 text-warning"></i>
-              Abonnements actifs ce mois
-            </span>
-            <span className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25">
-              {subscriptions.length}
-            </span>
-          </div>
-          <div className="table-responsive">
-            <table className="table table-sm table-hover mb-0">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Compte</th>
-                  <th>Catégorie</th>
-                  <th>Fréquence</th>
-                  <th className="text-end">Montant</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subscriptions.map((sub) => (
-                  <tr key={sub.id}>
-                    <td className="fw-medium">{sub.name}</td>
-                    <td>{sub.account.name}</td>
-                    <td>
-                      <span className="badge badge-expense">
-                        {sub.category.name}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge badge-${sub.frequency}`}>
-                        {frequencyLabels[sub.frequency] ?? sub.frequency}
-                      </span>
-                    </td>
-                    <td className="text-end fw-semibold text-danger">
-                      -{fmt(sub.amount)} €
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="table-light fw-semibold">
-                <tr>
-                  <td colSpan={4}>Total abonnements</td>
-                  <td className="text-end text-danger">
-                    -
-                    {fmt(
-                      subscriptions.reduce(
-                        (s, sub) => s + parseFloat(String(sub.amount)),
-                        0,
-                      ),
-                    )}{" "}
-                    €
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tableau budget */}
-      {budgets.length > 0 && (
+      {/* Tableau budget (inclut les abonnements actifs, toujours visibles) */}
+      {(budgets.length > 0 || subscriptionsNonBudgetees.length > 0) && (
         <div className="card border-0 shadow-sm rounded-3">
           <div
             className="card-header bg-white border-bottom d-flex align-items-center py-3 rounded-top-3"
@@ -623,7 +615,13 @@ export default function BudgetMonthView({
                   return (
                     <tr
                       key={b.id}
-                      className={b.isApproved ? "table-success" : ""}
+                      className={
+                        b.isApproved
+                          ? "table-success"
+                          : isAbonnement(b)
+                            ? "table-warning"
+                            : ""
+                      }
                       style={{ verticalAlign: "middle" }}
                     >
                       <td>
@@ -641,6 +639,15 @@ export default function BudgetMonthView({
                               ? "dépense"
                               : "virement"}
                         </span>
+                        {isAbonnement(b) && (
+                          <span
+                            className="badge ms-1 rounded-pill bg-warning bg-opacity-10 text-warning"
+                            style={{ fontSize: ".7rem" }}
+                          >
+                            <i className="bi bi-arrow-repeat me-1"></i>
+                            abonnement
+                          </span>
+                        )}
                       </td>
                       <td className="small text-muted">
                         {b.account ? (
@@ -776,7 +783,7 @@ export default function BudgetMonthView({
                         >
                           <i className="bi bi-pencil"></i>
                         </Link>
-                        {!b.isApproved && (
+                        {!b.isApproved && !isAbonnement(b) && (
                           <button
                             className="btn btn-outline-danger btn-action rounded-circle"
                             onClick={() => handleDelete(b)}
@@ -793,11 +800,98 @@ export default function BudgetMonthView({
                     </tr>
                   );
                 })}
+                {subscriptionsNonBudgetees.map((sub) => (
+                  <tr
+                    key={`sub-${sub.id}`}
+                    className="table-warning"
+                    style={{ verticalAlign: "middle" }}
+                  >
+                    <td>
+                      <span className="fw-medium">{sub.category.name}</span>
+                      <span className="text-muted small"> — {sub.name}</span>
+                      <span
+                        className="badge ms-1 rounded-pill bg-warning bg-opacity-10 text-warning"
+                        style={{ fontSize: ".7rem" }}
+                      >
+                        abonnement
+                      </span>
+                    </td>
+                    <td className="small text-muted">{sub.account.name}</td>
+                    <td className="text-end text-muted">{fmt(sub.amount)} €</td>
+                    <td className="text-end fw-medium text-muted">
+                      {fmt(0)} €
+                    </td>
+                    <td className="text-end fw-semibold">
+                      {fmt(sub.amount)} €
+                    </td>
+                    <td style={{ minWidth: "120px" }}>
+                      <div>
+                        <div
+                          className="progress rounded-pill"
+                          style={{ height: "6px" }}
+                        >
+                          <div
+                            className="progress-bar rounded-pill bg-success"
+                            style={{ width: "100%" }}
+                          ></div>
+                        </div>
+                        <small
+                          className="mt-1 d-block text-muted"
+                          style={{ fontSize: ".7rem" }}
+                        >
+                          100 %
+                        </small>
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25"
+                        style={{ fontSize: ".72rem" }}
+                      >
+                        <i className="bi bi-arrow-repeat me-1"></i>
+                        {frequencyLabels[sub.frequency] ?? sub.frequency}
+                      </span>
+                    </td>
+                    <td className="text-end" style={{ whiteSpace: "nowrap" }}>
+                      <button
+                        className="btn btn-success btn-action me-1 rounded-circle"
+                        title="Approuver → créer la ligne de budget et la transaction"
+                        onClick={() => handleApproveSubscription(sub)}
+                        style={{
+                          width: "30px",
+                          height: "30px",
+                          padding: 0,
+                        }}
+                      >
+                        <i className="bi bi-check-lg"></i>
+                      </button>
+                      <Link
+                        href={`/budget/new?year=${year}&month=${month}&categoryId=${sub.category.id}&accountId=${sub.account.id}&amount=${sub.amount}&label=${encodeURIComponent(sub.name)}`}
+                        className="btn btn-outline-primary btn-action me-1 rounded-circle"
+                        title={`Créer/ajuster le budget « ${sub.category.name} » pour ce mois`}
+                        style={{
+                          width: "30px",
+                          height: "30px",
+                          padding: 0,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <i className="bi bi-pencil"></i>
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
               <tfoot className="table-light fw-semibold">
                 <tr>
                   <td colSpan={2}>Solde net (recettes − dépenses)</td>
                   {(() => {
+                    const subsTotal = subscriptionsNonBudgetees.reduce(
+                      (s, sub) => s + parseFloat(String(sub.amount)),
+                      0,
+                    );
                     const netPlanned =
                       budgets
                         .filter((b) => b.category.transactionType === "income")
@@ -810,7 +904,8 @@ export default function BudgetMonthView({
                         .reduce(
                           (s, b) => s + parseFloat(String(b.plannedAmount)),
                           0,
-                        );
+                        ) -
+                      subsTotal;
                     const variance = budgets.reduce(
                       (s, b) =>
                         s +
@@ -830,7 +925,8 @@ export default function BudgetMonthView({
                         .reduce(
                           (s, b) => s + parseFloat(String(b.actualAmount)),
                           0,
-                        );
+                        ) -
+                      subsTotal;
                     return (
                       <React.Fragment key="tfoot-totals">
                         <td

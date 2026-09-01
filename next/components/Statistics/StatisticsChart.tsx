@@ -166,6 +166,44 @@ export default function StatisticsChart({
     };
   });
 
+  // Tri du tableau "Détail par catégorie" : clic sur un en-tête pour trier,
+  // reclic pour inverser le sens (asc <-> desc).
+  type SortKey = "category" | "planned" | "variance" | "actual" | "actualPct";
+  const [sortKey, setSortKey] = useState<SortKey>("category");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortArrow = (key: SortKey) => {
+    if (key !== sortKey) return <i className="bi bi-arrow-down-up text-muted ms-1 small"></i>;
+    return sortDir === "asc" ? (
+      <i className="bi bi-arrow-up ms-1 small"></i>
+    ) : (
+      <i className="bi bi-arrow-down ms-1 small"></i>
+    );
+  };
+
+  const sortedSummary = [...groupedSummary].sort((a, b) => {
+    let cmp = 0;
+    if (sortKey === "category") {
+      cmp = a.category_name.localeCompare(b.category_name);
+    } else if (sortKey === "planned") {
+      cmp = toNum(a.planned) - toNum(b.planned);
+    } else if (sortKey === "actual" || sortKey === "actualPct") {
+      cmp = toNum(a.actual) - toNum(b.actual);
+    } else if (sortKey === "variance") {
+      cmp = (toNum(a.planned) - toNum(a.actual)) - (toNum(b.planned) - toNum(b.actual));
+    }
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
   const pieData = (dataObj: Record<string, number | string>) => {
     const groupedValues: Record<string, number> = {};
     categories.forEach((cat) => {
@@ -420,15 +458,50 @@ export default function StatisticsChart({
                 <table className="table table-hover mb-0 align-middle">
                   <thead className="table-light">
                     <tr>
-                      <th>Catégorie</th>
-                      <th className="text-end">Total Prévu</th>
-                      <th className="text-end">Écart</th>
-                      <th className="text-end">Total Réalisé</th>
+                      <th role="button" onClick={() => handleSort("category")} style={{ cursor: "pointer" }}>
+                        Catégorie{sortArrow("category")}
+                      </th>
+                      <th
+                        role="button"
+                        onClick={() => handleSort("planned")}
+                        className="text-end"
+                        style={{ cursor: "pointer" }}
+                      >
+                        Total Prévu{sortArrow("planned")}
+                      </th>
+                      <th
+                        role="button"
+                        onClick={() => handleSort("variance")}
+                        className="text-end"
+                        style={{ cursor: "pointer" }}
+                      >
+                        Écart{sortArrow("variance")}
+                      </th>
+                      <th
+                        role="button"
+                        onClick={() => handleSort("actual")}
+                        className="text-end"
+                        style={{ cursor: "pointer" }}
+                      >
+                        Total Réalisé{sortArrow("actual")}
+                      </th>
+                      <th
+                        role="button"
+                        onClick={() => handleSort("actualPct")}
+                        className="text-end"
+                        style={{ cursor: "pointer" }}
+                      >
+                        Pourcentage réalisé{sortArrow("actualPct")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {groupedSummary.map((row, idx) => {
+                    {sortedSummary.map((row, idx) => {
                       const variance = toNum(row.planned) - toNum(row.actual);
+                      const actualPct =
+                        totalActual > 0
+                          ? ((toNum(row.actual) / totalActual) * 100).toFixed(1)
+                          : "0,0";
                       return (
                         <tr key={idx}>
                           <td className="fw-medium">{row.category_name}</td>
@@ -443,6 +516,9 @@ export default function StatisticsChart({
                           </td>
                           <td className="text-end">
                             {formatNumber(row.actual)} €
+                          </td>
+                          <td className="text-end small text-muted">
+                            {actualPct} %
                           </td>
                         </tr>
                       );
@@ -468,6 +544,9 @@ export default function StatisticsChart({
                       </td>
                       <td className="text-end">
                         {formatNumber(totalActual)} €
+                      </td>
+                      <td className="text-end small text-muted">
+                        {totalActual > 0 ? "100,0" : "0,0"} %
                       </td>
                     </tr>
                   </tfoot>
