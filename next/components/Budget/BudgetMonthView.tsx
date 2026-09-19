@@ -159,13 +159,107 @@ export default function BudgetMonthView({
     }
   };
 
-  const handleDuplicate = async () => {
-    if (!window.confirm("Copier ces lignes vers le mois suivant ?")) return;
+  // ── Duplication depuis un autre mois ────────────────────────────────────
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [dupYear, setDupYear] = useState(
+    urlMonth === 1 ? urlYear - 1 : urlYear,
+  );
+  const [dupMonth, setDupMonth] = useState(urlMonth === 1 ? 12 : urlMonth - 1);
+  const [dupBudgets, setDupBudgets] = useState<Budget[] | null>(null);
+  const [dupLoading, setDupLoading] = useState(false);
+  const [dupError, setDupError] = useState<string | null>(null);
+  const [dupSelected, setDupSelected] = useState<number[]>([]);
+  const [dupSaving, setDupSaving] = useState(false);
+
+  const loadDuplicateSource = useCallback(async (y: number, m: number) => {
+    setDupLoading(true);
+    setDupError(null);
+    setDupSelected([]);
     try {
-      await postAction(`/${urlYear}/${urlMonth}/duplicate`);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/budget/${y}/${m}`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: MonthData = await res.json();
+      setDupBudgets(data.budgets ?? []);
+    } catch (e) {
+      setDupError(e instanceof Error ? e.message : "Erreur inconnue");
+      setDupBudgets(null);
+    } finally {
+      setDupLoading(false);
+    }
+  }, []);
+
+  const openDuplicateModal = () => {
+    setShowDuplicateModal(true);
+    loadDuplicateSource(dupYear, dupMonth);
+  };
+
+  const changeDupYear = (y: number) => {
+    setDupYear(y);
+    loadDuplicateSource(y, dupMonth);
+  };
+
+  const changeDupMonth = (m: number) => {
+    setDupMonth(m);
+    loadDuplicateSource(dupYear, m);
+  };
+
+  const toggleDupSelected = (id: number) => {
+    setDupSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const dupAllSelected =
+    dupBudgets !== null &&
+    dupBudgets.length > 0 &&
+    dupSelected.length === dupBudgets.length;
+
+  const toggleDupSelectAll = () => {
+    if (!dupBudgets) return;
+    setDupSelected(dupAllSelected ? [] : dupBudgets.map((b) => b.id));
+  };
+
+  // Ajoute les lignes sélectionnées dans le mois affiché (urlYear/urlMonth) :
+  // nouvelle ligne pour chacune, montant réalisé réinitialisé au montant
+  // prévu (ligne non encore approuvée).
+  const handleAddDuplicatedLines = async () => {
+    if (!dupBudgets || dupSelected.length === 0) return;
+    setDupSaving(true);
+    try {
+      for (const id of dupSelected) {
+        const src = dupBudgets.find((b) => b.id === id);
+        if (!src) continue;
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/budget/new`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              label: src.label ?? null,
+              categoryId: src.category.id,
+              accountId: src.account?.id ?? null,
+              destinationAccountId: src.destinationAccount?.id ?? null,
+              year: urlYear,
+              month: urlMonth,
+              plannedAmount: src.plannedAmount,
+              actualAmount: src.plannedAmount,
+            }),
+          },
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }
+      setShowDuplicateModal(false);
       await fetchMonth(urlYear, urlMonth);
     } catch (e) {
       alert(`Erreur : ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setDupSaving(false);
     }
   };
 
@@ -322,9 +416,9 @@ export default function BudgetMonthView({
           </Link>
           <button
             className="btn btn-outline-secondary btn-sm rounded-pill px-3"
-            onClick={handleDuplicate}
+            onClick={openDuplicateModal}
           >
-            <i className="bi bi-copy me-1"></i>Dupliquer →
+            <i className="bi bi-copy me-1"></i>Dupliquer depuis…
           </button>
           <button
             className="btn btn-outline-success btn-sm rounded-pill px-3"
@@ -956,6 +1050,177 @@ export default function BudgetMonthView({
             </table>
           </div>
         </div>
+      )}
+
+      {showDuplicateModal && (
+        <>
+          <div className="modal-backdrop fade show"></div>
+          <div className="modal fade show d-block" tabIndex={-1} role="dialog">
+            <div
+              className="modal-dialog modal-lg modal-dialog-scrollable"
+              role="document"
+            >
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    <i className="bi bi-copy me-2"></i>
+                    Dupliquer vers {monthNames[urlMonth]} {urlYear}
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowDuplicateModal(false)}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <p className="text-muted small">
+                    Choisissez le mois source, sélectionnez les lignes à
+                    copier, puis cliquez sur « Ajouter ».
+                  </p>
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <label className="form-label small text-muted">
+                        Année
+                      </label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={dupYear}
+                        onChange={(e) =>
+                          changeDupYear(parseInt(e.target.value) || dupYear)
+                        }
+                      />
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label small text-muted">
+                        Mois
+                      </label>
+                      <select
+                        className="form-select"
+                        value={dupMonth}
+                        onChange={(e) => changeDupMonth(parseInt(e.target.value))}
+                      >
+                        {Object.entries(monthNames)
+                          .map(
+                            ([key, label]) =>
+                              [Number(key), label] as [number, string],
+                          )
+                          .sort((a, b) => a[0] - b[0])
+                          .map(([num, label]) => (
+                            <option key={num} value={num}>
+                              {label}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {dupLoading && (
+                    <div className="text-center text-muted py-4">
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Chargement…
+                    </div>
+                  )}
+
+                  {dupError && (
+                    <div className="alert alert-danger">
+                      <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                      {dupError}
+                    </div>
+                  )}
+
+                  {!dupLoading &&
+                    !dupError &&
+                    dupBudgets !== null &&
+                    (dupBudgets.length === 0 ? (
+                      <p className="text-muted mb-0">
+                        Aucune ligne de budget pour {monthNames[dupMonth]}{" "}
+                        {dupYear}.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="form-check mb-2 border-bottom pb-2">
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            id="dup-select-all"
+                            checked={dupAllSelected}
+                            onChange={toggleDupSelectAll}
+                          />
+                          <label
+                            className="form-check-label fw-semibold"
+                            htmlFor="dup-select-all"
+                          >
+                            Tout sélectionner ({dupBudgets.length})
+                          </label>
+                        </div>
+                        <div className="list-group">
+                          {dupBudgets.map((b) => (
+                            <label
+                              key={b.id}
+                              className="list-group-item d-flex align-items-center gap-2"
+                            >
+                              <input
+                                type="checkbox"
+                                className="form-check-input mt-0"
+                                checked={dupSelected.includes(b.id)}
+                                onChange={() => toggleDupSelected(b.id)}
+                              />
+                              <span className="flex-grow-1">
+                                <span className="fw-medium">
+                                  {b.category.name}
+                                </span>
+                                {b.label && (
+                                  <span className="text-muted small">
+                                    {" "}
+                                    — {b.label}
+                                  </span>
+                                )}
+                                <br />
+                                <span className="text-muted small">
+                                  {b.account?.name ?? "Compte non défini"}
+                                </span>
+                              </span>
+                              <span className="fw-semibold">
+                                {fmt(b.plannedAmount)} €
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    ))}
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={() => setShowDuplicateModal(false)}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={dupSelected.length === 0 || dupSaving}
+                    onClick={handleAddDuplicatedLines}
+                  >
+                    {dupSaving ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-1"></span>
+                        Ajout…
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-plus-lg me-1"></i>
+                        Ajouter ({dupSelected.length})
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       <OCRModal

@@ -68,6 +68,16 @@ class Budget
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Transaction $approvedDestinationTransaction = null;
 
+    // Renseigné uniquement quand cette ligne a été créée automatiquement par
+    // la synchronisation d'un abonnement (voir BudgetController::month()).
+    // Permet de retrouver précisément quelles lignes retirer quand
+    // l'abonnement est désactivé, sans se fier à un simple rapprochement par
+    // catégorie/compte qui supprimerait aussi des lignes créées à la main.
+    #[ORM\ManyToOne(targetEntity: Subscription::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['budget:read', 'budget:month'])]
+    private ?Subscription $sourceSubscription = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getCategory(): ?Category { return $this->category; }
@@ -104,6 +114,9 @@ class Budget
 
     public function getApprovedDestinationTransaction(): ?Transaction { return $this->approvedDestinationTransaction; }
     public function setApprovedDestinationTransaction(?Transaction $tx): static { $this->approvedDestinationTransaction = $tx; return $this; }
+
+    public function getSourceSubscription(): ?Subscription { return $this->sourceSubscription; }
+    public function setSourceSubscription(?Subscription $sub): static { $this->sourceSubscription = $sub; return $this; }
 
     public function isApproved(): bool { return $this->approvedAt !== null; }
 

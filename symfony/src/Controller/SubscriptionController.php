@@ -68,7 +68,10 @@ class SubscriptionController extends AbstractController
 
         if ($wasActive) {
             $removed = 0;
-            foreach ($budgetRepo->findBy(['category' => $subscription->getCategory(), 'account' => $subscription->getAccount()]) as $mb) {
+            // On ne retire QUE les lignes générées automatiquement à partir
+            // de CET abonnement (lien sourceSubscription) — jamais une ligne
+            // créée à la main, même si elle partage la même catégorie/compte.
+            foreach ($budgetRepo->findBy(['sourceSubscription' => $subscription]) as $mb) {
                 if (!$mb->isApproved()) {
                     $em->remove($mb);
                     $removed++;
@@ -85,8 +88,19 @@ class SubscriptionController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'delete', methods: ['POST'])]
-    public function delete(Subscription $subscription, EntityManagerInterface $em): Response
+    public function delete(Subscription $subscription, EntityManagerInterface $em, BudgetRepository $budgetRepo): Response
     {
+        // Même logique que toggle() : on ne retire que les lignes budgétaires
+        // générées automatiquement par CET abonnement (lien sourceSubscription)
+        // et non encore approuvées. Les lignes approuvées sont conservées
+        // (historique) ; leur sourceSubscription passe à NULL via l'onDelete
+        // SET NULL défini sur Budget::$sourceSubscription.
+        foreach ($budgetRepo->findBy(['sourceSubscription' => $subscription]) as $mb) {
+            if (!$mb->isApproved()) {
+                $em->remove($mb);
+            }
+        }
+
         $em->remove($subscription);
         $em->flush();
 

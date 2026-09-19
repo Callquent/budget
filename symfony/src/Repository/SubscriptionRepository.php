@@ -37,16 +37,29 @@ class SubscriptionRepository extends ServiceEntityRepository
      */
     public function findActiveForPeriod(int $year, int $month): array
     {
-        $firstDay = \DateTimeImmutable::createFromFormat('Y-n-j', "$year-$month-1");
+        // setTime(0, 0) est indispensable : createFromFormat() sans partie
+        // horaire hérite de l'heure courante, ce qui décale les comparaisons
+        // avec startDate/endDate (stockées à minuit) selon l'heure d'exécution.
+        $firstDay = \DateTimeImmutable::createFromFormat('Y-n-j', "$year-$month-1")->setTime(0, 0);
         $lastDay  = $firstDay->modify('last day of this month');
 
-        $candidates = $this->createQueryBuilder('s')
+        $qb = $this->createQueryBuilder('s');
+
+        $candidates = $qb
             ->addSelect('a', 'c')
             ->join('s.account', 'a')
             ->join('s.category', 'c')
             ->where('s.status = :status')
             ->andWhere('s.startDate <= :lastDay')
-            ->andWhere('s.endDate IS NULL OR s.endDate >= :firstDay')
+            // orX() explicite : passer la chaîne 'a OR b' à andWhere() ne la
+            // parenthèse pas, ce qui produit
+            // '... AND s.startDate <= :lastDay AND s.endDate IS NULL OR s.endDate >= :firstDay'
+            // — le OR reprend alors la main sur les filtres précédents
+            // (statut, startDate) et fausse le jeu de résultats.
+            ->andWhere($qb->expr()->orX(
+                's.endDate IS NULL',
+                's.endDate >= :firstDay'
+            ))
             ->setParameter('status', Subscription::STATUS_ACTIVE)
             ->setParameter('firstDay', $firstDay)
             ->setParameter('lastDay', $lastDay)

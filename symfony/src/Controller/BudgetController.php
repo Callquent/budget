@@ -48,7 +48,8 @@ class BudgetController extends AbstractController
                         ->setCategory($sub->getCategory())->setAccount($sub->getAccount())
                         ->setYear($year)->setMonth($m)
                         ->setPlannedAmount((string) $sub->getAmount())
-                        ->setActualAmount((string) $sub->getAmount()));
+                        ->setActualAmount((string) $sub->getAmount())
+                        ->setSourceSubscription($sub));
                     $synced++;
                 }
             }
@@ -152,24 +153,17 @@ class BudgetController extends AbstractController
             ];
         }
 
-        // Abonnements actifs distribués par mois
+        // Abonnements actifs distribués par mois.
+        // On réutilise findActiveForPeriod() — la même source que la
+        // synchronisation abonnements → lignes budgétaires ci-dessus — plutôt
+        // que de redupliquer ici les règles de fréquence : la version locale
+        // ignorait silencieusement les fréquences 'occasional' (default =>
+        // false), d'où des abonnements absents des estimations.
         $subMovements = [];
-        foreach ($subRepo->findActive() as $sub) {
-            $aid = $sub->getAccount()->getId();
-            for ($m = 1; $m <= 12; $m++) {
-                $applies = match ($sub->getFrequency()) {
-                    'monthly'   => true,
-                    'yearly'    => (int)$sub->getStartDate()->format('n') === $m,
-                    'quarterly' => ((($m - 1) % 3) === (((int)$sub->getStartDate()->format('n') - 1) % 3)),
-                    default     => false,
-                };
-                $monthDate   = \DateTimeImmutable::createFromFormat('Y-n-j', "$year-$m-1");
-                $lastOfMonth = $monthDate->modify('last day of this month');
-                if ($sub->getStartDate() > $lastOfMonth) $applies = false;
-                if ($sub->getEndDate() !== null && $sub->getEndDate() < $monthDate) $applies = false;
-                if ($applies) {
-                    $subMovements[$aid][$m] = ($subMovements[$aid][$m] ?? 0) + (float)$sub->getAmount();
-                }
+        for ($m = 1; $m <= 12; $m++) {
+            foreach ($subRepo->findActiveForPeriod($year, $m) as $sub) {
+                $aid = $sub->getAccount()->getId();
+                $subMovements[$aid][$m] = ($subMovements[$aid][$m] ?? 0) + (float) $sub->getAmount();
             }
         }
 
@@ -276,7 +270,8 @@ class BudgetController extends AbstractController
                     ->setCategory($sub->getCategory())->setAccount($sub->getAccount())
                     ->setYear($year)->setMonth($month)
                     ->setPlannedAmount((string) $sub->getAmount())
-                    ->setActualAmount((string) $sub->getAmount()));
+                    ->setActualAmount((string) $sub->getAmount())
+                    ->setSourceSubscription($sub));
                 $synced++;
             }
         }
