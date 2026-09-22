@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Budget;
+use App\Entity\Subscription;
 use App\Entity\Transaction;
 use App\Repository\AccountRepository;
 use App\Repository\BudgetRepository;
@@ -33,46 +34,86 @@ class BudgetController extends AbstractController
         EntityManagerInterface $em,
         int $year = 0
     ): Response {
-        $now = new \DateTimeImmutable();
-        if ($year === 0) {
-            $year = (int) $now->format('Y');
-            if ((int) $now->format('n') === 12) $year++;
-        }
+        $now  = new \DateTimeImmutable();
+        $year = $this->resolveYear($now, $year);
 
         // Synchronisation abonnements → lignes budgétaires pour toute l'année
-        $synced = 0;
-        for ($m = 1; $m <= 12; $m++) {
-            foreach ($subRepo->findActiveForPeriod($year, $m) as $sub) {
-                if (!$repo->findOneBy(['category' => $sub->getCategory(), 'account' => $sub->getAccount(), 'year' => $year, 'month' => $m])) {
-                    $em->persist((new Budget())
-                        ->setCategory($sub->getCategory())->setAccount($sub->getAccount())
-                        ->setYear($year)->setMonth($m)
-                        ->setPlannedAmount((string) $sub->getAmount())
-                        ->setActualAmount((string) $sub->getAmount())
-                        ->setSourceSubscription($sub));
-                    $synced++;
-                }
-            }
-        }
+        $synced = $subRepo->syncBudgetLinesForYear($em, $repo, $year);
         if ($synced > 0) $em->flush();
 
-        // Résumé mensuel
+        $summaryByMonth = $this->buildAnnualSummaryByMonth($repo, $year);
+        $plannedTotals  = $this->buildPlannedTotals($repo, $year);
+
+        $accounts       = $accountRepo->findAllOrderedByName();
+        $currentYear    = (int) $now->format('Y');
+        $currentMonth   = (int) $now->format('n');
+        $availableYears = range($currentYear - 1, $currentYear + 2);
+
+        $txMovements  = $this->buildTransactionMovements($txRepo, $year);
+        $subMovements = $this->buildSubscriptionMovements($subRepo, $year);
+        $starting     = $this->buildStartingBalances($repo, $txRepo, $year, $currentYear);
+
+        $accountBalances = $this->buildAccountBalances(
+            $accounts,
+            $year,
+            $currentYear,
+            $currentMonth,
+            $txMovements,
+            $subMovements,
+            $plannedTotals,
+            $starting
+        );
+
+        return $this->json([
+            'year'            => $year,
+            'currentYear'     => $currentYear,
+            'currentMonth'    => $currentMonth,
+            'availableYears'  => $availableYears,
+            'accounts'        => $accounts,
+            'summary'         => $summaryByMonth,
+            'accountBalances' => $accountBalances,
+            'monthNames'      => BudgetLabels::MONTHS,
+        ], 200, [], ['groups' => ['account:read']]);
+    }
+
+    // Année demandée dans l'URL, ou année "courante" par défaut — sachant
+    // qu'en décembre on bascule directement sur l'année suivante (la vue
+    // annuelle sert surtout à préparer le budget à venir).
+    private function resolveYear(\DateTimeImmutable $now, int $year): int
+    {
+        if ($year !== 0) {
+            return $year;
+        }
+
+        $year = (int) $now->format('Y');
+        if ((int) $now->format('n') === 12) {
+            $year++;
+        }
+
+        return $year;
+    }
+
+    // Résumé mensuel (planned vs actual, net) indexé par mois.
+    private function buildAnnualSummaryByMonth(BudgetRepository $repo, int $year): array
+    {
         $summaryByMonth = [];
         foreach ($repo->findAnnualSummary($year) as $row) {
             $summaryByMonth[(int) $row['month']] = $row;
         }
 
-        // Budget planifié par compte et par mois (pour projection)
-        $plannedByAccount = [];
-        $allBudgets = $repo->createQueryBuilder('mb')
-            ->addSelect('c')->join('mb.category', 'c')
-            ->where('mb.year = :year')->setParameter('year', $year)
-            ->orderBy('mb.month', 'ASC')->addOrderBy('c.name', 'ASC')
-            ->getQuery()->getResult();
+        return $summaryByMonth;
+    }
 
-        // plannedByAccount = budgets NON approuvés (pour projection future)
-        // allPlannedByAccount = TOUS budgets (pour calcul month_planned_net complet)
-        // approvalByAccount[$m][$aid] = [total, approved]
+    /**
+     * Agrège toutes les lignes de budget de l'année par compte et par mois.
+     *
+     * - plannedByAccount    : lignes NON approuvées uniquement (projection future)
+     * - allPlannedByAccount : TOUTES les lignes (calcul du "month_planned_net" complet)
+     * - approvalByAccount   : compteurs [total, approved] par compte/mois
+     */
+    private function buildPlannedTotals(BudgetRepository $repo, int $year): array
+    {
+        $plannedByAccount    = [];
         $allPlannedByAccount = [];
         $approvalByAccount   = [];
 
@@ -92,6 +133,12 @@ class BudgetController extends AbstractController
                 $allPlannedByAccount[$m][$aid]['expense'] += $amount;
             }
         };
+
+        $allBudgets = $repo->createQueryBuilder('mb')
+            ->addSelect('c')->join('mb.category', 'c')
+            ->where('mb.year = :year')->setParameter('year', $year)
+            ->orderBy('mb.month', 'ASC')->addOrderBy('c.name', 'ASC')
+            ->getQuery()->getResult();
 
         foreach ($allBudgets as $mb) {
             $m            = $mb->getMonth();
@@ -139,26 +186,35 @@ class BudgetController extends AbstractController
             }
         }
 
-        $accounts       = $accountRepo->findAllOrderedByName();
-        $currentYear    = (int) $now->format('Y');
-        $currentMonth   = (int) $now->format('n');
-        $availableYears = range($currentYear - 1, $currentYear + 2);
+        return [
+            'plannedByAccount'    => $plannedByAccount,
+            'allPlannedByAccount' => $allPlannedByAccount,
+            'approvalByAccount'   => $approvalByAccount,
+        ];
+    }
 
-        // Mouvements réels par compte+mois
+    // Mouvements réels (crédit/débit) par compte et par mois.
+    private function buildTransactionMovements(TransactionRepository $txRepo, int $year): array
+    {
         $txMovements = [];
         foreach ($txRepo->findMonthlyByAccountForYear($year) as $row) {
-            $txMovements[(int)$row['account_id']][(int)$row['month']] = [
-                'credit' => (float)$row['credit'],
-                'debit'  => (float)$row['debit'],
+            $txMovements[(int) $row['account_id']][(int) $row['month']] = [
+                'credit' => (float) $row['credit'],
+                'debit'  => (float) $row['debit'],
             ];
         }
 
-        // Abonnements actifs distribués par mois.
-        // On réutilise findActiveForPeriod() — la même source que la
-        // synchronisation abonnements → lignes budgétaires ci-dessus — plutôt
-        // que de redupliquer ici les règles de fréquence : la version locale
-        // ignorait silencieusement les fréquences 'occasional' (default =>
-        // false), d'où des abonnements absents des estimations.
+        return $txMovements;
+    }
+
+    // Abonnements actifs distribués par compte et par mois.
+    // On réutilise findActiveForPeriod() — la même source que la
+    // synchronisation abonnements → lignes budgétaires — plutôt que de
+    // redupliquer ici les règles de fréquence : une version locale
+    // ignorait silencieusement les fréquences 'occasional' (default =>
+    // false), d'où des abonnements absents des estimations.
+    private function buildSubscriptionMovements(SubscriptionRepository $subRepo, int $year): array
+    {
         $subMovements = [];
         for ($m = 1; $m <= 12; $m++) {
             foreach ($subRepo->findActiveForPeriod($year, $m) as $sub) {
@@ -167,29 +223,57 @@ class BudgetController extends AbstractController
             }
         }
 
-        // Soldes cumulés de base pour années futures
+        return $subMovements;
+    }
+
+    // Soldes cumulés de base (réel + planifié) hérités de l'année
+    // précédente — uniquement nécessaire pour une année future.
+    private function buildStartingBalances(BudgetRepository $repo, TransactionRepository $txRepo, int $year, int $currentYear): array
+    {
         $startingNetByAccount     = [];
         $startingPlannedByAccount = [];
-        if ($year > $currentYear) {
-            foreach ($txRepo->findMovementsUpToPeriod($year - 1, 12) as $row) {
-                $startingNetByAccount[(int) $row['account_id']] = (float)$row['credit'] - (float)$row['debit'];
-            }
-            foreach ($repo->createQueryBuilder('mb')->join('mb.category', 'c')->where('mb.year = :y')->setParameter('y', $year - 1)->getQuery()->getResult() as $mb) {
-                $amt = (float) $mb->getPlannedAmount();
-                if ($mb->getCategory()->getTransactionType() === 'transfer' && $mb->getDestinationAccount()) {
-                    $srcAid = $mb->getAccount()?->getId() ?? 'all';
-                    $dstAid = $mb->getDestinationAccount()->getId();
-                    $startingPlannedByAccount[$srcAid] = ($startingPlannedByAccount[$srcAid] ?? 0.0) - $amt;
-                    $startingPlannedByAccount[$dstAid] = ($startingPlannedByAccount[$dstAid] ?? 0.0) + $amt;
-                } else {
-                    $aid = $mb->getAccount()?->getId() ?? 'all';
-                    $startingPlannedByAccount[$aid] = ($startingPlannedByAccount[$aid] ?? 0.0)
-                        + ($mb->getCategory()->getTransactionType() === 'income' ? $amt : -$amt);
-                }
+
+        if ($year <= $currentYear) {
+            return ['net' => $startingNetByAccount, 'planned' => $startingPlannedByAccount];
+        }
+
+        foreach ($txRepo->findMovementsUpToPeriod($year - 1, 12) as $row) {
+            $startingNetByAccount[(int) $row['account_id']] = (float) $row['credit'] - (float) $row['debit'];
+        }
+
+        foreach ($repo->createQueryBuilder('mb')->join('mb.category', 'c')->where('mb.year = :y')->setParameter('y', $year - 1)->getQuery()->getResult() as $mb) {
+            $amt = (float) $mb->getPlannedAmount();
+            if ($mb->getCategory()->getTransactionType() === 'transfer' && $mb->getDestinationAccount()) {
+                $srcAid = $mb->getAccount()?->getId() ?? 'all';
+                $dstAid = $mb->getDestinationAccount()->getId();
+                $startingPlannedByAccount[$srcAid] = ($startingPlannedByAccount[$srcAid] ?? 0.0) - $amt;
+                $startingPlannedByAccount[$dstAid] = ($startingPlannedByAccount[$dstAid] ?? 0.0) + $amt;
+            } else {
+                $aid = $mb->getAccount()?->getId() ?? 'all';
+                $startingPlannedByAccount[$aid] = ($startingPlannedByAccount[$aid] ?? 0.0)
+                    + ($mb->getCategory()->getTransactionType() === 'income' ? $amt : -$amt);
             }
         }
 
-        // Calcul des soldes mois par mois
+        return ['net' => $startingNetByAccount, 'planned' => $startingPlannedByAccount];
+    }
+
+    // Calcule, pour chaque compte et chaque mois, le solde réel cumulé et
+    // le solde projeté (réel + planifié non approuvé), ainsi que quelques
+    // indicateurs annexes (mouvements du mois, statut d'approbation).
+    private function buildAccountBalances(
+        array $accounts,
+        int $year,
+        int $currentYear,
+        int $currentMonth,
+        array $txMovements,
+        array $subMovements,
+        array $plannedTotals,
+        array $starting
+    ): array {
+        ['plannedByAccount' => $plannedByAccount, 'allPlannedByAccount' => $allPlannedByAccount, 'approvalByAccount' => $approvalByAccount] = $plannedTotals;
+        ['net' => $startingNetByAccount, 'planned' => $startingPlannedByAccount] = $starting;
+
         $accountBalances = [];
         foreach ($accounts as $account) {
             $aid            = $account->getId();
@@ -235,16 +319,7 @@ class BudgetController extends AbstractController
             }
         }
 
-        return $this->json([
-            'year'            => $year,
-            'currentYear'     => $currentYear,
-            'currentMonth'    => $currentMonth,
-            'availableYears'  => $availableYears,
-            'accounts'        => $accounts,
-            'summary'         => $summaryByMonth,
-            'accountBalances' => $accountBalances,
-            'monthNames'      => BudgetLabels::MONTHS,
-        ], 200, [], ['groups' => ['account:read']]);
+        return $accountBalances;
     }
 
     // ─── Vue mois ─────────────────────────────────────────────────────────────
@@ -263,18 +338,7 @@ class BudgetController extends AbstractController
         $subscriptions = $subRepo->findActiveForPeriod($year, $month);
 
         // Synchronisation abonnements → lignes budgétaires
-        $synced = 0;
-        foreach ($subscriptions as $sub) {
-            if (!$repo->findOneBy(['category' => $sub->getCategory(), 'account' => $sub->getAccount(), 'year' => $year, 'month' => $month])) {
-                $em->persist((new Budget())
-                    ->setCategory($sub->getCategory())->setAccount($sub->getAccount())
-                    ->setYear($year)->setMonth($month)
-                    ->setPlannedAmount((string) $sub->getAmount())
-                    ->setActualAmount((string) $sub->getAmount())
-                    ->setSourceSubscription($sub));
-                $synced++;
-            }
-        }
+        $synced = $subRepo->syncBudgetLines($em, $repo, $year, $month);
         if ($synced > 0) $em->flush();
 
         $budgets = $repo->findByPeriod($year, $month);
@@ -371,6 +435,60 @@ class BudgetController extends AbstractController
         $em->flush();
 
         return $this->json($budget, 200, [], ['groups' => ['budget:read', 'account:read', 'category:read'], \Symfony\Component\Serializer\Normalizer\DateTimeNormalizer::FORMAT_KEY => 'Y-m-d']);
+    }
+
+    #[Route('/{id}/convert-to-subscription', name: 'convert_to_subscription', methods: ['POST'])]
+    public function convertToSubscription(Budget $budget, Request $request, EntityManagerInterface $em): Response
+    {
+        // Une ligne déjà générée par (ou déjà liée à) un abonnement ne peut
+        // pas en générer un second : ça créerait deux abonnements qui se
+        // disputeraient la même ligne budgétaire lors des prochaines synchros.
+        if ($budget->getSourceSubscription()) {
+            return $this->json(['error' => 'Cette ligne est déjà liée à un abonnement.'], 409);
+        }
+
+        if (!$budget->getAccount()) {
+            return $this->json(['error' => "Un compte est requis pour créer un abonnement."], 422);
+        }
+
+        // Un abonnement ne porte qu'un seul compte (pas de destinationAccount) :
+        // une ligne de virement n'a donc pas d'équivalent abonnement possible.
+        if ($budget->getCategory()->getTransactionType() === 'transfer') {
+            return $this->json(['error' => "Une ligne de virement ne peut pas être convertie en abonnement."], 422);
+        }
+
+        $data      = json_decode($request->getContent(), true) ?? [];
+        $frequency = $data['frequency'] ?? 'monthly';
+
+        // Le mois de la ligne budgétaire devient le mois de départ de
+        // l'abonnement (setTime(0,0) pour rester cohérent avec le reste
+        // de l'app — voir SubscriptionRepository::findActiveForPeriod()).
+        $startDate = \DateTimeImmutable::createFromFormat('Y-n-j', $budget->getYear() . '-' . $budget->getMonth() . '-1')
+            ->setTime(0, 0);
+
+        $subscription = (new Subscription())
+            ->setName($data['name'] ?? ($budget->getLabel() ?? $budget->getCategory()->getName()))
+            ->setAmount($budget->getPlannedAmount())
+            ->setFrequency($frequency)
+            ->setStatus(Subscription::STATUS_ACTIVE)
+            ->setStartDate($startDate)
+            ->setEndDate(!empty($data['endDate']) ? new \DateTimeImmutable($data['endDate']) : null)
+            ->setDayOfMonth(!empty($data['dayOfMonth']) ? (int) $data['dayOfMonth'] : null)
+            ->setNotes($data['notes'] ?? null)
+            ->setAccount($budget->getAccount())
+            ->setCategory($budget->getCategory());
+
+        $em->persist($subscription);
+
+        // On lie la ligne existante à l'abonnement fraîchement créé : la
+        // prochaine synchro (SubscriptionRepository::syncBudgetLines) la
+        // reconnaîtra comme déjà existante pour ce mois et ne créera pas
+        // de doublon.
+        $budget->setSourceSubscription($subscription);
+
+        $em->flush();
+
+        return $this->json($subscription, 201, [], ['groups' => ['subscription:read', 'account:read', 'category:read']]);
     }
 
     #[Route('/{id}/approve', name: 'approve', methods: ['POST'])]

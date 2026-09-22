@@ -10,6 +10,13 @@ import AccountPicker from "../Account/AccountPicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
+const FREQUENCIES = [
+  { value: "monthly", label: "Mensuel" },
+  { value: "yearly", label: "Annuel" },
+  { value: "quarterly", label: "Trimestriel" },
+  { value: "occasional", label: "Occasionnel" },
+] as const;
+
 const MONTH_NAMES = [
   "Janvier",
   "Février",
@@ -51,6 +58,44 @@ export default function BudgetForm({
   const [sameAmount, setSameAmount] = useState(false);
 
   const isApproved = initialData?.isApproved ?? false;
+  const alreadyLinkedToSubscription =
+    initialData?.sourceSubscriptionId != null ||
+    initialData?.sourceSubscription?.id != null;
+
+  // ─── Conversion en abonnement ────────────────────────────────────────────
+  const [showConvertForm, setShowConvertForm] = useState(false);
+  const [convertFrequency, setConvertFrequency] = useState<string>("monthly");
+  const [convertDayOfMonth, setConvertDayOfMonth] = useState<string>("");
+  const [convertEndDate, setConvertEndDate] = useState<string>("");
+  const [converting, setConverting] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+
+  const handleConvertToSubscription = async () => {
+    setConverting(true);
+    setConvertError(null);
+
+    try {
+      const res = await fetch(
+        `${API}/budget/${initialData!.id}/convert-to-subscription`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            frequency: convertFrequency,
+            dayOfMonth: convertDayOfMonth ? parseInt(convertDayOfMonth) : null,
+            endDate: convertEndDate || null,
+          }),
+        },
+      );
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `Erreur ${res.status}`);
+      router.push("/subscriptions");
+    } catch (e: any) {
+      setConvertError(e.message);
+    } finally {
+      setConverting(false);
+    }
+  };
 
   // Pour une catégorie Virement, une seule ligne Budget porte les deux
   // comptes : "Compte" (accountId) = expéditeur (débit), "Compte
@@ -63,6 +108,8 @@ export default function BudgetForm({
     return null;
   }, [grouped, categoryId]);
   const isTransferCategory = selectedCategoryType === "transfer";
+  const canConvertToSubscription =
+    !!initialData?.id && !isTransferCategory && !alreadyLinkedToSubscription;
 
   useEffect(() => {
     if (!isTransferCategory) {
@@ -180,7 +227,32 @@ export default function BudgetForm({
           <Link href="/" className="text-muted text-decoration-none me-3">
             <i className="bi bi-chevron-left"></i>
           </Link>
-          <h1 className="h4 mb-0">{title}</h1>
+          <h1 className="h4 mb-0 flex-grow-1">{title}</h1>
+          {canConvertToSubscription && (
+            <div className="dropdown">
+              <button
+                type="button"
+                className="btn btn-link text-muted p-1"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                aria-label="Actions"
+              >
+                <i className="bi bi-three-dots-vertical fs-5"></i>
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end">
+                <li>
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => setShowConvertForm(true)}
+                  >
+                    <i className="bi bi-arrow-repeat me-2"></i>
+                    Convertir en abonnement
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
         </div>
 
         {isApproved && (
@@ -380,6 +452,92 @@ export default function BudgetForm({
             </div>
           </form>
         </div>
+
+        {canConvertToSubscription && showConvertForm && (
+          <div className="card p-4 mt-3">
+            <h2 className="h6 mb-3">Convertir cette ligne en abonnement</h2>
+            <p className="text-muted small">
+              Un nouvel abonnement sera créé avec la même catégorie, le même
+              compte et le même montant prévu. Cette ligne restera liée à
+              l'abonnement pour ne pas être dupliquée lors des prochaines
+              synchronisations.
+            </p>
+
+            {convertError && (
+              <div className="alert alert-danger mb-3">
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                {convertError}
+              </div>
+            )}
+
+            <div className="mb-3">
+              <label className="form-label d-block">Fréquence</label>
+              <div className="d-flex flex-wrap gap-2">
+                {FREQUENCIES.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    className={`btn btn-sm ${convertFrequency === f.value ? "btn-primary" : "btn-outline-secondary"}`}
+                    onClick={() => setConvertFrequency(f.value)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="row g-3 mb-3">
+              <div className="col-6">
+                <label className="form-label">Jour du mois</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  min="1"
+                  max="28"
+                  value={convertDayOfMonth}
+                  onChange={(e) => setConvertDayOfMonth(e.target.value)}
+                />
+              </div>
+              <div className="col-6">
+                <label className="form-label">Date de fin</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={convertEndDate}
+                  onChange={(e) => setConvertEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="d-flex gap-2">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={converting}
+                onClick={handleConvertToSubscription}
+              >
+                {converting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-1"></span>
+                    Conversion…
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check-lg me-1"></i>Créer l'abonnement
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                disabled={converting}
+                onClick={() => setShowConvertForm(false)}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

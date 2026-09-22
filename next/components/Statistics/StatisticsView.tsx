@@ -69,6 +69,8 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
     actualMonthly,
     netPlannedMonthly,
     netActualMonthly,
+    plannedIncomeMonthly,
+    actualIncomeMonthly,
     monthNames,
   } = data;
 
@@ -110,6 +112,8 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
       </div>
 
       <StatisticsChart
+        year={year}
+        groupBy={groupBy}
         summary={summary}
         plannedChart={plannedChart}
         actualChart={actualChart}
@@ -118,6 +122,8 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
         actualMonthly={actualMonthly}
         netPlannedMonthly={netPlannedMonthly}
         netActualMonthly={netActualMonthly}
+        plannedIncomeMonthly={plannedIncomeMonthly}
+        actualIncomeMonthly={actualIncomeMonthly}
         monthNames={monthNames}
       />
     </>

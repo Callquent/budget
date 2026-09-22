@@ -240,17 +240,6 @@ export default function BudgetYearView() {
                           {((ab?.month_planned_net ?? 0) !== 0 ||
                             ab?.month_all_approved) && (
                             <div style={{ marginBottom: "6px" }}>
-                              {!ab?.month_all_approved && (
-                                <div
-                                  style={{
-                                    fontSize: ".68rem",
-                                    color: "#adb5bd",
-                                    marginBottom: "2px",
-                                  }}
-                                >
-                                  Estimation prévue du solde en fin de mois
-                                </div>
-                              )}
                               {(() => {
                                 const allApproved = ab?.month_all_approved;
                                 const value = allApproved
@@ -290,6 +279,17 @@ export default function BudgetYearView() {
                                   </div>
                                 );
                               })()}
+                              {!ab?.month_all_approved && (
+                                <div
+                                  style={{
+                                    fontSize: ".68rem",
+                                    color: "#adb5bd",
+                                    marginBottom: "2px",
+                                  }}
+                                >
+                                  Estimation prévue du solde en fin de mois
+                                </div>
+                              )}
                               {!ab?.month_all_approved && (
                                 <div
                                   style={{

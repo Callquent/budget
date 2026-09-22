@@ -28,6 +28,8 @@ ChartJS.register(
 
 import type { StatisticsChartProps } from "./Statistics.interface";
 
+const API = process.env.NEXT_PUBLIC_API_URL;
+
 function formatNumber(num: number | string) {
   return new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
@@ -85,6 +87,8 @@ function buildCategoryToLabel(categories: string[], groups: CategoryGroup[]) {
 }
 
 export default function StatisticsChart({
+  year,
+  groupBy,
   summary,
   plannedChart,
   actualChart,
@@ -93,6 +97,8 @@ export default function StatisticsChart({
   actualMonthly,
   netPlannedMonthly,
   netActualMonthly,
+  plannedIncomeMonthly,
+  actualIncomeMonthly,
   monthNames,
 }: StatisticsChartProps) {
   const [activeTab, setActiveTab] = useState<"dist" | "evo">("dist");
@@ -144,6 +150,69 @@ export default function StatisticsChart({
 
   // Catégories déjà utilisées dans un groupe existant, pour éviter les doublons.
   const groupedCategoriesSet = new Set(groups.flatMap((g) => g.categories));
+
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [budgetRows, setBudgetRows] = useState<
+    {
+      category_name: string;
+      label: string | null;
+      month: number;
+      planned: number;
+      actual: number;
+      approved: boolean;
+    }[]
+  >([]);
+  const [loadingBudgets, setLoadingBudgets] = useState(false);
+
+  // Affiche le détail des budgets d'une catégorie/sous-catégorie cliquée (ligne du
+  // tableau ou part de camembert). Si le libellé cliqué correspond à un groupe
+  // personnalisé (regroupement manuel de catégories, voir plus haut), interroge
+  // chacune des catégories brutes qui le composent et fusionne les résultats —
+  // le backend, lui, ne connaît que le regroupement parent/sous-catégorie.
+  async function handleSelectLabel(label: string) {
+    setSelectedLabel(label);
+    setLoadingBudgets(true);
+    setBudgetRows([]);
+
+    const customGroup = groups.find((g) => g.label === label);
+    const rawLabels = customGroup ? customGroup.categories : [label];
+
+    try {
+      const results = await Promise.all(
+        rawLabels.map((raw) =>
+          fetch(
+            `${API}/statistics/${year}/budgets?label=${encodeURIComponent(raw)}&groupBy=${groupBy}`,
+          ).then((res) => {
+            if (!res.ok) throw new Error(`Erreur ${res.status}`);
+            return res.json();
+          }),
+        ),
+      );
+      const merged = results.flatMap((r) => r.budgets ?? []);
+      merged.sort(
+        (a, b) =>
+          a.category_name.localeCompare(b.category_name) || a.month - b.month,
+      );
+      setBudgetRows(merged);
+    } catch (e) {
+      console.error("Impossible de charger le détail des budgets", e);
+    } finally {
+      setLoadingBudgets(false);
+    }
+  }
+
+  function closeBudgetModal() {
+    setSelectedLabel(null);
+    setBudgetRows([]);
+  }
+
+  // Utilisé pour le clic sur une part de camembert (chart.js retourne l'index
+  // de l'élément cliqué, à traduire en libellé via groupedLabels).
+  function handlePieClick(_event: unknown, elements: { index: number }[]) {
+    if (!elements.length) return;
+    const label = groupedLabels[elements[0].index];
+    if (label) handleSelectLabel(label);
+  }
 
   // Conversion défensive : les montants peuvent arriver en string (colonnes
   // decimal Doctrine/Symfony). "+" sur des strings concatène au lieu d'additionner
@@ -266,6 +335,32 @@ export default function StatisticsChart({
         data: netActualMonthly.map(toNum),
         borderColor: "#ec4899",
         backgroundColor: "rgba(236, 72, 153, 0.1)",
+        fill: true,
+        tension: 0.3,
+        borderWidth: 3,
+        pointRadius: 4,
+      },
+    ],
+  };
+
+  const incomeLineData = {
+    labels: monthNames,
+    datasets: [
+      {
+        label: "Prévu",
+        data: plannedIncomeMonthly.map(toNum),
+        borderColor: "#0891b2",
+        backgroundColor: "rgba(8, 145, 178, 0.1)",
+        fill: true,
+        tension: 0.3,
+        borderWidth: 3,
+        pointRadius: 4,
+      },
+      {
+        label: "Réalisé",
+        data: actualIncomeMonthly.map(toNum),
+        borderColor: "#22c55e",
+        backgroundColor: "rgba(34, 197, 94, 0.1)",
         fill: true,
         tension: 0.3,
         borderWidth: 3,
@@ -417,6 +512,12 @@ export default function StatisticsChart({
                         data={pieData(plannedChart)}
                         options={{
                           plugins: { legend: { position: "bottom" } },
+                          onClick: handlePieClick,
+                          onHover: (evt, elements) => {
+                            (evt.native?.target as HTMLElement).style.cursor = elements.length
+                              ? "pointer"
+                              : "default";
+                          },
                         }}
                       />
                     </div>
@@ -441,6 +542,12 @@ export default function StatisticsChart({
                         data={pieData(actualChart)}
                         options={{
                           plugins: { legend: { position: "bottom" } },
+                          onClick: handlePieClick,
+                          onHover: (evt, elements) => {
+                            (evt.native?.target as HTMLElement).style.cursor = elements.length
+                              ? "pointer"
+                              : "default";
+                          },
                         }}
                       />
                     </div>
@@ -503,7 +610,12 @@ export default function StatisticsChart({
                           ? ((toNum(row.actual) / totalActual) * 100).toFixed(1)
                           : "0,0";
                       return (
-                        <tr key={idx}>
+                        <tr
+                          key={idx}
+                          role="button"
+                          style={{ cursor: "pointer" }}
+                          onClick={() => handleSelectLabel(row.category_name)}
+                        >
                           <td className="fw-medium">{row.category_name}</td>
                           <td className="text-end text-muted">
                             {formatNumber(row.planned)} €
@@ -576,6 +688,24 @@ export default function StatisticsChart({
               </div>
             </div>
 
+            <div className="card mb-4">
+              <div className="card-header bg-white fw-semibold">
+                <i className="bi bi-graph-up-arrow me-2 text-success"></i>
+                Évolution des revenus mensuels
+              </div>
+              <div className="card-body" style={{ height: "400px" }}>
+                <Line
+                  data={incomeLineData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "top" } },
+                    scales: { y: { beginAtZero: true } },
+                  }}
+                />
+              </div>
+            </div>
+
             <div className="card">
               <div className="card-header bg-white fw-semibold">
                 <i className="bi bi-cash-stack me-2 text-primary"></i>
@@ -596,6 +726,88 @@ export default function StatisticsChart({
           </div>
         )}
       </div>
+
+      {selectedLabel && (
+        <>
+          <div className="modal-backdrop fade show" onClick={closeBudgetModal}></div>
+          <div className="modal fade show d-block" tabIndex={-1} role="dialog">
+            <div className="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    <i className="bi bi-list-ul me-2 text-primary"></i>
+                    Budgets — {selectedLabel}
+                  </h5>
+                  <button type="button" className="btn-close" onClick={closeBudgetModal}></button>
+                </div>
+                <div className="modal-body">
+                  {loadingBudgets ? (
+                    <div className="d-flex justify-content-center py-4">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Chargement…</span>
+                      </div>
+                    </div>
+                  ) : budgetRows.length === 0 ? (
+                    <p className="text-muted mb-0">
+                      Aucun budget trouvé pour cette catégorie sur cette année.
+                    </p>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table table-sm table-hover align-middle mb-0">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Sous-catégorie</th>
+                            <th>Libellé</th>
+                            <th>Mois</th>
+                            <th className="text-end">Prévu</th>
+                            <th className="text-end">Réalisé</th>
+                            <th className="text-end">Écart</th>
+                            <th>Statut</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {budgetRows.map((row, idx) => {
+                            const variance = toNum(row.planned) - toNum(row.actual);
+                            return (
+                              <tr key={idx}>
+                                <td>{row.category_name}</td>
+                                <td className="text-muted">{row.label || "—"}</td>
+                                <td>{monthNames[row.month - 1] ?? row.month}</td>
+                                <td className="text-end text-muted">
+                                  {formatNumber(row.planned)} €
+                                </td>
+                                <td className="text-end">{formatNumber(row.actual)} €</td>
+                                <td
+                                  className={`text-end ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : ""}`}
+                                >
+                                  {variance > 0 ? "+" : ""}
+                                  {formatNumber(variance)} €
+                                </td>
+                                <td>
+                                  <span
+                                    className={`badge ${row.approved ? "bg-success" : "bg-secondary"}`}
+                                  >
+                                    {row.approved ? "Approuvé" : "Non approuvé"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline-secondary" onClick={closeBudgetModal}>
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

@@ -2,8 +2,10 @@
 
 namespace App\Repository;
 
+use App\Entity\Budget;
 use App\Entity\Subscription;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 
 class SubscriptionRepository extends ServiceEntityRepository
@@ -97,6 +99,53 @@ class SubscriptionRepository extends ServiceEntityRepository
             'occasional' => $monthsSinceStart === 0,
             default      => true, // 'monthly' et toute valeur inconnue
         };
+    }
+
+    /**
+     * Synchronise les abonnements actifs d'un mois donné vers des lignes de
+     * budget (création uniquement — ne touche pas aux lignes existantes).
+     * Ne flush pas : à la charge de l'appelant, pour pouvoir grouper le
+     * flush sur plusieurs mois (voir syncBudgetLinesForYear()).
+     */
+    public function syncBudgetLines(EntityManagerInterface $em, BudgetRepository $budgetRepo, int $year, int $month): int
+    {
+        $synced = 0;
+        foreach ($this->findActiveForPeriod($year, $month) as $sub) {
+            $exists = $budgetRepo->findOneBy([
+                'category' => $sub->getCategory(),
+                'account'  => $sub->getAccount(),
+                'year'     => $year,
+                'month'    => $month,
+            ]);
+            if ($exists) {
+                continue;
+            }
+
+            $em->persist((new Budget())
+                ->setCategory($sub->getCategory())
+                ->setAccount($sub->getAccount())
+                ->setYear($year)
+                ->setMonth($month)
+                ->setPlannedAmount((string) $sub->getAmount())
+                ->setActualAmount((string) $sub->getAmount())
+                ->setSourceSubscription($sub));
+            $synced++;
+        }
+
+        return $synced;
+    }
+
+    /**
+     * Idem syncBudgetLines() mais pour les 12 mois d'une année.
+     */
+    public function syncBudgetLinesForYear(EntityManagerInterface $em, BudgetRepository $budgetRepo, int $year): int
+    {
+        $synced = 0;
+        for ($m = 1; $m <= 12; $m++) {
+            $synced += $this->syncBudgetLines($em, $budgetRepo, $year, $m);
+        }
+
+        return $synced;
     }
 
     public function findAllWithRelations(): array

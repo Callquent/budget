@@ -61,6 +61,17 @@ class StatisticsController extends AbstractController
         $netPlannedMonthly = array_column($netByMonth, 'planned');
         $netActualMonthly  = array_column($netByMonth, 'actual');
 
+        // Évolution mensuelle des revenus, en miroir de celle des dépenses ci-dessus.
+        $incomeMonthlyTotals = $statisticsRepo->findYearlyMonthlyTotalsByType($year, 'income');
+        $plannedIncomeMonthly = array_fill(1, 12, 0.0);
+        $actualIncomeMonthly = array_fill(1, 12, 0.0);
+
+        foreach ($incomeMonthlyTotals as $row) {
+            $m = (int) $row['month'];
+            $plannedIncomeMonthly[$m] = (float) $row['planned'];
+            $actualIncomeMonthly[$m] = (float) $row['actual'];
+        }
+
         $currentYear = (int) $now->format('Y');
         $availableYears = range($currentYear - 2, $currentYear + 1);
 
@@ -77,7 +88,26 @@ class StatisticsController extends AbstractController
             'actualMonthly'      => array_values($actualMonthly),
             'netPlannedMonthly'  => array_values($netPlannedMonthly),
             'netActualMonthly'   => array_values($netActualMonthly),
+            'plannedIncomeMonthly' => array_values($plannedIncomeMonthly),
+            'actualIncomeMonthly'  => array_values($actualIncomeMonthly),
             'monthNames'         => array_values(BudgetLabels::MONTHS),
         ]);
+    }
+
+    // Détail mois par mois des budgets d'une catégorie (ou d'une catégorie parente
+    // et de ses sous-catégories), utilisé par le clic sur une part du camembert ou
+    // une ligne du tableau "Détail par catégorie" côté front.
+    #[Route('/{year}/budgets', name: 'budgets', requirements: ['year' => '\d{4}'])]
+    public function budgets(Request $request, StatisticsRepository $statisticsRepo, int $year): Response
+    {
+        $label = $request->query->get('label');
+        if (!$label) {
+            return $this->json(['error' => 'Le paramètre label est requis.'], 400);
+        }
+
+        $groupBy = $request->query->get('groupBy', 'category');
+        $budgets = $statisticsRepo->findBudgetsForLabel($year, $label, $groupBy !== 'subcategory');
+
+        return $this->json(['budgets' => $budgets]);
     }
 }
