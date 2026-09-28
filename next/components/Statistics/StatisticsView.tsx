@@ -76,34 +76,37 @@ export default function StatisticsView({ year }: StatisticsViewProps) {
 
   return (
     <>
-      <div className="d-flex align-items-center gap-2 year-nav mb-4">
-        <span className="text-muted me-2 small fw-semibold">ANNÉE</span>
-        {availableYears.map((y) => (
-          <Link
-            key={y}
-            href={`/statistics/${y}`}
-            className={`btn btn-sm ${y === parseInt(year) ? "btn-dark" : "btn-outline-secondary"}`}
-          >
-            {y}
-            {y === currentYear && (
-              <span className="badge bg-primary ms-1" style={{ fontSize: ".6rem" }}>
-                en cours
-              </span>
-            )}
-          </Link>
-        ))}
+      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div className="btn-group btn-group-sm" role="group" aria-label="Année">
+          {availableYears.map((y) => (
+            <Link
+              key={y}
+              href={`/statistics/${y}`}
+              className={`btn ${y === parseInt(year) ? "btn-dark" : "btn-outline-secondary"}`}
+            >
+              {y}
+              {y === currentYear && (
+                <span
+                  className="d-inline-block rounded-circle bg-primary ms-1 align-middle"
+                  style={{ width: 6, height: 6 }}
+                  title="Année en cours"
+                ></span>
+              )}
+            </Link>
+          ))}
+        </div>
 
-        <div className="btn-group ms-auto" role="group">
+        <div className="btn-group btn-group-sm" role="group" aria-label="Regroupement">
           <button
             type="button"
-            className={`btn btn-sm ${groupBy === "category" ? "btn-dark" : "btn-outline-secondary"}`}
+            className={`btn ${groupBy === "category" ? "btn-dark" : "btn-outline-secondary"}`}
             onClick={() => setGroupBy("category")}
           >
             Catégories
           </button>
           <button
             type="button"
-            className={`btn btn-sm ${groupBy === "subcategory" ? "btn-dark" : "btn-outline-secondary"}`}
+            className={`btn ${groupBy === "subcategory" ? "btn-dark" : "btn-outline-secondary"}`}
             onClick={() => setGroupBy("subcategory")}
           >
             Sous-catégories

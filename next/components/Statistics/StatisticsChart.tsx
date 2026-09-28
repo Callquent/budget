@@ -371,59 +371,64 @@ export default function StatisticsChart({
 
   return (
     <>
-      <ul className="nav nav-tabs mb-4" role="tablist">
-        <li className="nav-item" role="presentation">
-          <button
-            className={`nav-link ${activeTab === "dist" ? "active" : ""}`}
-            onClick={() => setActiveTab("dist")}
-            type="button"
-          >
-            <i className="bi bi-pie-chart-fill me-2"></i>Répartition
-          </button>
-        </li>
-        <li className="nav-item" role="presentation">
-          <button
-            className={`nav-link ${activeTab === "evo" ? "active" : ""}`}
-            onClick={() => setActiveTab("evo")}
-            type="button"
-          >
-            <i className="bi bi-graph-up me-2"></i>Évolution Mensuelle
-          </button>
-        </li>
-      </ul>
+      <div className="d-flex align-items-center justify-content-between border-bottom mb-4">
+        <ul className="nav nav-underline gap-2" role="tablist">
+          <li className="nav-item" role="presentation">
+            <button
+              className={`nav-link ${activeTab === "dist" ? "active" : "text-secondary"}`}
+              onClick={() => setActiveTab("dist")}
+              type="button"
+            >
+              Répartition
+            </button>
+          </li>
+          <li className="nav-item" role="presentation">
+            <button
+              className={`nav-link ${activeTab === "evo" ? "active" : "text-secondary"}`}
+              onClick={() => setActiveTab("evo")}
+              type="button"
+            >
+              Évolution
+            </button>
+          </li>
+        </ul>
 
-      <div className="tab-content">
         {activeTab === "dist" && (
-          <div className="tab-pane fade show active">
-            <div className="card mb-4">
-              <div
-                className="card-header bg-white fw-semibold d-flex align-items-center justify-content-between"
-                role="button"
-                onClick={() => setShowGroupPanel((v) => !v)}
-              >
-                <span>
-                  <i className="bi bi-diagram-3 me-2 text-primary"></i>
-                  Regrouper des catégories
+          <div className="position-relative pb-1">
+            <button
+              type="button"
+              className="btn btn-sm btn-light border d-flex align-items-center gap-2"
+              onClick={() => setShowGroupPanel((v) => !v)}
+            >
+              <i className="bi bi-diagram-3"></i>
+              Regrouper
+              {groups.length > 0 && (
+                <span className="badge rounded-pill bg-primary">{groups.length}</span>
+              )}
+            </button>
+
+            {showGroupPanel && (
+              <>
+                <div
+                  className="position-fixed top-0 start-0 w-100 h-100"
+                  style={{ zIndex: 1040 }}
+                  onClick={() => setShowGroupPanel(false)}
+                ></div>
+                <div
+                  className="card shadow position-absolute end-0 mt-2 p-3"
+                  style={{ zIndex: 1050, width: "min(440px, 90vw)" }}
+                >
                   {groups.length > 0 && (
-                    <span className="badge bg-primary ms-2">{groups.length}</span>
-                  )}
-                </span>
-                <i className={`bi bi-chevron-${showGroupPanel ? "up" : "down"}`}></i>
-              </div>
-              {showGroupPanel && (
-                <div className="card-body">
-                  {groups.length > 0 && (
-                    <div className="d-flex flex-wrap gap-2 mb-3">
+                    <div className="d-flex flex-wrap gap-1 mb-3">
                       {groups.map((g) => (
                         <span
                           key={g.label}
-                          className="badge bg-light text-dark border d-flex align-items-center gap-2 py-2 px-3"
+                          className="badge bg-light text-dark border fw-normal d-flex align-items-center gap-2 py-2 px-2"
+                          title={g.categories.join(", ")}
                         >
-                          <span>
-                            <strong>{g.label}</strong> ({g.categories.join(", ")})
-                          </span>
+                          {g.label}
                           <i
-                            className="bi bi-x-circle text-danger"
+                            className="bi bi-x text-muted"
                             role="button"
                             onClick={() => removeGroup(g.label)}
                           ></i>
@@ -432,66 +437,56 @@ export default function StatisticsChart({
                     </div>
                   )}
 
-                  <div className="row g-3 align-items-start">
-                    <div className="col-md-7">
-                      <div className="small text-muted fw-semibold mb-2">
-                        Sélectionner au moins 2 catégories à fusionner
-                      </div>
-                      <div
-                        className="d-flex flex-wrap gap-2"
-                        style={{ maxHeight: "180px", overflowY: "auto" }}
-                      >
-                        {categories.map((cat) => {
-                          const alreadyGrouped = groupedCategoriesSet.has(cat);
-                          return (
-                            <button
-                              key={cat}
-                              type="button"
-                              disabled={alreadyGrouped}
-                              className={`btn btn-sm ${
-                                selectedCats.includes(cat)
-                                  ? "btn-primary"
-                                  : "btn-outline-secondary"
-                              }`}
-                              onClick={() => toggleCatSelection(cat)}
-                              title={
-                                alreadyGrouped
-                                  ? "Déjà incluse dans un groupe existant"
-                                  : ""
-                              }
-                            >
-                              {cat}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="col-md-5">
-                      <div className="small text-muted fw-semibold mb-2">
-                        Nom du groupe affiché sur le graphique
-                      </div>
-                      <div className="input-group">
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="Ex : Abonnements"
-                          value={newGroupLabel}
-                          onChange={(e) => setNewGroupLabel(e.target.value)}
-                        />
+                  <div
+                    className="d-flex flex-wrap gap-1 mb-3"
+                    style={{ maxHeight: "160px", overflowY: "auto" }}
+                  >
+                    {categories.map((cat) => {
+                      const alreadyGrouped = groupedCategoriesSet.has(cat);
+                      return (
                         <button
-                          className="btn btn-primary"
+                          key={cat}
                           type="button"
-                          disabled={selectedCats.length < 2 || !newGroupLabel.trim()}
-                          onClick={createGroup}
+                          disabled={alreadyGrouped}
+                          className={`btn btn-sm ${
+                            selectedCats.includes(cat) ? "btn-primary" : "btn-outline-secondary"
+                          }`}
+                          onClick={() => toggleCatSelection(cat)}
+                          title={alreadyGrouped ? "Déjà dans un groupe" : ""}
                         >
-                          <i className="bi bi-plus-lg me-1"></i>Créer
+                          {cat}
                         </button>
-                      </div>
-                    </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="input-group input-group-sm">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Nom du groupe (2 catégories min.)"
+                      value={newGroupLabel}
+                      onChange={(e) => setNewGroupLabel(e.target.value)}
+                    />
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      disabled={selectedCats.length < 2 || !newGroupLabel.trim()}
+                      onClick={createGroup}
+                    >
+                      Créer
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="tab-content">
+        {activeTab === "dist" && (
+          <div className="tab-pane fade show active">
 
             <div className="row g-3 mb-4">
               <div className="col-md-6">
