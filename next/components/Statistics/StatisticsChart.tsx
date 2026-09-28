@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Fragment as ReactFragment } from "react";
 import {
   Chart as ChartJS,
   ArcElement,
@@ -163,6 +163,19 @@ export default function StatisticsChart({
     }[]
   >([]);
   const [loadingBudgets, setLoadingBudgets] = useState(false);
+  const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
+
+  function toggleMonth(month: number) {
+    setExpandedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(month)) {
+        next.delete(month);
+      } else {
+        next.add(month);
+      }
+      return next;
+    });
+  }
 
   // Affiche le détail des budgets d'une catégorie/sous-catégorie cliquée (ligne du
   // tableau ou part de camembert). Si le libellé cliqué correspond à un groupe
@@ -173,6 +186,7 @@ export default function StatisticsChart({
     setSelectedLabel(label);
     setLoadingBudgets(true);
     setBudgetRows([]);
+    setExpandedMonths(new Set());
 
     const customGroup = groups.find((g) => g.label === label);
     const rawLabels = customGroup ? customGroup.categories : [label];
@@ -753,7 +767,6 @@ export default function StatisticsChart({
                           <tr>
                             <th>Sous-catégorie</th>
                             <th>Libellé</th>
-                            <th>Mois</th>
                             <th className="text-end">Prévu</th>
                             <th className="text-end">Réalisé</th>
                             <th className="text-end">Écart</th>
@@ -761,33 +774,76 @@ export default function StatisticsChart({
                           </tr>
                         </thead>
                         <tbody>
-                          {budgetRows.map((row, idx) => {
-                            const variance = toNum(row.planned) - toNum(row.actual);
-                            return (
-                              <tr key={idx}>
-                                <td>{row.category_name}</td>
-                                <td className="text-muted">{row.label || "—"}</td>
-                                <td>{monthNames[row.month - 1] ?? row.month}</td>
-                                <td className="text-end text-muted">
-                                  {formatNumber(row.planned)} €
-                                </td>
-                                <td className="text-end">{formatNumber(row.actual)} €</td>
-                                <td
-                                  className={`text-end ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : ""}`}
-                                >
-                                  {variance > 0 ? "+" : ""}
-                                  {formatNumber(variance)} €
-                                </td>
-                                <td>
-                                  <span
-                                    className={`badge ${row.approved ? "bg-success" : "bg-secondary"}`}
+                          {Array.from({ length: 12 }, (_, i) => i + 1)
+                            .map((month) => ({
+                              month,
+                              rows: budgetRows.filter((r) => r.month === month),
+                            }))
+                            .filter((m) => m.rows.length > 0)
+                            .map((m) => {
+                              const planned = m.rows.reduce((s, r) => s + toNum(r.planned), 0);
+                              const actual = m.rows.reduce((s, r) => s + toNum(r.actual), 0);
+                              const variance = planned - actual;
+                              return (
+                                <ReactFragment key={m.month}>
+                                  <tr
+                                    className="table-light"
+                                    role="button"
+                                    onClick={() => toggleMonth(m.month)}
+                                    style={{ cursor: "pointer" }}
                                   >
-                                    {row.approved ? "Approuvé" : "Non approuvé"}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
+                                    <td colSpan={2} className="fw-semibold">
+                                      <i
+                                        className={`bi bi-chevron-${expandedMonths.has(m.month) ? "down" : "right"} me-2 text-muted`}
+                                      ></i>
+                                      {monthNames[m.month - 1] ?? m.month}
+                                    </td>
+                                    <td className="text-end fw-semibold text-muted">
+                                      {formatNumber(planned)} €
+                                    </td>
+                                    <td className="text-end fw-semibold">
+                                      {formatNumber(actual)} €
+                                    </td>
+                                    <td
+                                      className={`text-end fw-semibold ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : ""}`}
+                                    >
+                                      {variance > 0 ? "+" : ""}
+                                      {formatNumber(variance)} €
+                                    </td>
+                                    <td className="text-muted small">
+                                      {m.rows.length} ligne{m.rows.length > 1 ? "s" : ""}
+                                    </td>
+                                  </tr>
+                                  {expandedMonths.has(m.month) &&
+                                    m.rows.map((row, idx) => {
+                                    const rowVariance = toNum(row.planned) - toNum(row.actual);
+                                    return (
+                                      <tr key={idx}>
+                                        <td>{row.category_name}</td>
+                                        <td className="text-muted">{row.label || "—"}</td>
+                                        <td className="text-end text-muted">
+                                          {formatNumber(row.planned)} €
+                                        </td>
+                                        <td className="text-end">{formatNumber(row.actual)} €</td>
+                                        <td
+                                          className={`text-end ${rowVariance > 0 ? "text-success" : rowVariance < 0 ? "text-danger" : ""}`}
+                                        >
+                                          {rowVariance > 0 ? "+" : ""}
+                                          {formatNumber(rowVariance)} €
+                                        </td>
+                                        <td>
+                                          <span
+                                            className={`badge ${row.approved ? "bg-success" : "bg-secondary"}`}
+                                          >
+                                            {row.approved ? "Approuvé" : "Non approuvé"}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </ReactFragment>
+                              );
+                            })}
                         </tbody>
                       </table>
                     </div>
