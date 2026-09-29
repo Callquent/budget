@@ -123,36 +123,23 @@ export default function BudgetYearView() {
         </h1>
       </div>
 
-      <div className="card mb-4 border-0 shadow-sm rounded-3 p-3">
-        <div className="d-flex align-items-center gap-2 flex-wrap">
-          <span
-            className="text-uppercase text-muted me-1"
-            style={{
-              fontSize: ".7rem",
-              letterSpacing: ".08em",
-              fontWeight: 600,
-            }}
+      <div className="btn-group btn-group-sm mb-4" role="group" aria-label="Année">
+        {availableYears.map((y) => (
+          <button
+            key={y}
+            onClick={() => fetchYear(y)}
+            className={`btn ${y === yearState ? "btn-dark" : "btn-outline-secondary"}`}
           >
-            Année
-          </span>
-          {availableYears.map((y) => (
-            <button
-              key={y}
-              onClick={() => fetchYear(y)}
-              className={`btn btn-sm rounded-pill px-3 ${y === yearState ? "btn-primary" : "btn-outline-secondary"}`}
-            >
-              {y}
-              {y === currentYear && (
-                <span
-                  className={`badge ms-1 ${y === yearState ? "bg-white text-primary" : "bg-primary text-white"}`}
-                  style={{ fontSize: ".6rem" }}
-                >
-                  en cours
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+            {y}
+            {y === currentYear && (
+              <span
+                className="d-inline-block rounded-circle bg-primary ms-1 align-middle"
+                style={{ width: 6, height: 6 }}
+                title="Année en cours"
+              ></span>
+            )}
+          </button>
+        ))}
       </div>
 
       <div className="card mb-4 border-0 shadow-sm rounded-3">

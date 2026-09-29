@@ -30,6 +30,25 @@ import type { StatisticsChartProps } from "./Statistics.interface";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
+// Style épuré des tableaux, cohérent avec BudgetYearView : en-têtes discrets,
+// filets fins plutôt que des bordures Bootstrap épaisses, espacement généreux.
+const thStyle: React.CSSProperties = {
+  fontSize: ".72rem",
+  fontWeight: 600,
+  color: "#6c757d",
+  textTransform: "uppercase",
+  letterSpacing: ".06em",
+  borderBottom: "2px solid #e9ecef",
+  padding: "12px 16px",
+  whiteSpace: "nowrap",
+};
+
+const tdStyle: React.CSSProperties = {
+  borderBottom: "1px solid #eef0f2",
+  padding: "14px 16px",
+  verticalAlign: "middle",
+};
+
 function formatNumber(num: number | string) {
   return new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
@@ -177,6 +196,14 @@ export default function StatisticsChart({
     });
   }
 
+  const budgetMonths = Array.from(new Set(budgetRows.map((r) => r.month)));
+  const allMonthsExpanded =
+    budgetMonths.length > 0 && budgetMonths.every((m) => expandedMonths.has(m));
+
+  function toggleAllMonths() {
+    setExpandedMonths(allMonthsExpanded ? new Set() : new Set(budgetMonths));
+  }
+
   // Affiche le détail des budgets d'une catégorie/sous-catégorie cliquée (ligne du
   // tableau ou part de camembert). Si le libellé cliqué correspond à un groupe
   // personnalisé (regroupement manuel de catégories, voir plus haut), interroge
@@ -265,11 +292,17 @@ export default function StatisticsChart({
   };
 
   const sortArrow = (key: SortKey) => {
-    if (key !== sortKey) return <i className="bi bi-arrow-down-up text-muted ms-1 small"></i>;
+    if (key !== sortKey)
+      return (
+        <i
+          className="bi bi-chevron-expand text-muted opacity-50 ms-1"
+          style={{ fontSize: ".65rem" }}
+        ></i>
+      );
     return sortDir === "asc" ? (
-      <i className="bi bi-arrow-up ms-1 small"></i>
+      <i className="bi bi-caret-up-fill ms-1" style={{ fontSize: ".65rem" }}></i>
     ) : (
-      <i className="bi bi-arrow-down ms-1 small"></i>
+      <i className="bi bi-caret-down-fill ms-1" style={{ fontSize: ".65rem" }}></i>
     );
   };
 
@@ -506,7 +539,6 @@ export default function StatisticsChart({
               <div className="col-md-6">
                 <div className="card h-100">
                   <div className="card-header bg-white fw-semibold">
-                    <i className="bi bi-pie-chart-fill me-2 text-primary"></i>
                     Répartition Prévue (Annuelle)
                   </div>
                   <div className="card-body d-flex justify-content-center">
@@ -536,7 +568,6 @@ export default function StatisticsChart({
               <div className="col-md-6">
                 <div className="card h-100">
                   <div className="card-header bg-white fw-semibold">
-                    <i className="bi bi-pie-chart-fill me-2 text-success"></i>
                     Répartition Réelle (Annuelle)
                   </div>
                   <div className="card-body d-flex justify-content-center">
@@ -566,22 +597,31 @@ export default function StatisticsChart({
             </div>
 
             <div className="card">
-              <div className="card-header bg-white fw-semibold">
-                <i className="bi bi-table me-2 text-primary"></i>Détail par
-                catégorie
-              </div>
+              <div className="card-header bg-white fw-semibold">Détail par catégorie</div>
               <div className="table-responsive">
                 <table className="table table-hover mb-0 align-middle">
-                  <thead className="table-light">
+                  <thead>
                     <tr>
-                      <th role="button" onClick={() => handleSort("category")} style={{ cursor: "pointer" }}>
+                      <th
+                        role="button"
+                        onClick={() => handleSort("category")}
+                        style={{
+                          ...thStyle,
+                          cursor: "pointer",
+                          color: sortKey === "category" ? "#212529" : thStyle.color,
+                        }}
+                      >
                         Catégorie{sortArrow("category")}
                       </th>
                       <th
                         role="button"
                         onClick={() => handleSort("planned")}
                         className="text-end"
-                        style={{ cursor: "pointer" }}
+                        style={{
+                          ...thStyle,
+                          cursor: "pointer",
+                          color: sortKey === "planned" ? "#212529" : thStyle.color,
+                        }}
                       >
                         Total Prévu{sortArrow("planned")}
                       </th>
@@ -589,7 +629,11 @@ export default function StatisticsChart({
                         role="button"
                         onClick={() => handleSort("variance")}
                         className="text-end"
-                        style={{ cursor: "pointer" }}
+                        style={{
+                          ...thStyle,
+                          cursor: "pointer",
+                          color: sortKey === "variance" ? "#212529" : thStyle.color,
+                        }}
                       >
                         Écart{sortArrow("variance")}
                       </th>
@@ -597,7 +641,11 @@ export default function StatisticsChart({
                         role="button"
                         onClick={() => handleSort("actual")}
                         className="text-end"
-                        style={{ cursor: "pointer" }}
+                        style={{
+                          ...thStyle,
+                          cursor: "pointer",
+                          color: sortKey === "actual" ? "#212529" : thStyle.color,
+                        }}
                       >
                         Total Réalisé{sortArrow("actual")}
                       </th>
@@ -605,7 +653,11 @@ export default function StatisticsChart({
                         role="button"
                         onClick={() => handleSort("actualPct")}
                         className="text-end"
-                        style={{ cursor: "pointer" }}
+                        style={{
+                          ...thStyle,
+                          cursor: "pointer",
+                          color: sortKey === "actualPct" ? "#212529" : thStyle.color,
+                        }}
                       >
                         Pourcentage réalisé{sortArrow("actualPct")}
                       </th>
@@ -614,10 +666,7 @@ export default function StatisticsChart({
                   <tbody>
                     {sortedSummary.map((row, idx) => {
                       const variance = toNum(row.planned) - toNum(row.actual);
-                      const actualPct =
-                        totalActual > 0
-                          ? ((toNum(row.actual) / totalActual) * 100).toFixed(1)
-                          : "0,0";
+                      const pct = totalActual > 0 ? (toNum(row.actual) / totalActual) * 100 : 0;
                       return (
                         <tr
                           key={idx}
@@ -625,48 +674,59 @@ export default function StatisticsChart({
                           style={{ cursor: "pointer" }}
                           onClick={() => handleSelectLabel(row.category_name)}
                         >
-                          <td className="fw-medium">{row.category_name}</td>
-                          <td className="text-end text-muted">
+                          <td className="fw-medium" style={tdStyle}>
+                            {row.category_name}
+                          </td>
+                          <td className="text-end text-muted" style={tdStyle}>
                             {formatNumber(row.planned)} €
                           </td>
                           <td
-                            className={`text-end ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : ""}`}
+                            className={`text-end ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : "text-muted"}`}
+                            style={tdStyle}
                           >
-                            {variance > 0 ? "+" : ""}
-                            {formatNumber(variance)} €
+                            {variance !== 0
+                              ? `${variance > 0 ? "+" : ""}${formatNumber(variance)} €`
+                              : "—"}
                           </td>
-                          <td className="text-end">
+                          <td className="text-end fw-medium" style={tdStyle}>
                             {formatNumber(row.actual)} €
                           </td>
-                          <td className="text-end small text-muted">
-                            {actualPct} %
+                          <td className="text-end text-muted small" style={tdStyle}>
+                            {pct.toFixed(1)} %
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot className="table-light fw-bold">
-                    <tr>
-                      <td>TOTAL</td>
-                      <td className="text-end">
+                  <tfoot>
+                    <tr className="fw-semibold">
+                      <td style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}>
+                        Total
+                      </td>
+                      <td
+                        className="text-end text-muted"
+                        style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}
+                      >
                         {formatNumber(totalPlanned)} €
                       </td>
                       <td
-                        className={
-                          totalPlanned - totalActual !== 0
-                            ? totalPlanned - totalActual > 0
-                              ? "text-end text-success"
-                              : "text-end text-danger"
-                            : "text-end"
-                        }
+                        className={`text-end ${totalPlanned - totalActual > 0 ? "text-success" : totalPlanned - totalActual < 0 ? "text-danger" : "text-muted"}`}
+                        style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}
                       >
-                        {totalPlanned - totalActual > 0 ? "+" : ""}
-                        {formatNumber(totalPlanned - totalActual)} €
+                        {totalPlanned - totalActual !== 0
+                          ? `${totalPlanned - totalActual > 0 ? "+" : ""}${formatNumber(totalPlanned - totalActual)} €`
+                          : "—"}
                       </td>
-                      <td className="text-end">
+                      <td
+                        className="text-end"
+                        style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}
+                      >
                         {formatNumber(totalActual)} €
                       </td>
-                      <td className="text-end small text-muted">
+                      <td
+                        className="text-end text-muted small"
+                        style={{ ...tdStyle, borderBottom: "none", borderTop: "2px solid #e9ecef" }}
+                      >
                         {totalActual > 0 ? "100,0" : "0,0"} %
                       </td>
                     </tr>
@@ -747,7 +807,23 @@ export default function StatisticsChart({
                     <i className="bi bi-list-ul me-2 text-primary"></i>
                     Budgets — {selectedLabel}
                   </h5>
-                  <button type="button" className="btn-close" onClick={closeBudgetModal}></button>
+                  {budgetMonths.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 ms-3"
+                      onClick={toggleAllMonths}
+                    >
+                      <i
+                        className={`bi bi-${allMonthsExpanded ? "arrows-collapse" : "arrows-expand"}`}
+                      ></i>
+                      {allMonthsExpanded ? "Tout replier" : "Tout déplier"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-close ms-auto"
+                    onClick={closeBudgetModal}
+                  ></button>
                 </div>
                 <div className="modal-body">
                   {loadingBudgets ? (
@@ -762,15 +838,15 @@ export default function StatisticsChart({
                     </p>
                   ) : (
                     <div className="table-responsive">
-                      <table className="table table-sm table-hover align-middle mb-0">
-                        <thead className="table-light">
+                      <table className="table table-hover align-middle mb-0">
+                        <thead>
                           <tr>
-                            <th>Sous-catégorie</th>
-                            <th>Libellé</th>
-                            <th className="text-end">Prévu</th>
-                            <th className="text-end">Réalisé</th>
-                            <th className="text-end">Écart</th>
-                            <th>Statut</th>
+                            <th style={thStyle}>Sous-catégorie</th>
+                            <th style={thStyle}>Libellé</th>
+                            <th className="text-end" style={thStyle}>Prévu</th>
+                            <th className="text-end" style={thStyle}>Réalisé</th>
+                            <th className="text-end" style={thStyle}>Écart</th>
+                            <th style={thStyle}>Statut</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -787,30 +863,30 @@ export default function StatisticsChart({
                               return (
                                 <ReactFragment key={m.month}>
                                   <tr
-                                    className="table-light"
                                     role="button"
                                     onClick={() => toggleMonth(m.month)}
-                                    style={{ cursor: "pointer" }}
+                                    style={{ cursor: "pointer", backgroundColor: "#f8f9fa" }}
                                   >
-                                    <td colSpan={2} className="fw-semibold">
+                                    <td colSpan={2} className="fw-semibold" style={tdStyle}>
                                       <i
                                         className={`bi bi-chevron-${expandedMonths.has(m.month) ? "down" : "right"} me-2 text-muted`}
                                       ></i>
                                       {monthNames[m.month - 1] ?? m.month}
                                     </td>
-                                    <td className="text-end fw-semibold text-muted">
+                                    <td className="text-end fw-semibold text-muted" style={tdStyle}>
                                       {formatNumber(planned)} €
                                     </td>
-                                    <td className="text-end fw-semibold">
+                                    <td className="text-end fw-semibold" style={tdStyle}>
                                       {formatNumber(actual)} €
                                     </td>
                                     <td
                                       className={`text-end fw-semibold ${variance > 0 ? "text-success" : variance < 0 ? "text-danger" : ""}`}
+                                      style={tdStyle}
                                     >
                                       {variance > 0 ? "+" : ""}
                                       {formatNumber(variance)} €
                                     </td>
-                                    <td className="text-muted small">
+                                    <td className="text-muted small" style={tdStyle}>
                                       {m.rows.length} ligne{m.rows.length > 1 ? "s" : ""}
                                     </td>
                                   </tr>
@@ -819,19 +895,24 @@ export default function StatisticsChart({
                                     const rowVariance = toNum(row.planned) - toNum(row.actual);
                                     return (
                                       <tr key={idx}>
-                                        <td>{row.category_name}</td>
-                                        <td className="text-muted">{row.label || "—"}</td>
-                                        <td className="text-end text-muted">
+                                        <td style={tdStyle}>{row.category_name}</td>
+                                        <td className="text-muted" style={tdStyle}>
+                                          {row.label || "—"}
+                                        </td>
+                                        <td className="text-end text-muted" style={tdStyle}>
                                           {formatNumber(row.planned)} €
                                         </td>
-                                        <td className="text-end">{formatNumber(row.actual)} €</td>
+                                        <td className="text-end" style={tdStyle}>
+                                          {formatNumber(row.actual)} €
+                                        </td>
                                         <td
                                           className={`text-end ${rowVariance > 0 ? "text-success" : rowVariance < 0 ? "text-danger" : ""}`}
+                                          style={tdStyle}
                                         >
                                           {rowVariance > 0 ? "+" : ""}
                                           {formatNumber(rowVariance)} €
                                         </td>
-                                        <td>
+                                        <td style={tdStyle}>
                                           <span
                                             className={`badge ${row.approved ? "bg-success" : "bg-secondary"}`}
                                           >
