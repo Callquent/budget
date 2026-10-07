@@ -3,6 +3,7 @@ import React, { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import type { AccountInterface } from "../Account/Account.interface";
 import type { SubscriptionInterface } from "../Subscription/Subscription.interface";
+import type { SavingsGoalInterface } from "../Savings/Savings.interface";
 import OCRModal from "../OCR/OCRModal";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -87,7 +88,13 @@ export default function BudgetMonthView({
         headers: { Accept: "application/json" },
       },
     );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      // Les erreurs métier (ex: solde insuffisant pour approuver une ligne
+      // d'épargne) sont renvoyées en JSON sous la forme { error: "..." } —
+      // on les fait remonter telles quelles plutôt qu'un simple "HTTP 422".
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error ?? `HTTP ${res.status}`);
+    }
   }
 
   const handleApprove = async (b: Budget) => {
@@ -355,6 +362,7 @@ export default function BudgetMonthView({
     accounts,
     txByAccount,
     subscriptions,
+    savingsGoals,
     budgets,
     monthNames,
     frequencyLabels,
@@ -386,6 +394,19 @@ export default function BudgetMonthView({
         sub.account.id === b.account.id &&
         Math.abs(
           parseFloat(String(b.plannedAmount)) - parseFloat(String(sub.amount)),
+        ) < 0.01,
+    );
+  // Une ligne de budget qui correspond à un objectif d'épargne (même logique
+  // que isAbonnement — on matche par catégorie+compte+montant plutôt que par
+  // un champ sourceSavingsGoal direct, pour rester cohérent avec le pattern
+  // déjà en place ici).
+  const isEpargne = (b: (typeof budgets)[number]) =>
+    savingsGoals.some(
+      (g: SavingsGoalInterface) =>
+        g.category?.name === b.category.name &&
+        g.account?.id === b.account.id &&
+        Math.abs(
+          parseFloat(String(b.plannedAmount)) - parseFloat(String(g.contributionAmount)),
         ) < 0.01,
     );
 
@@ -714,7 +735,9 @@ export default function BudgetMonthView({
                           ? "table-success"
                           : isAbonnement(b)
                             ? "table-warning"
-                            : ""
+                            : isEpargne(b)
+                              ? "table-info"
+                              : ""
                       }
                       style={{ verticalAlign: "middle" }}
                     >
@@ -740,6 +763,15 @@ export default function BudgetMonthView({
                           >
                             <i className="bi bi-arrow-repeat me-1"></i>
                             abonnement
+                          </span>
+                        )}
+                        {isEpargne(b) && (
+                          <span
+                            className="badge ms-1 rounded-pill bg-info bg-opacity-10 text-info"
+                            style={{ fontSize: ".7rem" }}
+                          >
+                            <i className="bi bi-piggy-bank me-1"></i>
+                            épargne
                           </span>
                         )}
                       </td>

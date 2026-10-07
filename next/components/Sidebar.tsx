@@ -7,21 +7,62 @@ interface SidebarProps {
   onSearch?: (query: string) => void;
 }
 
-const NAV_ITEMS = [
-  { name: "Tableau de bord", href: "/", icon: "bi-house", exact: true },
-  { name: "Budget",          href: "/budget",        icon: "bi-calendar3" },
-  { name: "Transactions",    href: "/transactions",  icon: "bi-list-ul" },
-  { name: "Abonnements",     href: "/subscriptions", icon: "bi-arrow-repeat" },
-  { name: "Comptes",         href: "/accounts",      icon: "bi-bank" },
-  { name: "Catégories",      href: "/categories",    icon: "bi-tags" },
-  { name: "Statistiques",    href: "/statistics",    icon: "bi-graph-up-arrow" },
+interface NavItem {
+  name: string;
+  href: string;
+  icon: string;
+  exact?: boolean;
+}
+
+const NAV_GROUPS: { label: string; icon: string; items: NavItem[] }[] = [
+  {
+    label: "Pilotage",
+    icon: "bi-speedometer2",
+    items: [
+      { name: "Tableau de bord", href: "/",           icon: "bi-house", exact: true },
+      { name: "Budget",          href: "/budget",     icon: "bi-calendar3" },
+      { name: "Statistiques",    href: "/statistics", icon: "bi-graph-up-arrow" },
+    ],
+  },
+  {
+    label: "Mouvements",
+    icon: "bi-arrow-left-right",
+    items: [
+      { name: "Transactions", href: "/transactions",  icon: "bi-list-ul" },
+      { name: "Abonnements",  href: "/subscriptions", icon: "bi-arrow-repeat" },
+      { name: "Épargne",      href: "/savings",       icon: "bi-piggy-bank" },
+    ],
+  },
+  {
+    label: "Configuration",
+    icon: "bi-gear",
+    items: [
+      { name: "Comptes",    href: "/accounts",   icon: "bi-bank" },
+      { name: "Catégories", href: "/categories", icon: "bi-tags" },
+    ],
+  },
 ];
+
+// Barre mobile : mêmes 5 entrées qu'avant (la place manque pour les 8).
+const MOBILE_HREFS = ["/", "/budget", "/transactions", "/subscriptions", "/accounts"];
+const MOBILE_ITEMS = NAV_GROUPS.flatMap((g) => g.items).filter((i) =>
+  MOBILE_HREFS.includes(i.href),
+);
 
 export default function Sidebar({ onSearch }: SidebarProps) {
   const pathname = usePathname();
 
-  const isActive = (item: (typeof NAV_ITEMS)[0]) =>
+  const isActive = (item: NavItem) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
+
+  // Sections repliables : seule celle de la page courante est ouverte au départ.
+  const [open, setOpen] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      NAV_GROUPS.map((g) => [g.label, g.items.some((i) => isActive(i))]),
+    ),
+  );
+  const toggleGroup = (label: string) =>
+    setOpen((o) => ({ ...o, [label]: !o[label] }));
 
   return (
     <>
@@ -123,75 +164,111 @@ export default function Sidebar({ onSearch }: SidebarProps) {
 
         {/* Nav */}
         <nav style={{ padding: "12px 10px", flexGrow: 1 }}>
-          <p
-            style={{
-              fontSize: ".65rem",
-              fontWeight: 600,
-              letterSpacing: ".1em",
-              textTransform: "uppercase",
-              color: "#6b7280",
-              margin: "8px 10px 6px",
-            }}
-          >
-            Navigation
-          </p>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {NAV_ITEMS.map((item) => {
-              const active = isActive(item);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
+          {NAV_GROUPS.map((group) => {
+            const isOpen = !!open[group.label];
+            const hasActive = group.items.some((i) => isActive(i));
+            return (
+              <div key={group.label} style={{ marginBottom: "4px" }}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  aria-expanded={isOpen}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "9px 12px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "transparent",
+                    outline: "none",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    fontSize: ".875rem",
+                    color: hasActive ? "#fff" : "#e5e7eb",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,.05)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <i
+                    className={`bi ${group.icon}`}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      padding: "9px 12px",
-                      borderRadius: "8px",
-                      marginBottom: "2px",
-                      textDecoration: "none",
-                      fontWeight: active ? 600 : 400,
-                      fontSize: ".875rem",
-                      color: active ? "#fff" : "#9ca3af",
-                      background: active
-                        ? "linear-gradient(90deg, rgba(59,130,246,.25) 0%, rgba(99,102,241,.15) 100%)"
-                        : "transparent",
-                      borderLeft: active
-                        ? "3px solid #3b82f6"
-                        : "3px solid transparent",
-                      transition: "all .15s ease",
+                      fontSize: "1rem",
+                      width: "18px",
+                      textAlign: "center",
+                      flexShrink: 0,
+                      color: hasActive ? "#60a5fa" : "inherit",
                     }}
-                    onMouseEnter={(e) => {
-                      if (!active) {
-                        (e.currentTarget as HTMLElement).style.background =
-                          "rgba(255,255,255,.05)";
-                        (e.currentTarget as HTMLElement).style.color = "#e5e7eb";
-                      }
+                  ></i>
+                  <span style={{ flexGrow: 1 }}>{group.label}</span>
+                  <i
+                    className="bi bi-chevron-down"
+                    style={{
+                      fontSize: ".75rem",
+                      color: "#6b7280",
+                      transition: "transform .2s ease",
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
                     }}
-                    onMouseLeave={(e) => {
-                      if (!active) {
-                        (e.currentTarget as HTMLElement).style.background =
-                          "transparent";
-                        (e.currentTarget as HTMLElement).style.color = "#9ca3af";
-                      }
-                    }}
-                  >
-                    <i
-                      className={`bi ${item.icon}`}
-                      style={{
-                        fontSize: "1rem",
-                        width: "18px",
-                        textAlign: "center",
-                        flexShrink: 0,
-                        color: active ? "#60a5fa" : "inherit",
-                      }}
-                    ></i>
-                    {item.name}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                  ></i>
+                </button>
+
+                {isOpen && (
+                  <ul style={{ listStyle: "none", padding: 0, margin: "2px 0 0" }}>
+                    {group.items.map((item) => {
+                      const active = isActive(item);
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            style={{
+                              display: "block",
+                              padding: "8px 12px 8px 40px",
+                              borderRadius: "8px",
+                              marginBottom: "2px",
+                              textDecoration: "none",
+                              fontWeight: active ? 600 : 400,
+                              fontSize: ".85rem",
+                              color: active ? "#fff" : "#9ca3af",
+                              background: active
+                                ? "linear-gradient(90deg, rgba(59,130,246,.25) 0%, rgba(99,102,241,.15) 100%)"
+                                : "transparent",
+                              borderLeft: active
+                                ? "3px solid #3b82f6"
+                                : "3px solid transparent",
+                              transition: "all .15s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!active) {
+                                (e.currentTarget as HTMLElement).style.background =
+                                  "rgba(255,255,255,.05)";
+                                (e.currentTarget as HTMLElement).style.color = "#e5e7eb";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!active) {
+                                (e.currentTarget as HTMLElement).style.background =
+                                  "transparent";
+                                (e.currentTarget as HTMLElement).style.color = "#9ca3af";
+                              }
+                            }}
+                          >
+                            <span style={{ opacity: 0.5, marginRight: "8px" }}>–</span>
+                            {item.name}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Footer */}
@@ -222,7 +299,7 @@ export default function Sidebar({ onSearch }: SidebarProps) {
           justifyContent: "space-around",
         }}
       >
-        {NAV_ITEMS.slice(0, 5).map((item) => {
+        {MOBILE_ITEMS.map((item) => {
           const active = isActive(item);
           return (
             <Link

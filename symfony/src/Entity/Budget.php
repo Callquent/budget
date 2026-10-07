@@ -78,6 +78,14 @@ class Budget
     #[Groups(['budget:read', 'budget:month'])]
     private ?Subscription $sourceSubscription = null;
 
+    // Même principe que sourceSubscription, pour les lignes générées par la
+    // synchronisation d'un objectif d'épargne (voir
+    // SavingsGoalRepository::syncBudgetLines()).
+    #[ORM\ManyToOne(targetEntity: SavingsGoal::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['budget:read', 'budget:month'])]
+    private ?SavingsGoal $sourceSavingsGoal = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getCategory(): ?Category { return $this->category; }
@@ -117,6 +125,9 @@ class Budget
 
     public function getSourceSubscription(): ?Subscription { return $this->sourceSubscription; }
     public function setSourceSubscription(?Subscription $sub): static { $this->sourceSubscription = $sub; return $this; }
+
+    public function getSourceSavingsGoal(): ?SavingsGoal { return $this->sourceSavingsGoal; }
+    public function setSourceSavingsGoal(?SavingsGoal $goal): static { $this->sourceSavingsGoal = $goal; return $this; }
 
     public function isApproved(): bool { return $this->approvedAt !== null; }
 

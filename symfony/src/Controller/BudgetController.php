@@ -2,11 +2,13 @@
 
 namespace App\Controller;
 
+use App\Entity\Account;
 use App\Entity\Budget;
 use App\Entity\Subscription;
 use App\Entity\Transaction;
 use App\Repository\AccountRepository;
 use App\Repository\BudgetRepository;
+use App\Repository\SavingsGoalRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TransactionRepository;
 use App\Support\BudgetLabels;
@@ -31,6 +33,7 @@ class BudgetController extends AbstractController
         AccountRepository $accountRepo,
         TransactionRepository $txRepo,
         SubscriptionRepository $subRepo,
+        SavingsGoalRepository $savingsRepo,
         EntityManagerInterface $em,
         int $year = 0
     ): Response {
@@ -40,6 +43,11 @@ class BudgetController extends AbstractController
         // Synchronisation abonnements → lignes budgétaires pour toute l'année
         $synced = $subRepo->syncBudgetLinesForYear($em, $repo, $year);
         if ($synced > 0) $em->flush();
+
+        // Idem pour les objectifs d'épargne, mais sans créer la ligne si le
+        // solde projeté du mois concerné est déjà insuffisant — voir
+        // syncSavingsGoalLinesForYear().
+        $synced += $this->syncSavingsGoalLinesForYear($em, $repo, $txRepo, $subRepo, $savingsRepo, $year);
 
         $summaryByMonth = $this->buildAnnualSummaryByMonth($repo, $year);
         $plannedTotals  = $this->buildPlannedTotals($repo, $year);
@@ -145,22 +153,31 @@ class BudgetController extends AbstractController
             $categoryType = $mb->getCategory()->getTransactionType();
             $amount       = (float) $mb->getPlannedAmount();
             $approved     = $mb->isApproved();
+            $actual       = (float) $mb->getActualAmount();
+            // Montant du mois (month_planned_net) : le RÉALISÉ dès qu'il existe
+            // (ligne approuvée, ou déjà des transactions), le prévu sinon.
+            $monthAmount  = ($approved || $actual > 0) ? $actual : $amount;
 
             if ($categoryType === 'transfer' && $mb->getDestinationAccount()) {
                 // Une seule ligne, mais un impact sur DEUX comptes : sortie
                 // (débit) sur account, entrée (crédit) sur destinationAccount.
                 $srcAid = $mb->getAccount()?->getId() ?? 'all';
                 $dstAid = $mb->getDestinationAccount()->getId();
-                $applyEntry($m, $srcAid, false, $amount, $approved);
-                $applyEntry($m, $dstAid, true, $amount, $approved);
+                $applyEntry($m, $srcAid, false, $monthAmount, $approved);
+                $applyEntry($m, $dstAid, true, $monthAmount, $approved);
             } else {
                 $aid      = $mb->getAccount()?->getId() ?? 'all';
                 $isCredit = $categoryType === 'income';
-                $applyEntry($m, $aid, $isCredit, $amount, $approved);
+                $applyEntry($m, $aid, $isCredit, $monthAmount, $approved);
             }
 
             // Seulement non-approuvés pour la projection cumulative
             if ($approved) continue;
+
+            // La projection utilise le même montant que le net du mois : le réalisé
+            // quand il existe, le prévu sinon. Les lignes approuvées sont exclues
+            // (leurs transactions sont déjà dans le solde réel).
+            $amount = $monthAmount;
 
             if ($categoryType === 'transfer' && $mb->getDestinationAccount()) {
                 $srcAid = $mb->getAccount()?->getId() ?? 'all';
@@ -324,21 +341,159 @@ class BudgetController extends AbstractController
 
     // ─── Vue mois ─────────────────────────────────────────────────────────────
 
+    /**
+     * Solde projeté cumulé d'UN compte à la fin d'un mois donné — même
+     * calcul que 'balance_projected' dans la vue annuelle (celui qui
+     * affiche par ex. "Estimation prévue du solde en fin de mois : -242,52€"
+     * sous Décembre). Réutilisé par approve() pour bloquer l'approbation
+     * d'une ligne d'épargne dont le mois est déjà annoncé négatif, même si
+     * le solde RÉEL actuel (aujourd'hui, en septembre) est encore positif.
+     */
+    private function getProjectedBalanceForMonth(
+        Account $account,
+        int $year,
+        int $month,
+        BudgetRepository $repo,
+        TransactionRepository $txRepo,
+        SubscriptionRepository $subRepo,
+    ): float {
+        $now          = new \DateTimeImmutable();
+        $currentYear  = (int) $now->format('Y');
+        $currentMonth = (int) $now->format('n');
+
+        $plannedTotals = $this->buildPlannedTotals($repo, $year);
+        $txMovements   = $this->buildTransactionMovements($txRepo, $year);
+        $subMovements  = $this->buildSubscriptionMovements($subRepo, $year);
+        $starting      = $this->buildStartingBalances($repo, $txRepo, $year, $currentYear);
+
+        $accountBalances = $this->buildAccountBalances(
+            [$account],
+            $year,
+            $currentYear,
+            $currentMonth,
+            $txMovements,
+            $subMovements,
+            $plannedTotals,
+            $starting,
+        );
+
+        return $accountBalances[$account->getId()][$month]['balance_projected']
+            ?? (float) $account->getBalance();
+    }
+
+    /**
+     * Synchronise les objectifs d'épargne dus sur (year, month) — mais NE
+     * CRÉE PAS la ligne budgétaire si le solde projeté du compte, une fois
+     * ce versement déduit, serait négatif : on préfère ne pas l'ajouter au
+     * budget de ce mois plutôt que de créer une ligne qu'il faudra de toute
+     * façon bloquer à l'approbation (voir approve()). Un goal ainsi "sauté"
+     * n'est pas définitivement perdu : dès que la situation s'améliore
+     * (solde réel qui monte, autre ligne annulée...), il sera synchronisé
+     * normalement au prochain chargement de la vue budget.
+     *
+     * Flush après CHAQUE ligne créée : le calcul du solde projeté du mois
+     * suivant dépend des lignes déjà décidées sur les mois précédents (ex:
+     * si le versement de mars a été sauté faute de fonds, avril doit voir
+     * un compte moins amputé qu'il ne le serait si mars avait été créé).
+     */
+    private function syncSavingsGoalLinesForMonth(
+        EntityManagerInterface $em,
+        BudgetRepository $repo,
+        TransactionRepository $txRepo,
+        SubscriptionRepository $subRepo,
+        SavingsGoalRepository $savingsRepo,
+        int $year,
+        int $month,
+    ): int {
+        $created = 0;
+        foreach ($savingsRepo->findActiveForPeriod($year, $month) as $goal) {
+            $exists = $repo->findOneBy([
+                'sourceSavingsGoal' => $goal,
+                'year'              => $year,
+                'month'             => $month,
+            ]);
+            if ($exists) {
+                continue;
+            }
+
+            // Plafonne au reste à épargner : getContributedAmount() inclut les lignes
+            // déjà créées (planifiées ou approuvées), donc le total ne dépasse jamais
+            // targetAmount. Plus rien à verser → on ne crée pas de ligne.
+            $remaining = (float) $goal->getTargetAmount() - $savingsRepo->getContributedAmount($goal);
+            if ($remaining <= 0.0) {
+                continue;
+            }
+            $contribution = round(min((float) $goal->getContributionAmount(), $remaining), 2);
+            $projected    = $this->getProjectedBalanceForMonth(
+                $goal->getAccount(),
+                $year,
+                $month,
+                $repo,
+                $txRepo,
+                $subRepo,
+            );
+
+            // $projected ne compte pas encore cette ligne (elle n'existe pas
+            // en base) : on simule son ajout en la déduisant nous-mêmes.
+            if ($projected - $contribution < 0) {
+                continue;
+            }
+
+            $em->persist((new Budget())
+                ->setCategory($goal->getCategory())
+                ->setAccount($goal->getAccount())
+                ->setYear($year)
+                ->setMonth($month)
+                ->setLabel($goal->getName())
+                ->setPlannedAmount((string) $contribution)
+                ->setActualAmount((string) $contribution)
+                ->setSourceSavingsGoal($goal));
+            $em->flush();
+            $created++;
+        }
+
+        return $created;
+    }
+
+    private function syncSavingsGoalLinesForYear(
+        EntityManagerInterface $em,
+        BudgetRepository $repo,
+        TransactionRepository $txRepo,
+        SubscriptionRepository $subRepo,
+        SavingsGoalRepository $savingsRepo,
+        int $year,
+    ): int {
+        $created = 0;
+        for ($m = 1; $m <= 12; $m++) {
+            $created += $this->syncSavingsGoalLinesForMonth($em, $repo, $txRepo, $subRepo, $savingsRepo, $year, $m);
+        }
+
+        return $created;
+    }
+
     #[Route('/{year}/{month}', name: 'month', requirements: ['year' => '\d{4}', 'month' => '\d{1,2}'])]
     public function month(
         BudgetRepository $repo,
         AccountRepository $accountRepo,
         TransactionRepository $txRepo,
         SubscriptionRepository $subRepo,
+        SavingsGoalRepository $savingsRepo,
         EntityManagerInterface $em,
         int $year,
         int $month
     ): Response {
         $accounts      = $accountRepo->findAllOrderedByName();
         $subscriptions = $subRepo->findActiveForPeriod($year, $month);
+        $savingsGoals  = $savingsRepo->findActiveForPeriod($year, $month);
 
         // Synchronisation abonnements → lignes budgétaires
         $synced = $subRepo->syncBudgetLines($em, $repo, $year, $month);
+        if ($synced > 0) $em->flush();
+
+        // Idem pour les objectifs d'épargne, mais sans créer la ligne si le
+        // solde projeté du mois est déjà insuffisant — voir
+        // syncSavingsGoalLinesForMonth().
+        $synced += $this->syncSavingsGoalLinesForMonth($em, $repo, $txRepo, $subRepo, $savingsRepo, $year, $month);
         if ($synced > 0) $em->flush();
 
         $budgets = $repo->findByPeriod($year, $month);
@@ -346,18 +501,24 @@ class BudgetController extends AbstractController
         // Mouvements du mois par compte
         $txByAccount = [];
         foreach ($accounts as $account) {
-            $txByAccount[$account->getId()] = ['credit' => 0, 'debit' => 0, 'subs' => 0];
+            $txByAccount[$account->getId()] = ['credit' => 0, 'debit' => 0, 'subs' => 0, 'savings' => 0];
         }
         foreach ($txRepo->findByPeriod($year, $month) as $tx) {
             $aid = $tx->getAccount()->getId();
-            if (!isset($txByAccount[$aid])) $txByAccount[$aid] = ['credit' => 0, 'debit' => 0, 'subs' => 0];
+            if (!isset($txByAccount[$aid])) $txByAccount[$aid] = ['credit' => 0, 'debit' => 0, 'subs' => 0, 'savings' => 0];
             $txByAccount[$aid][$tx->getType()] += (float) $tx->getAmount();
         }
         foreach ($subscriptions as $sub) {
             $aid = $sub->getAccount()->getId();
-            if (!isset($txByAccount[$aid])) $txByAccount[$aid] = ['credit' => 0, 'debit' => 0, 'subs' => 0];
+            if (!isset($txByAccount[$aid])) $txByAccount[$aid] = ['credit' => 0, 'debit' => 0, 'subs' => 0, 'savings' => 0];
             $txByAccount[$aid]['debit'] += (float) $sub->getAmount();
             $txByAccount[$aid]['subs']  += (float) $sub->getAmount();
+        }
+        foreach ($savingsGoals as $goal) {
+            $aid = $goal->getAccount()->getId();
+            if (!isset($txByAccount[$aid])) $txByAccount[$aid] = ['credit' => 0, 'debit' => 0, 'subs' => 0, 'savings' => 0];
+            $txByAccount[$aid]['debit']   += (float) $goal->getContributionAmount();
+            $txByAccount[$aid]['savings'] += (float) $goal->getContributionAmount();
         }
 
         $now = new \DateTimeImmutable();
@@ -371,10 +532,11 @@ class BudgetController extends AbstractController
             'accounts'        => $accounts,
             'txByAccount'     => $txByAccount,
             'subscriptions'   => $subscriptions,
+            'savingsGoals'    => $savingsGoals,
             'budgets'         => $budgets,
             'monthNames'      => BudgetLabels::MONTHS,
             'frequencyLabels' => BudgetLabels::FREQUENCIES,
-        ], 200, [], ['groups' => ['budget:month', 'budget:read', 'account:read', 'category:read', 'subscription:read']]);
+        ], 200, [], ['groups' => ['budget:month', 'budget:read', 'account:read', 'category:read', 'subscription:read', 'savings_goal:read']]);
     }
 
     // ─── CRUD ─────────────────────────────────────────────────────────────────
@@ -492,8 +654,13 @@ class BudgetController extends AbstractController
     }
 
     #[Route('/{id}/approve', name: 'approve', methods: ['POST'])]
-    public function approve(Budget $budget, EntityManagerInterface $em): Response
-    {
+    public function approve(
+        Budget $budget,
+        EntityManagerInterface $em,
+        BudgetRepository $repo,
+        TransactionRepository $txRepo,
+        SubscriptionRepository $subRepo,
+    ): Response {
         if ($budget->isApproved()) {
             return $this->json(['error' => 'Cette ligne est déjà approuvée.'], 409);
         }
@@ -504,6 +671,37 @@ class BudgetController extends AbstractController
         $categoryType = $budget->getCategory()->getTransactionType();
         $txDate = \DateTimeImmutable::createFromFormat('Y-n-j', $budget->getYear() . '-' . $budget->getMonth() . '-1');
         $label  = $budget->getLabel() ?? ($budget->getCategory()->getName() . ' — ' . $budget->getPeriodLabel());
+
+        // Une ligne générée par un objectif d'épargne ne doit pas mettre le
+        // compte à découvert. On vérifie le solde PROJETÉ cumulé jusqu'au
+        // mois de cette ligne (même calcul que la vue annuelle) plutôt que
+        // le solde réel d'aujourd'hui : une ligne d'épargne datée de
+        // décembre doit être bloquée dès maintenant (en septembre) si la
+        // trajectoire prévue jusqu'à décembre est déjà négative, même si le
+        // compte est positif là, tout de suite. Ne s'applique qu'aux lignes
+        // d'épargne — les autres dépenses/virements restent approuvables
+        // sans ce contrôle.
+        if ($budget->getSourceSavingsGoal() !== null) {
+            $projectedBalance = $this->getProjectedBalanceForMonth(
+                $budget->getAccount(),
+                $budget->getYear(),
+                $budget->getMonth(),
+                $repo,
+                $txRepo,
+                $subRepo,
+            );
+            if ($projectedBalance < 0) {
+                return $this->json([
+                    'error' => sprintf(
+                        "Solde insuffisant sur %s : selon les prévisions jusqu'à %s, ce versement d'épargne de %s€ laisserait le compte à %s€. Réduisez le montant, alimentez le compte, ou mettez l'objectif en pause.",
+                        $budget->getAccount()->getName(),
+                        $budget->getPeriodLabel(),
+                        number_format((float) $budget->getActualAmount(), 2, ',', ' '),
+                        number_format($projectedBalance, 2, ',', ' '),
+                    ),
+                ], 422);
+            }
+        }
 
         if ($categoryType === 'transfer') {
             if (!$budget->getDestinationAccount()) {

@@ -1,3 +1,5 @@
+import type { SavingsGoalInterface } from "../Savings/Savings.interface";
+
 interface BudgetBase {
   plannedAmount: number;
   actualAmount: number;
@@ -37,7 +39,7 @@ export interface BudgetFormProps {
 }
 
 export interface TxByAccount {
-  [accountId: number]: { credit: number; debit: number; subs: number };
+  [accountId: number]: { credit: number; debit: number; subs: number; savings: number };
 }
 
 export interface SummaryRow {
@@ -63,6 +65,7 @@ export interface MonthData {
   accounts: any[];
   txByAccount: TxByAccount;
   subscriptions: any[];
+  savingsGoals: SavingsGoalInterface[];
   budgets: Budget[];
 }
 
